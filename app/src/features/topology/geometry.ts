@@ -113,6 +113,14 @@ export function elbow(corners: readonly Point[], radius = 10): Route {
   return sample(d, line);
 }
 
+/** Two routes as one, the second starting where the first ends. */
+export function join(a: Route, b: Route): Route {
+  const end = a.points.at(-1)!;
+  const start = b.points[0]!;
+  if (dist(end, start) > 0.5) throw new Error('Routes do not meet');
+  return sample(`${a.d} ${b.d.replace(/^M[^A-Za-z]*/, '')}`, [...a.points, ...b.points.slice(1)]);
+}
+
 /** The same path, travelled from its end to its start (the lane of a link's other direction). */
 export function reversed(route: Route): Route {
   return { d: route.d, points: route.points.toReversed(), length: route.length };

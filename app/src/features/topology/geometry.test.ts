@@ -5,6 +5,7 @@ import {
   elbow,
   fitScale,
   inside,
+  join,
   onEdge,
   overlaps,
   type Point,
@@ -65,6 +66,17 @@ describe('routes', () => {
       expect(pt.y).toBeGreaterThanOrEqual(0);
       expect(pt.y).toBeLessThanOrEqual(8.001);
     }
+  });
+
+  test('two routes joined end to end are one route', () => {
+    const drop = straight(p(0, 0), p(0, 50));
+    const bend = curve(p(0, 50), p(0, 90), p(120, 60), p(120, 100));
+    const both = join(drop, bend);
+    expect(both.d).toBe('M0 0 L0 50 C0 90 120 60 120 100');
+    expect(Math.abs(both.length - (drop.length + bend.length))).toBeLessThan(1);
+    expect(both.points[0]).toEqual(p(0, 0));
+    expect(both.points.at(-1)).toEqual(p(120, 100));
+    expect(() => join(drop, straight(p(5, 5), p(9, 9)))).toThrow('do not meet');
   });
 
   test('a reversed route runs the same path the other way', () => {
