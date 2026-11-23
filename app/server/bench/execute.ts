@@ -325,7 +325,8 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
       p: spec.p,
       n: spec.n,
       r: spec.r,
-      onPhase: (phase, step) => setLive({ phase, step, ...(phase === 'loading' ? {} : { loadProgress: null }) }),
+      // Every phase starts without a loading progress: only `onLoadProgress` sets one, for the load in progress.
+      onPhase: (phase, step) => setLive({ phase, step, loadProgress: null }),
       onLoadProgress: (loadProgress) => setLive({ loadProgress }),
       onLine: (text) => line(text).pipe(Effect.andThen(setLive({}, true))),
       onSpawn: spawned,

@@ -209,7 +209,8 @@ export function parseModelsSseEvent(raw: unknown): ModelsSseEvent | null {
 /**
  * Streams `GET <baseUrl>/models/sse`: yields each recognized event until the server closes the stream (clean EOF) or
  * `signal` aborts it. Throws the `fetch` error when nothing answers, `LlamaHttpError` on a non-2xx status (e.g. 404 or
- * 503 on older builds without single-model `/models/sse`), `LlamaReplyError` when the body is not bytes, and
+ * 503 on older builds without single-model `/models/sse`), `LlamaReplyError` when a 2xx has no body or the body is
+ * not bytes, and
  * `LlamaStreamCutError` when reading the body fails mid-stream.
  */
 export async function* streamModelsSse(
@@ -221,7 +222,8 @@ export async function* streamModelsSse(
     headers: { accept: 'text/event-stream' },
     ...(o.signal ? { signal: o.signal } : {}),
   });
-  if (!res.ok || !res.body) throw new LlamaHttpError(res.status, await res.text().catch(() => ''));
+  if (!res.ok) throw new LlamaHttpError(res.status, await res.text().catch(() => ''));
+  if (!res.body) throw new LlamaReplyError('the stream has no body');
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   const parser = new SseParser();

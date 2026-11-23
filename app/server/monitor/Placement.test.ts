@@ -79,8 +79,10 @@ const fresh =
       Effect.scoped,
     );
 
-/** The placement, built now on what the test's scope holds. */
-const buildPlacement = Layer.build(Placement.layer).pipe(Effect.map(Context.get(Placement)));
+/** The placement, built now on what the test's scope holds, without the machine's GPUs (the same result in CI). */
+const buildPlacement = Layer.build(Placement.layerWith({ gpus: Effect.succeed([]) })).pipe(
+  Effect.map(Context.get(Placement)),
+);
 
 let nextId = 1;
 

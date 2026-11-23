@@ -8,6 +8,7 @@ import {
   stateLoadProgress,
 } from '@llama-webui/shared';
 import {
+  Cause,
   Clock,
   Context,
   Duration,
@@ -20,6 +21,7 @@ import {
   Metric,
   Option,
   type Path,
+  Predicate,
   PubSub,
   Schema,
   Scope,
@@ -372,9 +374,8 @@ export class Supervisor extends Context.Service<
           Effect.gen(function* () {
             const target = { host: running.cmd.host, port: running.cmd.port };
             let supported = false;
-            for (;;) {
-              const current = yield* SynchronizedRef.get(held);
-              if (!isThis(running)(current) || current.state.kind === 'stopping') return;
+            /** One connection to the stream: whether to connect again. */
+            const round = Effect.gen(function* () {
               const outcome = yield* streamModelsSse(target).pipe(
                 Stream.runForEach((event) =>
                   Effect.andThen(
@@ -387,7 +388,18 @@ export class Supervisor extends Context.Service<
                 Effect.result,
               );
               if (outcome._tag === 'Success' || outcome.failure._tag === 'ModelsSseCut') supported = true;
-              else if (outcome.failure._tag === 'ModelsSseUnsupported' && !supported) return;
+              else if (outcome.failure._tag === 'ModelsSseUnsupported' && !supported) return false;
+              return true;
+            }).pipe(
+              Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
+                Effect.as(Effect.logError('following /models/sse of llama-server', cause), true),
+              ),
+            );
+            for (;;) {
+              const current = yield* SynchronizedRef.get(held);
+              if (!isThis(running)(current) || current.state.kind === 'stopping') return;
+              const again = yield* round;
+              if (!again) return;
               yield* Effect.sleep(options.healthPoll);
             }
           }).pipe(Effect.provideContext(context));
@@ -440,28 +452,34 @@ export class Supervisor extends Context.Service<
          */
         const watchExternal = (port: number, pid: number | null): Effect.Effect<void> =>
           Effect.gen(function* () {
-            for (;;) {
-              const current = yield* SynchronizedRef.get(held);
-              if (!isSameExternal(current.state, port, pid)) return;
+            /** One look at `/props`, then one connection to the stream: whether to try again. */
+            const round = Effect.gen(function* () {
               const details = yield* props(probeUrl(null, port)).pipe(Effect.option);
               if (Option.isNone(details)) {
                 // A 503 during the first load, a slow or failed answer: tried again while this server is the one
                 // watched. A server gone leaves `external` (the loop ends at its next round).
                 const status = yield* health({ port });
                 if (Option.isNone(status)) yield* recheckExternal;
-                yield* Effect.sleep(options.healthPoll);
-                continue;
+                return true;
               }
-              if (!isServerProps(details.value) || details.value.role === 'router') return;
+              if (!isServerProps(details.value) || details.value.role === 'router') return false;
               const outcome = yield* streamModelsSse({ port }).pipe(
                 Stream.runForEach((event) => applyExternalEvent(port, pid, event)),
                 Effect.result,
               );
-              if (outcome._tag === 'Failure') {
-                if (outcome.failure._tag === 'ModelsSseUnsupported') return;
-              } else {
-                yield* recheckExternal;
-              }
+              if (outcome._tag === 'Success') yield* recheckExternal;
+              else if (outcome.failure._tag === 'ModelsSseUnsupported') return false;
+              return true;
+            }).pipe(
+              Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
+                Effect.as(Effect.logError('following /models/sse of an external llama-server', cause), true),
+              ),
+            );
+            for (;;) {
+              const current = yield* SynchronizedRef.get(held);
+              if (!isSameExternal(current.state, port, pid)) return;
+              const again = yield* round;
+              if (!again) return;
               yield* Effect.sleep(options.healthPoll);
             }
           }).pipe(Effect.provideContext(context));

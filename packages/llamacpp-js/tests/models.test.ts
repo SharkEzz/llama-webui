@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { LlamaHttpError, LlamaStreamCutError } from '../src/errors.ts';
+import { LlamaHttpError, LlamaReplyError, LlamaStreamCutError } from '../src/errors.ts';
 import { type ModelsSseEvent, parseModelsSseEvent, streamModelsSse } from '../src/models.ts';
 import { serve } from './helpers.ts';
 
@@ -179,6 +179,11 @@ describe('streamModelsSse', () => {
       collect(streamModelsSse('http://127.0.0.1:8080', { fetch: f503.impl })),
       (e: unknown) => e instanceof LlamaHttpError && e.status === 503,
     );
+  });
+
+  test('throws LlamaReplyError, not LlamaHttpError, on a 2xx without a body', async () => {
+    const impl = (() => Promise.resolve(new Response(null, { status: 200 }))) as typeof fetch;
+    await assert.rejects(collect(streamModelsSse('http://127.0.0.1:8080', { fetch: impl })), LlamaReplyError);
   });
 
   test('throws LlamaStreamCutError when the stream breaks mid-read', async () => {

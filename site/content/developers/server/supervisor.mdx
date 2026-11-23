@@ -207,7 +207,8 @@ inherited variable. Nothing else is added.
    `healthPoll` when `/props` fails (a `503` during the first load, a slow or failed answer; a server that no longer
    answers `/health` is rechecked and leaves `external`). A router stays in the generic `external` state because its
    events describe individual models. A single-model server can report `status`, `progress`, and
-   `supervisor.memory` once its properties are available.
+   `supervisor.memory` once its properties are available. A round of either watcher that dies on a defect is logged
+   (`following /models/sse of llama-server`, `… of an external llama-server`) and the next one runs.
 
 Stage-only SSE announcements, such as the start of projector loading, reuse the last stage order from the current load.
 

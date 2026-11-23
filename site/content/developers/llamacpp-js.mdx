@@ -77,12 +77,12 @@ console.log(catalog?.byName.get('-c')?.help);
 
 The errors are classes with a fixed `name`, so a caller can test them with `instanceof` or by name:
 
-| Class                 | When                                                                           | Carries                                                                      |
-| --------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| `LlamaHttpError`      | The server answered an HTTP error (or a stream response without a body).       | `status`, `body`, and `error`: the `LlamaError` of a JSON body, else `null`. |
-| `LlamaReplyError`     | A 2xx reply that is not what the endpoint returns (`/props` that is not JSON). | The message.                                                                 |
-| `LlamaStreamError`    | A streamed completion sent an `error` event.                                   | `error`, the `LlamaError`.                                                   |
-| `LlamaStreamCutError` | The stream ended or broke before `[DONE]`.                                     | The read error as `cause`, when there is one.                                |
+| Class                 | When                                                                                                         | Carries                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `LlamaHttpError`      | The server answered an HTTP error (or a stream response without a body).                                     | `status`, `body`, and `error`: the `LlamaError` of a JSON body, else `null`. |
+| `LlamaReplyError`     | A 2xx reply that is not what the endpoint returns (`/props` that is not JSON, `/models/sse` without a body). | The message.                                                                 |
+| `LlamaStreamError`    | A streamed completion sent an `error` event.                                                                 | `error`, the `LlamaError`.                                                   |
+| `LlamaStreamCutError` | The stream ended or broke before `[DONE]`.                                                                   | The read error as `cause`, when there is one.                                |
 
 A `fetch` that fails before any response (nothing listens, a timeout) throws its own error unchanged. Node's `fetch`
 has timeouts of its own (300 s without response headers, 300 s between two chunks): for a request that can stay

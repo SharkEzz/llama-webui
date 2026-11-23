@@ -17,6 +17,13 @@ interface Held {
   readonly suspended: boolean;
 }
 
+/** `state` without its loading `progress`. */
+const withoutProgress = (state: ServerState): ServerState => {
+  if (!('progress' in state)) return state;
+  const { progress: _, ...rest } = state;
+  return rest;
+};
+
 type Event =
   | { readonly kind: 'state'; readonly state: ServerState }
   | { readonly kind: 'memory'; readonly memory: ModelMemory | null }
@@ -108,6 +115,11 @@ export class Placement extends Context.Service<
         /** Recomputes placement on any state, memory or relevant log batch; publishes when changed. */
         const follow = Effect.fnUntraced(function* (event: Event) {
           const before = yield* Ref.get(held);
+          // A new loading progress alone changes nothing of the placement: no reread of the ring.
+          if (event.kind === 'state' && Equal.equals(withoutProgress(event.state), withoutProgress(before.state))) {
+            yield* Ref.set(held, { ...before, state: event.state });
+            return;
+          }
           const nextState = event.kind === 'state' ? event.state : before.state;
           const nextMemory = event.kind === 'memory' ? event.memory : before.memory;
           const next = yield* reread(before, nextState, nextMemory);
