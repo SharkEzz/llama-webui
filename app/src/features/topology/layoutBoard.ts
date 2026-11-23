@@ -32,6 +32,17 @@ const SOCKET = { x: 420, y: 70, size: 180 };
 const LANE = 14;
 const DIMM = { top: 40, h: 200, w: 36, step: 50, narrow: { w: 20, step: 28 } };
 const CHIPSET = { size: 100, stickStep: STICK.step };
+/** Lanes of the longest slot: the edge connector of a card is drawn that long. */
+const SLOT_LANES = 16;
+
+/**
+ * How many of a card's contacts carry its link, from the bracket's side: half of them at x8, a quarter at x4. Lanes
+ * that are not known light them all.
+ */
+export function litContacts(lanes: number | null, contacts: number): number {
+  if (lanes === null || !(lanes > 0)) return contacts;
+  return Math.max(1, Math.round((contacts * Math.min(lanes, SLOT_LANES)) / SLOT_LANES));
+}
 /** Slots drawn when the count of memory modules is not known, and which of four hold a module for a count. */
 const FILLED: Record<number, readonly number[]> = { 1: [1], 2: [1, 3], 3: [0, 1, 3], 4: [0, 1, 2, 3] };
 

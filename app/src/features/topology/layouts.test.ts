@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { FOUR, LARGE, LOOSE, MACHINES, MINE, NO_CPU, ODD, ONE } from './fixtures';
 import type { PeerLink } from './flows';
 import { crosses, inside, onEdge, overlaps } from './geometry';
-import { layoutBoard } from './layoutBoard';
+import { layoutBoard, litContacts } from './layoutBoard';
 import { layoutCards } from './layoutCards';
 import { treeOf } from './tree';
 
@@ -183,5 +183,21 @@ describe('board', () => {
     expect(slots).toHaveLength(3);
     expect(slots.map((r) => r.x)).toEqual(slots.map(() => slots[0]!.x));
     expect(slots.slice(1).map((r, i) => r.y > slots[i]!.y + slots[i]!.h)).toEqual([true, true]);
+  });
+});
+
+describe('litContacts', () => {
+  test('a slot lights the share of its contacts that its lanes take out of sixteen', () => {
+    expect(litContacts(16, 68)).toBe(68);
+    expect(litContacts(8, 68)).toBe(34);
+    expect(litContacts(4, 68)).toBe(17);
+    expect(litContacts(1, 68)).toBe(4);
+  });
+
+  test('a link whose lanes are unknown lights every contact, and one lane lights at least one', () => {
+    expect(litContacts(null, 68)).toBe(68);
+    expect(litContacts(0, 68)).toBe(68);
+    expect(litContacts(1, 8)).toBe(1);
+    expect(litContacts(32, 68)).toBe(68);
   });
 });

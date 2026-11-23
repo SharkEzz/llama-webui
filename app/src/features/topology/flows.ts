@@ -107,17 +107,20 @@ export interface NodeLive {
   barPct: number | null;
   /** Second line under the name (memory in use); null = none. */
   sub: string | null;
+  /** Lanes the link of a card in a slot trained at; null = not a card in a slot, or unknown. */
+  lanes: number | null;
   /** Every figure of the block, for its detail panel. */
   facts: Fact[];
 }
 
 /** Values of a block that is not a tank and has nothing to add to its name and headline. */
-const PLAIN: Pick<NodeLive, 'fillLevel' | 'layers' | 'cores' | 'barPct' | 'sub'> = {
+const PLAIN: Pick<NodeLive, 'fillLevel' | 'layers' | 'cores' | 'barPct' | 'sub' | 'lanes'> = {
   fillLevel: 'ok',
   layers: [],
   cores: [],
   barPct: null,
   sub: null,
+  lanes: null,
 };
 
 const linkLabel = (gen: number | null | undefined, width: number | null | undefined) =>
@@ -273,9 +276,12 @@ export function nodeLive(
 
     if (n.kind === 'gpu') {
       const g = gpuOf(snapshot, n);
+      // A GPU inside the processor is in no slot. The sample is read more often than the graph
+      const lanes = link?.kind === 'pcie' ? (g?.pcieWidth ?? link.widthCur ?? link.widthMax) : null;
       if (g?.hidden || g?.suspended) {
         out.set(n.id, {
           ...PLAIN,
+          lanes,
           loadPct: null,
           fillPct: null,
           dim: true,
@@ -328,6 +334,7 @@ export function nodeLive(
         headline: g?.utilPct != null ? formatPct(g.utilPct) : '—',
         barPct: g?.utilPct ?? null,
         sub: vram,
+        lanes,
         facts,
       });
     } else if (n.kind === 'cpu') {

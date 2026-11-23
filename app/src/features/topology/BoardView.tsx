@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { Block, factOf, FillPct, Layers, Threads, toneOfNode } from './blocks';
 import type { NodeLive } from './flows';
 import type { Rect } from './geometry';
-import { type BoardLayout, layoutBoard } from './layoutBoard';
+import { type BoardLayout, layoutBoard, litContacts } from './layoutBoard';
 import { Stage, type ViewProps } from './Stage';
 
 /*
@@ -17,6 +17,8 @@ import { Stage, type ViewProps } from './Stage';
 const NAME = 'truncate text-[12.5px] font-semibold tracking-tight';
 const SUB = 'text-[11.5px] whitespace-nowrap text-muted-foreground';
 const FIGURE = 'num text-foreground';
+/** The edge connector under a card: its margins in the card's width, and the width and pitch of a contact. */
+const CONNECTOR = { left: 26, right: 120, contact: 3, pitch: 6 };
 /** A part the size of a drive or less: one line. */
 const STICK_MAX_H = 40;
 
@@ -74,20 +76,36 @@ export function BoardView({ graph, live, peers, tones, ...stage }: ViewProps) {
         return (
           <Block key={node.id} {...block} className="flex flex-col justify-between rounded-[9px] px-3 pt-[9px] pb-2.5">
             <Slot node={node} live={l} />
-            {node.kind === 'gpu' && (
-              // The edge connector of a card in its slot
-              <span
-                aria-hidden="true"
-                className="absolute right-[120px] -bottom-1.5 left-[26px] h-1.5 rounded-b-[3px] opacity-50"
-                style={{
-                  background: 'repeating-linear-gradient(to right, var(--tone-amber) 0 3px, transparent 3px 6px)',
-                }}
-              />
-            )}
+            {node.kind === 'gpu' && <Connector width={rect.w} lanes={l.lanes} />}
           </Block>
         );
       })}
     </Stage>
+  );
+}
+
+/**
+ * The edge connector of a card in its slot, as long as an x16 one: the contacts its link uses are gold, from the
+ * bracket's side, the others gray (half of them at x8, three quarters at x4).
+ */
+function Connector({ width, lanes }: { width: number; lanes: number | null }) {
+  const { left, right, contact, pitch } = CONNECTOR;
+  const contacts = Math.floor((width - left - right + pitch - contact) / pitch);
+  const stripes = (color: string) =>
+    `repeating-linear-gradient(to right, ${color} 0 ${contact}px, transparent ${contact}px ${pitch}px)`;
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -bottom-1.5 h-1.5 rounded-b-[3px] opacity-50"
+      style={{
+        left,
+        width: contacts * pitch - (pitch - contact),
+        // The gold contacts over the gray ones, on the same pitch
+        backgroundImage: `${stripes('var(--tone-amber)')}, ${stripes('var(--muted-foreground)')}`,
+        backgroundSize: `${litContacts(lanes, contacts) * pitch}px 100%, 100% 100%`,
+        backgroundRepeat: 'no-repeat',
+      }}
+    />
   );
 }
 

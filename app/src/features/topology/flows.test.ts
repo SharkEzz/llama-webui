@@ -682,6 +682,35 @@ test('nodeLive: a GPU inside the processor has no PCIe link among its facts, wha
   expect(labels).not.toContain('PCIe link');
 });
 
+test('nodeLive: a card in a slot gives the lanes its link trained at, a GPU sample winning over the graph', () => {
+  const live = nodeLive(graph, snapshot, placement);
+  expect(live.get('pci:0000:01:00.0')!.lanes).toBe(8);
+  expect(live.get('pci:0000:08:00.0')!.lanes).toBe(4);
+  // Without a sample, what the graph read; without a current state, what the link can do
+  const wide = {
+    ...graph,
+    links: graph.links.map((l) => (l.id === 'a' ? { ...l, widthMax: 16, widthCur: null } : l)),
+  };
+  expect(nodeLive(graph, null, null).get('pci:0000:01:00.0')!.lanes).toBe(8);
+  expect(nodeLive(wide, null, null).get('pci:0000:01:00.0')!.lanes).toBe(16);
+  expect(nodeLive(wide, snapshot, null).get('pci:0000:01:00.0')!.lanes).toBe(8);
+});
+
+test('nodeLive: a GPU inside the processor, and a block that is not a card, have no lanes', () => {
+  const live = nodeLive(graph, snapshot, placement);
+  expect(live.get('pci:0000:0d:00.0')!.lanes).toBeNull();
+  expect(live.get('cpu')!.lanes).toBeNull();
+  expect(live.get('pci:0000:02:00.0')!.lanes).toBeNull();
+});
+
+test('nodeLive: a hidden card keeps the lanes of its slot', () => {
+  const s = {
+    ...snapshot,
+    allGpus: snapshot.allGpus.map((g) => (g.busId === '0000:08:00.0' ? { ...g, hidden: true } : g)),
+  } as Snapshot;
+  expect(nodeLive(graph, s, placement).get('pci:0000:08:00.0')).toMatchObject({ dim: true, lanes: 4 });
+});
+
 test('linkSpecs: the current state of each PCIe link, a GPU sample winning over the graph', () => {
   // Link `a` is Gen1 x8 in the graph (read at rest), Gen5 x8 in the sample
   expect(linkSpecs(graph, null)).toEqual(
