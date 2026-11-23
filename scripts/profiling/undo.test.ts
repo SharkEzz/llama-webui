@@ -1,12 +1,12 @@
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { copyDataDir, dataCopyOf } from './datadir.ts';
-import { alive, startTime, terminate, undo } from './instance.ts';
+import { alive, inspectorUrl, startTime, terminate, undo } from './instance.ts';
 import { EMPTY_STATE, runDir } from './run-dir.ts';
 import { worktreeAddArgs } from './target.ts';
 
@@ -122,4 +122,16 @@ test('a worktree that cannot be removed is reported, and the rest is still undon
   expect(out.failed[0]).toContain('could not remove the base worktree');
   expect(existsSync(folder)).toBe(true);
   expect(existsSync(dataCopyOf(run))).toBe(false);
+});
+
+test("the inspector of a second start in the same log is the one read, not the first start's", async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'profiling-log-'));
+  cleanups.push(() => rmSync(folder, { recursive: true, force: true }));
+  const log = join(folder, 'server.log');
+  writeFileSync(log, 'Debugger listening on ws://127.0.0.1:1111/first\nDebugger ending on ws://127.0.0.1:1111/first\n');
+  const from = statSync(log).size;
+  appendFileSync(log, 'Debugger listening on ws://127.0.0.1:2222/second\nFor help, see: https://nodejs.org\n');
+  await expect(inspectorUrl(log, from, process.pid, 1000)).resolves.toBe('ws://127.0.0.1:2222/second');
+  await expect(inspectorUrl(log, 0, process.pid, 1000)).resolves.toBe('ws://127.0.0.1:1111/first');
+  await expect(inspectorUrl(log, statSync(log).size, process.pid, 50)).rejects.toThrow('did not open its inspector');
 });

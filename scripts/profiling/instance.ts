@@ -1,7 +1,7 @@
 // The app under measure: the production build (with hidden source maps), the server under the inspector, its API,
 // the profile, and the undo that leaves the instance as it was found.
 import { type ChildProcess, spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync } from 'node:fs';
 import { connect } from 'node:net';
 import { basename, join } from 'node:path';
 import { Cdp } from './cdp.ts';
@@ -204,10 +204,15 @@ export interface Instance {
   stop: () => Promise<void>;
 }
 
-async function inspectorUrl(log: string, pid: number, timeoutMs: number): Promise<string> {
+/**
+ * The inspector's address a server wrote to its log, read from `from` on: a run's log holds every start of its server
+ * (the short one that reads the default profile, then the measured one), each with its own address.
+ */
+export async function inspectorUrl(log: string, from: number, pid: number, timeoutMs: number): Promise<string> {
   const end = now() + timeoutMs;
   while (now() < end) {
-    const url = /Debugger listening on (ws:\/\/\S+)/.exec(existsSync(log) ? readFileSync(log, 'utf8') : '')?.[1];
+    const written = existsSync(log) ? readFileSync(log).subarray(from).toString('utf8') : '';
+    const url = /Debugger listening on (ws:\/\/\S+)/.exec(written)?.[1];
     if (url !== undefined) return url;
     if (!alive(pid)) break;
     await sleep(20);
@@ -232,6 +237,7 @@ export async function startInstance(run: RunDir, options: Options, target: Targe
   const log = run.file('server.log');
   const args = ['--inspect=127.0.0.1:0', target.launcher, '--host', options.host, '--port', String(options.port)];
   if (options.dataDir !== null) args.push('--data-dir', options.dataDir);
+  const logged = existsSync(log) ? statSync(log).size : 0;
   const fd = openSync(log, 'a');
   const child = spawn(process.execPath, args, { cwd: REPO, detached: true, stdio: ['ignore', fd, fd] });
   closeSync(fd);
@@ -239,7 +245,7 @@ export async function startInstance(run: RunDir, options: Options, target: Targe
   const pid = child.pid;
   if (pid === undefined) throw new Error('the server did not spawn');
   run.writeState({ ...run.readState(), serverPid: pid, serverStart: startTime(pid) });
-  const inspector = await Cdp.connect(await inspectorUrl(log, pid, 10_000));
+  const inspector = await Cdp.connect(await inspectorUrl(log, logged, pid, 10_000));
   if (!(await waitHealth(baseUrl, 30_000))) throw new Error(`the server did not answer /api/health: see ${log}`);
   const api = (path: string, init?: { method?: string; body?: unknown }) => request(baseUrl, path, init);
 
