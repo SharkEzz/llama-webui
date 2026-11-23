@@ -3,7 +3,7 @@ import { Array as Arr, Clock, Context, Effect, Layer, Option, Order, Schema } fr
 import { SqlClient, SqlSchema } from 'effect/sql';
 import type { NewDownload } from '../hf/repo.ts';
 
-const Files = Schema.fromJsonString(Schema.Array(DownloadFile));
+const Files = DownloadFile.pipe(Schema.Array, Schema.fromJsonString);
 
 /** A row of `downloads`, its files decoded. */
 const Row = Schema.Struct({

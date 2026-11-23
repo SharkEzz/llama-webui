@@ -60,7 +60,7 @@ export class ChatApi extends HttpApiGroup.make('chat').add(
   HttpApiEndpoint.get('list', '/api/chat', { success: Schema.Array(ConversationSummary) }),
   // `profileId` omitted: the running server's profile; null: none.
   HttpApiEndpoint.post('create', '/api/chat', {
-    payload: Schema.Struct({ profileId: Schema.optionalKey(Schema.NullOr(Schema.Int)) }),
+    payload: Schema.Struct({ profileId: Schema.Int.pipe(Schema.NullOr, Schema.optionalKey) }),
     success: ConversationDetail.pipe(HttpApiSchema.status(201)),
     error: ProfileNotFound,
   }),

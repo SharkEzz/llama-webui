@@ -63,7 +63,7 @@ const Stats = Schema.Struct({
   pp: Schema.NullOr(Measure),
   tg: Schema.NullOr(Measure),
   draftAcceptPct: Schema.NullOr(Schema.Finite),
-  diskReadPeakBps: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+  diskReadPeakBps: Schema.Finite.pipe(Schema.NullOr, Schema.optionalKey),
 });
 const StatsJson = Schema.fromJsonString(Stats);
 const SpecJson = Schema.fromJsonString(StoredBenchSpec);

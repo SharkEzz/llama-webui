@@ -253,7 +253,9 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
       read: ({ handle }) =>
         Effect.all(
           [
-            Stream.mkString(Stream.decodeText(handle.stdout)).pipe(
+            handle.stdout.pipe(
+              Stream.decodeText,
+              Stream.mkString,
               Effect.flatMap((out) => Ref.set(stdout, out)),
               Effect.ignore,
             ),

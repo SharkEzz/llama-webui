@@ -28,6 +28,6 @@ export const boundedText: {
           ? Effect.fail(OutputTooLarge.make({ maxBytes, message: `Output exceeded ${maxBytes} bytes` }))
           : Effect.succeed(chunk);
       });
-      return Stream.mkString(Stream.decodeText(capped));
+      return capped.pipe(Stream.decodeText, Stream.mkString);
     }),
 );

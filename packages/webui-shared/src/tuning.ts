@@ -212,7 +212,7 @@ const ModelPath = Schema.String.check(Schema.isMinLength(1, { message: 'cannot b
 /** `POST /api/tuning/estimate` (strict). */
 export const EstimateRequest = Schema.Struct({
   modelPath: ModelPath,
-  mmprojPath: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  mmprojPath: Schema.String.pipe(Schema.NullOr, Schema.optionalKey),
   preset: PresetId,
   pinned: Schema.optionalKey(BenchParams),
   ctx: Schema.optionalKey(

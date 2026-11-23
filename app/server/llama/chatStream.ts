@@ -47,18 +47,14 @@ export type ChatStreamFailure = LlamaHttpFailed | LlamaStreamFailed | LlamaStrea
  * when they do not decode).
  */
 export const ChatChunk = Schema.Struct({
-  choices: Schema.optionalKey(
-    Schema.Array(
+  choices: Schema.Struct({
+    delta: Schema.optionalKey(
       Schema.Struct({
-        delta: Schema.optionalKey(
-          Schema.Struct({
-            content: Schema.optionalKey(Schema.NullOr(Schema.String)),
-            reasoning_content: Schema.optionalKey(Schema.NullOr(Schema.String)),
-          }),
-        ),
+        content: Schema.String.pipe(Schema.NullOr, Schema.optionalKey),
+        reasoning_content: Schema.String.pipe(Schema.NullOr, Schema.optionalKey),
       }),
     ),
-  ),
+  }).pipe(Schema.Array, Schema.optionalKey),
   // Timings that do not decode are dropped alone: the chunk keeps its delta.
   timings: Schema.optionalKey(LlamaTimingsSchema.pipe(Schema.catchDecoding(() => Effect.succeedNone))),
 });

@@ -58,7 +58,7 @@ export type RequestRecord = typeof RequestRecord.Type;
 export { slotContextTokens } from 'llamacpp-js/metrics';
 
 /** A detailed reading: missing or null = unknown (not provided by this vendor or card). */
-const Detail = Schema.optionalKey(Schema.NullOr(Schema.Finite));
+const Detail = Schema.Finite.pipe(Schema.NullOr, Schema.optionalKey);
 
 /** One GPU on one tick. */
 export const GpuSample = Schema.Struct({
@@ -80,7 +80,7 @@ export const GpuSample = Schema.Struct({
   powerLimitW: Detail,
   /** Factory power limit (NVIDIA); differs from `powerLimitW` if the user lowered it. */
   powerDefaultLimitW: Detail,
-  persistence: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
+  persistence: Schema.Boolean.pipe(Schema.NullOr, Schema.optionalKey),
   clockGrMhz: Detail,
   clockGrMaxMhz: Detail,
   clockMemMhz: Detail,
@@ -123,7 +123,7 @@ export const SystemSample = Schema.Struct({
   load: Schema.NullOr(Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])),
   mem: Schema.NullOr(MemInfo),
   /** Missing or null: not measurable (no perf, unknown PMU, permissions). */
-  memBw: Schema.optionalKey(Schema.NullOr(MemBandwidth)),
+  memBw: MemBandwidth.pipe(Schema.NullOr, Schema.optionalKey),
 });
 export type SystemSample = typeof SystemSample.Type;
 
@@ -169,7 +169,7 @@ export const Snapshot = Schema.Struct({
   /** null: no active server. */
   health: Schema.NullOr(Health),
   rates: Schema.Struct({ genTps: Schema.Finite, ppTps: Schema.Finite }),
-  slots: Schema.NullOr(Schema.Array(SlotView)),
+  slots: SlotView.pipe(Schema.Array, Schema.NullOr),
   kv: Schema.NullOr(Schema.Struct({ usedTokens: Schema.Int, totalTokens: Schema.Int })),
   /** `busySlots`: busy slots per llama_decode() call, an average (`llamacpp:n_busy_slots_per_decode`), so fractional. */
   queue: Schema.NullOr(Schema.Struct({ processing: Schema.Int, deferred: Schema.Int, busySlots: Schema.Finite })),
@@ -186,7 +186,7 @@ export const Snapshot = Schema.Struct({
     Schema.Struct({
       cpuPct: Schema.Finite,
       rssBytes: Schema.Finite,
-      dramBps: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+      dramBps: Schema.Finite.pipe(Schema.NullOr, Schema.optionalKey),
     }),
   ),
   system: Schema.NullOr(SystemSample),
@@ -206,7 +206,7 @@ export const HistoryDump = Schema.Struct({
   at: Schema.Int,
   /** Time of each point (ms), same length as each series. */
   times: Schema.Array(Schema.Int),
-  series: Schema.Record(Schema.String, Schema.Array(Schema.NullOr(Schema.Finite))),
+  series: Schema.Record(Schema.String, Schema.Finite.pipe(Schema.NullOr, Schema.Array)),
 });
 export type HistoryDump = typeof HistoryDump.Type;
 

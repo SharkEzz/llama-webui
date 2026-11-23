@@ -222,7 +222,7 @@ const eventually = Effect.fnUntraced(
 );
 
 /** The same on the `TestClock`: the polling on the live clock. */
-const eventuallyLive = <R>(check: Effect.Effect<boolean, never, R>) => TestClock.withLive(eventually(check));
+const eventuallyLive = <R>(check: Effect.Effect<boolean, never, R>) => check.pipe(eventually, TestClock.withLive);
 
 /** A live pause, for a fiber woken by a message to get to its next sleep. */
 const settle = TestClock.withLive(Effect.sleep('20 millis'));

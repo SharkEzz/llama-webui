@@ -15,13 +15,16 @@ test('the idle loop line of -lv 4 is noise, the request lines are not (#16)', ()
 it.effect('lines are rebuilt across chunks, cleaned, and the last one is flushed', () =>
   Effect.gen(function* () {
     const chunks = ['a\x1b[31mb\x1b[0m\r\n  \nc d  \n', 'e', 'f'];
-    const lines = yield* Stream.runCollect(linesOf(Stream.fromIterable(Arr.map(chunks, (c) => encoder.encode(c)))));
+    const lines = yield* Stream.fromIterable(Arr.map(chunks, (c) => encoder.encode(c))).pipe(
+      linesOf,
+      Stream.runCollect,
+    );
     assert.deepStrictEqual(lines, ['ab', 'c d', 'ef']);
 
     // "é" is two bytes in UTF-8: the first chunk ends between them.
     const bytes = encoder.encode('café\n');
     const cut = bytes.length - 2;
-    const split = yield* Stream.runCollect(linesOf(Stream.make(bytes.slice(0, cut), bytes.slice(cut))));
+    const split = yield* Stream.make(bytes.slice(0, cut), bytes.slice(cut)).pipe(linesOf, Stream.runCollect);
     assert.deepStrictEqual(split, ['café']);
   }),
 );

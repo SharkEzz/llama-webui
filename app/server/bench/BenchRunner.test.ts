@@ -718,14 +718,22 @@ describe('BenchRunner', () => {
         Arr.map((r: BenchRun) => r.status),
       );
       // The first item ends, then the loop waits on the clock.
-      yield* TestClock.withLive(until(Effect.map(statuses, (s) => s[0] === 'ok')));
+      yield* statuses.pipe(
+        Effect.map((s) => s[0] === 'ok'),
+        until,
+        TestClock.withLive,
+      );
       yield* TestClock.withLive(Effect.sleep('300 millis'));
       yield* Effect.map(statuses, (now) => assert.deepStrictEqual(now, ['ok', 'queued']));
       yield* TestClock.adjust('999 millis');
       yield* TestClock.withLive(Effect.sleep('300 millis'));
       yield* Effect.map(statuses, (now) => assert.deepStrictEqual(now, ['ok', 'queued']));
       yield* TestClock.adjust('1 millis');
-      yield* TestClock.withLive(until(Effect.map(statuses, (s) => s[1] !== 'queued')));
+      yield* statuses.pipe(
+        Effect.map((s) => s[1] !== 'queued'),
+        until,
+        TestClock.withLive,
+      );
     }).pipe(withRunner({ pause: '1 second' }), fresh),
   );
 

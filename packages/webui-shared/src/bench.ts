@@ -76,10 +76,10 @@ type Key = keyof BenchParams;
 /** The flags as they are stored: the fields of `BenchParams` without its rules (a reply carries what is stored). */
 export const StoredBenchParams = Schema.Struct({
   ngl: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Literal('all'), Schema.Literal('auto')])),
-  ot: Schema.optionalKey(Schema.Array(Schema.String)),
+  ot: Schema.String.pipe(Schema.Array, Schema.optionalKey),
   ncmoe: Schema.optionalKey(Schema.Finite),
-  dev: Schema.optionalKey(Schema.Array(Schema.String)),
-  ts: Schema.optionalKey(Schema.Array(Schema.Finite)),
+  dev: Schema.String.pipe(Schema.Array, Schema.optionalKey),
+  ts: Schema.Finite.pipe(Schema.Array, Schema.optionalKey),
   sm: Schema.optionalKey(Schema.Literals(SPLIT_MODES)),
   fa: Schema.optionalKey(Schema.Literals(FLASH_ATTN)),
   ctk: Schema.optionalKey(Schema.Literals(CACHE_TYPES)),

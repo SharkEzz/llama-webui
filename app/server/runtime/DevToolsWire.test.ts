@@ -3,7 +3,7 @@ import { Effect, Metric, Schema, String as Str } from 'effect';
 import { DevToolsSchema } from 'effect/devtools';
 import { rewrite } from './DevToolsWire.ts';
 
-const Wire = Schema.fromJsonString(Schema.toCodecJson(DevToolsSchema.Request));
+const Wire = DevToolsSchema.Request.pipe(Schema.toCodecJson, Schema.fromJsonString);
 const parse = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 it.effect('a metrics snapshot is sent in the shape of the VS Code extension', () =>

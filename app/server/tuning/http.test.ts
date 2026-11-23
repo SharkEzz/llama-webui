@@ -112,7 +112,7 @@ const ok = Effect.fnUntraced(function* <A, I>(
 const Failure = Schema.Struct({
   _tag: Schema.String,
   message: Schema.String,
-  issues: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.Array(Schema.Unknown) }))),
+  issues: Schema.Struct({ path: Schema.Array(Schema.Unknown) }).pipe(Schema.Array, Schema.optionalKey),
 });
 
 /** The status, `_tag` and `message` of an error reply, and the paths of its issues. */

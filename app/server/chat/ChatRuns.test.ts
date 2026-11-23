@@ -82,7 +82,7 @@ const follow = Effect.fnUntraced(function* (reply: ChatReply) {
 });
 
 /** Every event of `reply` until its `done`, in a fiber: joined once the reply ended. */
-const toEnd = (reply: ChatReply) => Effect.forkScoped(Stream.runCollect(reply.events));
+const toEnd = (reply: ChatReply) => reply.events.pipe(Stream.runCollect, Effect.forkScoped);
 
 /** The `done` message of the events `end` collected, once the reply ended. */
 const doneAt = <E>(end: Fiber.Fiber<ReadonlyArray<ChatEvent>, E>) => Effect.map(Fiber.join(end), doneOf);

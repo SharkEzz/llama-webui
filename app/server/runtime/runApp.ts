@@ -20,7 +20,7 @@ const report = <E>(cause: Cause.Cause<E>): Effect.Effect<void> => {
   if (Option.isSome(error) && !Runtime.getErrorReported(error.value)) return Effect.void;
   return Option.match(Option.flatMap(error, userMessage), {
     onSome: (message) => Console.error(`llama-webui: ${message}`),
-    onNone: () => Console.error(Cause.pretty(cause)),
+    onNone: () => cause.pipe(Cause.pretty, Console.error),
   });
 };
 

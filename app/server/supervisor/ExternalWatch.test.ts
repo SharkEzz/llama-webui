@@ -32,7 +32,7 @@ const BusyRunner = Layer.effect(
     const busy = yield* Busy;
     const unused = Effect.die('not used by the watch');
     return BenchRunner.of({
-      busy: Effect.flatten(Ref.get(busy)),
+      busy: busy.pipe(Ref.get, Effect.flatten),
       live: unused,
       sweepLive: unused,
       files: unused,

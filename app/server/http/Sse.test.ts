@@ -56,7 +56,7 @@ const read = Effect.fn('read')(function* (client: HttpClient.HttpClient) {
 it.live('events arrive as they are produced, then the response ends', () =>
   Effect.gen(function* () {
     const events = yield* Queue.unbounded<Event, Cause.Done>();
-    const ctx = yield* Layer.build(app(HttpRouter.add('GET', '/events', sseResponse(Stream.fromQueue(events)))));
+    const ctx = yield* HttpRouter.add('GET', '/events', sseResponse(Stream.fromQueue(events))).pipe(app, Layer.build);
     const reader = yield* read(Context.get(ctx, HttpClient.HttpClient));
     assert.strictEqual(reader.res.headers['content-type'], 'text/event-stream');
     assert.strictEqual(reader.res.headers['x-accel-buffering'], 'no');
@@ -74,9 +74,11 @@ it.live('events arrive as they are produced, then the response ends', () =>
 it.live('a ping comment is sent while no event comes', () =>
   Effect.gen(function* () {
     const events = yield* Queue.unbounded<Event, Cause.Done>();
-    const ctx = yield* Layer.build(
-      app(HttpRouter.add('GET', '/events', sseResponse(Stream.fromQueue(events), { pingInterval: '50 millis' }))),
-    );
+    const ctx = yield* HttpRouter.add(
+      'GET',
+      '/events',
+      sseResponse(Stream.fromQueue(events), { pingInterval: '50 millis' }),
+    ).pipe(app, Layer.build);
     const reader = yield* read(Context.get(ctx, HttpClient.HttpClient));
     yield* reader.until(': ping\n\n');
     yield* Queue.end(events);
@@ -90,7 +92,7 @@ it.live('a client that goes away interrupts the source', () =>
     const events = yield* Queue.unbounded<Event, Cause.Done>();
     const ended = yield* Deferred.make<void>();
     const source = Stream.fromQueue(events).pipe(Stream.ensuring(Deferred.succeed(ended, undefined)));
-    const ctx = yield* Layer.build(app(HttpRouter.add('GET', '/events', sseResponse(source))));
+    const ctx = yield* HttpRouter.add('GET', '/events', sseResponse(source)).pipe(app, Layer.build);
     const client = Context.get(ctx, HttpClient.HttpClient);
     const leaves = yield* Scope.make();
     const reader = yield* read(client).pipe(Scope.provide(leaves));
