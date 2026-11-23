@@ -1,11 +1,14 @@
 import { Check, Copy } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/lib/clipboard';
 import { highlight } from '@/lib/highlight';
 
-/** Code block: language, Copy button, shiki highlighting (plain text until it is ready). */
-export function CodeBlock({ code, lang }: { code: string; lang?: string | undefined }) {
+/**
+ * Code block: language, Copy button, shiki highlighting (plain text until it is ready). Memo: a finished block in the
+ * last piece of a streamed reply (a list item's) does not render again at each flush.
+ */
+export const CodeBlock = memo(function CodeBlock({ code, lang }: { code: string; lang?: string | undefined }) {
   const [html, setHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -56,4 +59,4 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string | undefi
       )}
     </div>
   );
-}
+});

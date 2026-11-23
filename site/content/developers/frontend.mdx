@@ -180,6 +180,24 @@ conversation whose reply is still running (`live: true`) attaches to it with `GE
 another conversation aborts the stream, which only unsubscribes: the generation goes on on the server (see
 [Chat runs](/developers/server/chat/)).
 
+`Markdown` (`features/chat/Markdown.tsx`) cuts a growing reply into pieces of top-level blocks (`features/chat/blocks.ts`)
+and renders each piece with its own react-markdown, memoized and keyed by its offset: the pieces before the last one are
+neither parsed nor rendered again, and a piece keeps its components (a code block its highlighting). The cuts come from
+the parse of the last piece, which rendering it makes anyway (a remark plugin notes where its top-level blocks start):
+finding them costs no parse of its own. A cut is made only where it is final and the pieces render as the whole text
+would:
+
+- before a block whose first line is complete, unindented, after a blank line (`2` after `1. a` is a paragraph until
+  its line ends: `2. b` would continue the list);
+- not after an indented code block (micromark reads the next block as if it interrupted a paragraph), nor after a list
+  item or a quote that ends inside a code or HTML block left open (closed by the next line, it does not take the same
+  blank lines as at the end of the text);
+- never in a reply with a link reference definition or a footnote (`]:`, `[^`), which ties blocks to text elsewhere, or
+  a carriage return: those render whole.
+
+A finished reply opened as such is one piece, parsed once. `Markdown.test.ts` renders a corpus and random documents at
+every cut of a stream with `react-dom/server`, by pieces and whole, and compares the HTML.
+
 ## WebSocket client
 
 `app/src/lib/ws.ts` holds the app's single WebSocket, opened by `connect()` (once) on `ws://` or `wss://` +
