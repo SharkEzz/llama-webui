@@ -12,6 +12,7 @@ import type { HttpApiClient } from 'effect/http-api';
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { errorMessage, errorTag, call as webCall, callStream as webCallStream } from './api';
+import { debugStore } from './debug/stores';
 
 /** Reply being written in the open conversation. */
 export interface Streaming {
@@ -225,3 +226,5 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
   });
 
 export const useChat = makeChatStore({ call: webCall, callStream: webCallStream });
+
+debugStore('chat', useChat);

@@ -1,6 +1,7 @@
 import type { ModelPlacement, TopologyGraph } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { call as webCall } from './api';
+import { debugStore } from './debug/stores';
 import { onWs, useWs, type WsStatus } from './ws';
 
 interface TopologyState {
@@ -95,3 +96,5 @@ export function startTopologySync(): void {
   started = true;
   onWs('placement', (m) => topology.receive(m.payload));
 }
+
+debugStore('topology', useTopology);

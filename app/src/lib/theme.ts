@@ -1,6 +1,7 @@
 import type { ThemeMode } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { call } from './api';
+import { debugStore } from './debug/stores';
 
 const KEY = 'llama-webui:theme';
 const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -58,3 +59,5 @@ export function startThemeSync() {
     })
     .catch(() => {});
 }
+
+debugStore('theme', useTheme);

@@ -292,3 +292,14 @@ test('with the debug mode on, a stream records its events and its end; off, noth
   await call((api) => api.t.get({ params: { id: 7 }, query: {} }));
   expect(snapshot().calls).toEqual([]);
 });
+
+test('with the debug mode on, a call records the payload it sent', async () => {
+  setDebugEnabled(true);
+  try {
+    const { call } = stub(json(200, { id: 1, name: 'one' }));
+    await call((api) => api.t.create({ payload: { id: 1, name: 'one' } }));
+    expect(snapshot().calls[0]).toMatchObject({ method: 'POST', path: '/t', request: { id: 1, name: 'one' } });
+  } finally {
+    setDebugEnabled(false);
+  }
+});

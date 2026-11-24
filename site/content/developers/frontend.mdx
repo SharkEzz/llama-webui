@@ -407,28 +407,54 @@ holds it for the components.
 
 - **Capture** (`lib/debug/capture.ts`). The taps sit in `lib/ws.ts` (`debugWs`: the status, each frame in and out, a
   frame that does not decode with its error, a close with its code and the next delay) and `lib/api.ts` (`debugCall()`:
-  a `transformClient` of the Effect `HttpApiClient` for the method, path, status and `content-length`, then the end of
-  `call()` or `callStream()`: the reply, the `_tag` of an error, an abort, the events of a stream). Each tap starts
+  a `transformClient` of the Effect `HttpApiClient` for the method, path, body sent, status and `content-length`, then the end of
+  `call()` or `callStream()`: the reply, the `_tag` of an error, an abort, the events of a stream, and llama-server's
+  measures from the chat's `done` event, decoded with the shared `MessageStats`). Each tap starts
   with `if (!enabled) return`: while the mode is off, nothing is kept, and turning it on starts from empty. The
-  entries are kept in bounded rings (500 frames, 300 calls, 50 streams of 200 events at most, 20 navigations), and the
+  entries are kept in bounded rings (500 frames, 300 calls, 50 streams of 200 events at most, 20 navigations, 300
+  files, 120 frame samples, 200 changes per store: a store that changes every second does not push out the rare changes of another), and the
   window reads a copy, `useDebugCapture((s) => s.view)`, published at most every 250 ms (`PUBLISH_MS`), so a burst of
   frames does not render the window on each one; pause stops the publishing, not the capture. `capture.ts` imports
   nothing from the app, so `ws.ts` and `api.ts` can import it without a cycle.
-- **Performance** (`lib/debug/perf.ts`, `features/debug/probes.tsx`). Two `PerformanceObserver`s, started and
-  stopped with the mode: `longtask` (Chromium) and `event` with `durationThreshold: 40`, for the interactions.
+- **Performance** (`lib/debug/perf.ts`, `features/debug/probes.tsx`). `PerformanceObserver`s, started and stopped
+  with the mode: `longtask` (Chromium), `event` with `durationThreshold: 40` for the interactions, and, `buffered` to
+  include the page's load, `largest-contentful-paint`, `layout-shift` (the CLS is the worst session window, `addShift`:
+  shifts less than 1 s apart, 5 s at most, none right after an input) and `resource` (the files, the API's `fetch`
+  left to the HTTP tab).
   `AppLayout` wraps the sidebar, the status bar and the page in a `<Profiler>`; they stay in the tree whatever the
   mode (adding one later would remount the page) and their `onRender` returns at once while the mode is off. React
   calls `onRender` only in a development build: the Performance tab says so outside `pnpm dev`
   (`import.meta.env.DEV`). `NavigationTimer` times each navigation from the router leaving `idle` (a lazy page, a
-  loader) to its return. The frame rate is a `requestAnimationFrame` loop that runs only while the Performance tab is
-  shown.
+  loader) to its return. The frame rate and the heap are sampled by a `requestAnimationFrame` loop
+  (`startFrameSampler()`, every 500 ms) that runs only while the window is open.
 - **Window** (`features/debug/`). `DebugButton`, in `AppLayout`, renders nothing while the mode is off and loads
   `DebugWindow` with `lazy()` on its first opening. The window is a Base UI `Dialog` with `modal={false}` and
   `disablePointerDismissal` (the page stays usable, a click beside it does not close it) holding a `GlassCard`; it is
   open in a memory store (`useDebugWindow`, `geometry.ts`), so it survives a change of page, not a reload. Its
   position and size are pure functions (`clampRect`: 360 × 240 at least, its header always on screen; `dragRect`)
   and are saved in `localStorage['llama-webui:debug-window']` at the end of a drag. A JSON detail is rendered only
-  once its row is opened.
+  once its row is opened. <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> (`isToggleShortcut`, by `code`: the same key on
+  every layout; Ctrl+Shift+D is the browsers' “bookmark all tabs”) opens and closes it.
+- **Stores** (`lib/debug/stores.ts`, `lib/debug/inspect.ts`, `features/debug/StoresPanel.tsx`). Each store module
+  registers its store, `debugStore('chat', useChat)`, at its end: the Stores tab lists the stores loaded so far and
+  imports none (loading a store module from the window would start its subscriptions). While the capture runs, the
+  registry subscribes to each store (one registered later at once; `onCaptureStart`, `onCaptureStop` let them go),
+  and `debugStoreChange` keeps each `set()` that changed a top-level key (`changedKeys`, `Object.is`, actions left
+  out) with the values of those keys before and after, as they are, not copied; a `set()` that changed nothing is
+  only counted. A store registered again under its name (its module reloaded by HMR) replaces the first and its
+  subscription. The tree (`JsonTree`) and the diff (`diffPaths`, when a change is opened) read the values
+  themselves, a branch only once opened, a list by pages of 100: a state can hold the monitor's history. A value a
+  store changes in place (that history, shared with the charts) shows no difference. The tab only reads: it does not
+  set a state (the stores mirror the server). A new store registers itself the same way.
+- **Export** (`lib/debug/json.ts`, `features/debug/export.ts`). `toPlain()` makes a value JSON (a `Map` an object, a
+  `Set` an array, no functions, no cycles); the export adds `redact()` unless private data is asked for: a home folder
+  (`/home/<user>`, `/Users/<user>`, `/root`) becomes `<home>`, the values under an `env` key and after `--api-key` or
+  `--hf-token` become `<hidden>`, a string under `content`, `reasoning`, `systemPrompt`, `prompt` or `title` becomes
+  `<N chars>`, and a store's change keeps its keys, not its values (a chat message sits in a list, under no key
+  `redact` knows). The text is found by the name of its key (`TEXT_KEYS`), not read: a new string field of the chat's
+  schemas makes `json.test.ts` fail until it is added to `TEXT_KEYS` or, if it holds no text a person wrote, to the
+  test's `NOT_TEXT`. The logs of llama-server are only cleared of the home folder: at a verbose level they can hold a
+  prompt.
 
 ## Code highlighting
 

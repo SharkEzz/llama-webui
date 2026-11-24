@@ -1,6 +1,7 @@
 import type { ImportResult, Profile, ProfileInput } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { call } from './api';
+import { debugStore } from './debug/stores';
 import { plural } from './format';
 
 interface ProfilesStore {
@@ -37,3 +38,5 @@ export function importSummary(r: ImportSummary): string {
   const m = r.skipped.length;
   return `${n} ${plural(n, 'profile')} imported${m ? `, ${m} skipped` : ''}`;
 }
+
+debugStore('profiles', useProfiles);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { type ApiCall, useDebugCapture } from '@/lib/debug/capture';
-import { fmt, formatBytes, formatTime } from '@/lib/format';
+import { fmt, formatBytes, formatRate, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Chip, Empty, JsonDetails, ms, Section, SHOWN } from './parts';
 
@@ -11,7 +11,15 @@ const STATE_TONE: Record<ApiCall['state'], string> = {
   aborted: 'text-muted-foreground italic',
 };
 
-/** The calls of the API, those in flight first, then the newest. */
+/** What a call sent and received, for its details. */
+function exchange(c: ApiCall): unknown {
+  const shown: Record<string, unknown> = {};
+  if ('request' in c) shown.sent = c.request;
+  shown.received = 'reply' in c ? c.reply : c.state;
+  return shown;
+}
+
+/** The calls of the API, those in flight first, then the newest; their time to the headers, then to the reply. */
 export function HttpPanel() {
   const calls = useDebugCapture((s) => s.view.calls);
   const [errorsOnly, setErrorsOnly] = useState(false);
@@ -38,7 +46,7 @@ export function HttpPanel() {
             {ordered.map((c) => (
               <li key={c.id}>
                 <JsonDetails
-                  value={() => ('reply' in c ? c.reply : c.state)}
+                  value={() => exchange(c)}
                   summary={
                     <span className="flex items-center gap-2">
                       <span className="num text-muted-foreground">{formatTime(c.at)}</span>
@@ -49,7 +57,15 @@ export function HttpPanel() {
                         {c.status ?? c.state}
                         {c.tag !== undefined && ` ${c.tag}`}
                       </span>
-                      <span className="w-16 shrink-0 text-right num text-muted-foreground">{ms(c.ms)}</span>
+                      <span className="w-16 shrink-0 text-right num text-muted-foreground" title="Until the headers">
+                        {ms(c.headersMs)}
+                      </span>
+                      <span
+                        className="w-16 shrink-0 text-right num text-muted-foreground"
+                        title="Until the reply is read"
+                      >
+                        {ms(c.ms)}
+                      </span>
                       <span className="w-16 shrink-0 text-right num text-muted-foreground">
                         {c.bytes === undefined ? '—' : formatBytes(c.bytes)}
                       </span>
@@ -116,6 +132,18 @@ export function SsePanel() {
                           {rate !== undefined && <span>{fmt(rate, 0)} chars/s</span>}
                           <span>total {ms(c.ms)}</span>
                         </span>
+                        {s.stats && (
+                          <span className="flex flex-wrap gap-x-3 num text-muted-foreground">
+                            <span>
+                              llama-server: prompt {fmt(s.stats.promptTokens, 0)} tok at {formatRate(s.stats.ppTps)}
+                              {s.stats.cachedTokens > 0 && ` (${fmt(s.stats.cachedTokens, 0)} cached)`}
+                            </span>
+                            <span>
+                              reply {fmt(s.stats.genTokens, 0)} tok at {formatRate(s.stats.tgTps)}
+                            </span>
+                            <span>ttft {ms(s.stats.ttftMs ?? undefined)}</span>
+                          </span>
+                        )}
                       </span>
                     }
                   />

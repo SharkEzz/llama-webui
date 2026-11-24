@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { call, errorMessage, errorTag } from './api';
+import { debugStore } from './debug/stores';
 import { formatShortDate } from './format';
 import { onWs, useWs } from './ws';
 
@@ -464,3 +465,5 @@ export function startTuningSync(): void {
     if (s.status === 'open' && prev.status !== 'open') void useTuning.getState().loadSweeps();
   });
 }
+
+debugStore('tuning', useTuning);

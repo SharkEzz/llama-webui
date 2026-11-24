@@ -1,21 +1,40 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import type { WsFrame } from '@/lib/debug/capture';
 import { useDebugCapture } from '@/lib/debug/capture';
 import { fmt, formatBytes, formatDuration, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { wsListenerCounts } from '@/lib/ws';
 import { Chip, Empty, Facts, JsonDetails, ms, Section, SHOWN, Table } from './parts';
 
+/** The text of a frame's content, made once per frame (the list is filtered four times a second). */
+const frameText = new WeakMap<WsFrame, string>();
+function textOf(f: WsFrame): string {
+  let text = frameText.get(f);
+  if (text === undefined) {
+    try {
+      text = (typeof f.data === 'string' ? f.data : JSON.stringify(f.data)).toLowerCase();
+    } catch {
+      text = '';
+    }
+    frameText.set(f, text);
+  }
+  return text;
+}
+
 /** The socket: its connection, the rate of each message type, and the frames, newest first. */
 export function WsPanel() {
   const view = useDebugCapture((s) => s.view);
   const [type, setType] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const query = useDeferredValue(search.trim().toLowerCase());
   const { ws } = view;
   const subscribers = wsListenerCounts();
   const now = view.at;
 
   const frames = view.frames
-    .filter((f) => type === null || f.type === type)
+    .filter((f) => (type === null || f.type === type) && (query === '' || textOf(f).includes(query)))
     .slice(-SHOWN)
     .toReversed();
 
@@ -87,8 +106,16 @@ export function WsPanel() {
           </div>
         }
       >
+        <Input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search the frames' content"
+          aria-label="Search the frames"
+          className="h-7 text-xs"
+        />
         {frames.length === 0 ? (
-          <Empty>No frame.</Empty>
+          <Empty>{query === '' ? 'No frame.' : 'No frame matches.'}</Empty>
         ) : (
           <ul className="flex flex-col font-mono text-[0.7rem]">
             {frames.map((f) => (

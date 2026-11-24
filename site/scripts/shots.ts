@@ -31,6 +31,16 @@ export interface Shot {
   viewport?: { width: number; height: number };
   /** Only captured when named on the command line. */
   manual?: boolean;
+  /** Run before the page loads, at each load: what the browser keeps (localStorage). */
+  beforeLoad?: (page: Page) => Promise<void>;
+  /**
+   * An animated shot: `play` acts the scene after `prepare`, calling `frame(holdMs)` for each image of the animation,
+   * shown `holdMs`. Only the region `clip` (CSS pixels of the window) is captured, written at its width and at 800 px.
+   */
+  animation?: {
+    clip: { x: number; y: number; width: number; height: number };
+    play: (page: Page, frame: (holdMs: number) => Promise<void>) => Promise<void>;
+  };
 }
 
 const byText = (text: string) => `::-p-text(${JSON.stringify(text)})`;
@@ -108,6 +118,26 @@ async function scrollMainToBottom(page: Page) {
     }
   });
 }
+
+/** Where the debug window opens in its animation (CSS pixels of the 1600 × 1000 window), and what is captured. */
+const DEBUG_RECT = { x: 560, y: 290, width: 1010, height: 630 };
+const DEBUG_CLIP = { x: 480, y: 230, width: 1120, height: 770 };
+
+/** Takes `count` frames `everyMs` apart, each shown as long: what the window shows live. */
+async function frames(frame: (holdMs: number) => Promise<void>, count: number, everyMs: number) {
+  for (let i = 0; i < count; i++) {
+    await frame(everyMs);
+    await new Promise((r) => setTimeout(r, everyMs));
+  }
+}
+
+/** The debug window's tab named `label`. */
+const debugTab = (page: Page, label: string) =>
+  page.evaluate((text) => {
+    const tab = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find((t) => t.textContent.trim() === text);
+    if (!tab) throw new Error(`no tab ${text}`);
+    tab.click();
+  }, label);
 
 /** Wide enough for the Topology page to keep its column at the right of both views. */
 const TOPOLOGY_VIEWPORT = { width: 1920, height: 1200 };
@@ -216,6 +246,60 @@ export const SHOTS: Shot[] = [
     prepare: (page) => scrollTo(page, 'Exploration (llama-bench)', 'center'),
   },
   { name: 'logs', path: '/logs', readyText: 'Auto-follow' },
+  // The debug window over the Dashboard, tab by tab (an animated WebP: a few seconds of each).
+  {
+    name: 'debug',
+    path: '/',
+    readyText: 'Load average',
+    beforeLoad: async (page) => {
+      await page.evaluateOnNewDocument((rect) => {
+        localStorage.setItem('llama-webui:debug', 'on');
+        localStorage.setItem('llama-webui:debug-window', rect);
+      }, JSON.stringify(DEBUG_RECT));
+    },
+    delayMs: 2500,
+    animation: {
+      clip: DEBUG_CLIP,
+      play: async (page, frame) => {
+        await frame(1200);
+        // A click of the mouse, as a person would: the focus it gives the window shows no ring.
+        await page.click('[aria-label="Debug window"]');
+        await page.waitForSelector(byText('Message types'), { visible: true });
+        await new Promise((r) => setTimeout(r, 1500));
+        await frames(frame, 6, 500);
+        await debugTab(page, 'HTTP');
+        await new Promise((r) => setTimeout(r, 400));
+        await frame(2200);
+        await debugTab(page, 'Performance');
+        await new Promise((r) => setTimeout(r, 400));
+        await frames(frame, 5, 500);
+        await debugTab(page, 'Stores');
+        await new Promise((r) => setTimeout(r, 600));
+        await frames(frame, 4, 500);
+        // A store's button also holds its counts: picked by the name it starts with.
+        await page.evaluate(() => {
+          const nav = document.querySelector('nav[aria-label="Stores"]');
+          const store = [...(nav?.querySelectorAll('button') ?? [])].find((b) => b.textContent.startsWith('monitor'));
+          if (!store) throw new Error('no monitor store');
+          store.click();
+        });
+        await page.waitForSelector(byText('history'), { visible: true });
+        await new Promise((r) => setTimeout(r, 300));
+        await frame(2000);
+        await page.evaluate(() => {
+          const chip = [...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('changes'));
+          chip?.click();
+        });
+        await page.waitForSelector('details summary', { visible: true });
+        await page.evaluate(() => {
+          const row = document.querySelector('details');
+          if (row) row.open = true;
+        });
+        await new Promise((r) => setTimeout(r, 400));
+        await frame(3000);
+      },
+    },
+  },
   { name: 'settings', path: '/settings', readyText: 'Run setup again' },
   {
     name: 'settings-monitoring',

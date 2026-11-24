@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { errorMessage, call as webCall } from './api';
+import { debugStore } from './debug/stores';
 import { useModels } from './models';
 import { onWs, useWs } from './ws';
 
@@ -228,3 +229,5 @@ export function queueProgress(items: ReadonlyArray<DownloadItem>, live: Download
   const done = active.reduce((a, i) => a + (live?.id === i.id ? live.bytesDone : i.bytesDone), 0);
   return total > 0 ? done / total : 0;
 }
+
+debugStore('downloads', useDownloads);

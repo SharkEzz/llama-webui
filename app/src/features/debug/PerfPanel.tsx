@@ -1,60 +1,99 @@
-import { useEffect, useState } from 'react';
-import { useDebugCapture } from '@/lib/debug/capture';
+import { type PerfSample, SAMPLES, useDebugCapture } from '@/lib/debug/capture';
 import { fmt, formatBytes, formatTime } from '@/lib/format';
 import { Empty, Facts, ms, Section, Table } from './parts';
 
-/** The JS heap, where the browser tells it (Chromium). */
-function heap(): { used: number; limit: number } | undefined {
-  const memory: unknown = Reflect.get(performance, 'memory');
-  if (typeof memory !== 'object' || memory === null) return undefined;
-  const used: unknown = Reflect.get(memory, 'usedJSHeapSize');
-  const limit: unknown = Reflect.get(memory, 'jsHeapSizeLimit');
-  return typeof used === 'number' && typeof limit === 'number' ? { used, limit } : undefined;
+/** A line of the last minute's samples, scaled from 0 to its highest value. */
+function Sparkline({ values, label }: { values: number[]; label: string }) {
+  const max = Math.max(...values, 1);
+  const step = 100 / (SAMPLES - 1);
+  const offset = (SAMPLES - values.length) * step;
+  const points = values.map((v, i) => `${(offset + i * step).toFixed(2)},${(30 - (v / max) * 28).toFixed(2)}`);
+  return (
+    <svg
+      viewBox="0 0 100 30"
+      preserveAspectRatio="none"
+      className="h-6 w-32 shrink-0 text-tone-blue"
+      role="img"
+      aria-label={label}
+    >
+      <polyline
+        points={points.join(' ')}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
 }
 
-/** Frames per second and the heap, measured every half second while the panel is shown. */
-function useFrameRate() {
-  const [sample, setSample] = useState<{ fps: number; heap: ReturnType<typeof heap> } | null>(null);
-  useEffect(() => {
-    let frames = 0;
-    let from = performance.now();
-    let id = requestAnimationFrame(function tick(t) {
-      frames++;
-      if (t - from >= 500) {
-        setSample({ fps: (frames * 1000) / (t - from), heap: heap() });
-        frames = 0;
-        from = t;
-      }
-      id = requestAnimationFrame(tick);
-    });
-    return () => cancelAnimationFrame(id);
-  }, []);
-  return sample;
+/** The last minute of a sample's value: its line, its last value, its range. */
+function History({
+  samples,
+  pick,
+  unit,
+}: {
+  samples: PerfSample[];
+  pick: (s: PerfSample) => number | undefined;
+  unit: (v: number) => string;
+}) {
+  const values = samples.flatMap((s) => {
+    const v = pick(s);
+    return v === undefined ? [] : [v];
+  });
+  if (values.length === 0) return <span className="text-muted-foreground">not reported</span>;
+  return (
+    <span className="flex items-center gap-3">
+      <Sparkline values={values} label={`last ${unit(values.at(-1)!)}`} />
+      <span className="min-w-0 truncate text-muted-foreground">
+        now {unit(values.at(-1)!)}, between {unit(Math.min(...values))} and {unit(Math.max(...values))}
+      </span>
+    </span>
+  );
+}
+
+/** Good, needs improvement or poor, by the thresholds of Web Vitals. */
+function rating(value: number, good: number, poor: number): string {
+  return value <= good ? 'good' : value <= poor ? 'needs improvement' : 'poor';
 }
 
 /** The page's smoothness, its navigations and, in development, the renders of its parts. */
 export function PerfPanel() {
   const perf = useDebugCapture((s) => s.view.perf);
   const renders = useDebugCapture((s) => s.view.renders);
-  const sample = useFrameRate();
-  const { longTasks: lt, interactions: ix } = perf;
+  const { longTasks: lt, interactions: ix, lcp, layoutShifts: shifts } = perf;
 
   return (
     <div className="flex flex-col gap-4 pt-3">
+      <Section title="Last minute">
+        <p className="text-xs text-muted-foreground">Sampled every half second while this window is open.</p>
+        <Facts
+          items={[
+            [
+              'Frame rate',
+              <History key="fps" samples={perf.samples} pick={(s) => s.fps} unit={(v) => `${fmt(v, 0)} fps`} />,
+            ],
+            ['JS heap', <History key="heap" samples={perf.samples} pick={(s) => s.heap} unit={formatBytes} />],
+          ]}
+        />
+      </Section>
+
       <Section title="Page">
         <Facts
           items={[
-            ['Frame rate', sample ? `${fmt(sample.fps, 0)} fps` : '—'],
+            ['Largest paint', lcp ? `${ms(lcp.ms)} (${rating(lcp.ms, 2500, 4000)}), ${lcp.element}` : 'not reported'],
             [
-              'JS heap',
-              sample?.heap ? `${formatBytes(sample.heap.used)} of ${formatBytes(sample.heap.limit)}` : 'not reported',
+              'Layout shifts',
+              shifts.count === 0
+                ? 'none'
+                : `CLS ${fmt(shifts.worstWindow, 3)} (${rating(shifts.worstWindow, 0.1, 0.25)}), ${shifts.count} shifts, ${fmt(shifts.total, 3)} in all`,
             ],
             ['Long tasks', lt.count === 0 ? 'none' : `${lt.count}, ${ms(lt.totalMs)} in all, worst ${ms(lt.worstMs)}`],
             [
               'Interactions',
               ix.count === 0
                 ? 'none over 40 ms'
-                : `${ix.count} over 40 ms, worst ${ms(ix.worst?.ms)} (${ix.worst?.name ?? ''}), last ${ms(ix.last?.ms)} (${ix.last?.name ?? ''})`,
+                : `${ix.count} over 40 ms, worst ${ms(ix.worst?.ms)} (${ix.worst?.name ?? ''}, ${rating(ix.worst?.ms ?? 0, 200, 500)}), last ${ms(ix.last?.ms)} (${ix.last?.name ?? ''})`,
             ],
           ]}
         />

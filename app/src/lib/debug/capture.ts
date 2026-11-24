@@ -1,5 +1,5 @@
-import type { WsMessage } from '@llama-webui/shared';
-import { Predicate } from 'effect';
+import { MessageStats, type WsMessage } from '@llama-webui/shared';
+import { Option, Predicate, Schema } from 'effect';
 import { create } from 'zustand';
 
 /**
@@ -13,6 +13,12 @@ export const API_CALLS = 300;
 export const SSE_STREAMS = 50;
 export const STREAM_EVENTS = 200;
 export const NAVIGATIONS = 20;
+export const RESOURCES = 300;
+/** Per store: a store that changes every second does not push out the rare changes of another. */
+export const STORE_CHANGES = 200;
+/** Frame rate and heap samples: one every `SAMPLE_MS`, for the last minute. */
+export const SAMPLES = 120;
+export const SAMPLE_MS = 500;
 /** The window of the rates, in ms. */
 export const RATE_WINDOW_MS = 5000;
 export const PUBLISH_MS = 250;
@@ -98,6 +104,8 @@ export interface ApiCall {
   bytes?: number;
   /** The `_tag` (or name) of what the call rejected with. */
   tag?: string;
+  /** The body sent (decoded from JSON when it is). */
+  request?: unknown;
   /** The decoded reply. */
   reply?: unknown;
   stream?: {
@@ -107,6 +115,8 @@ export interface ApiCall {
     /** Characters of text received (`content` and `reasoning` of the events). */
     chars: number;
     last: StreamEvent[];
+    /** llama-server's measures of the reply, from the stream's `done` event. */
+    stats?: Pick<MessageStats, 'ttftMs' | 'promptTokens' | 'cachedTokens' | 'genTokens' | 'ppTps' | 'tgTps'>;
   };
 }
 
@@ -128,6 +138,61 @@ export interface PerfStats {
   interactions: { count: number; worst?: { ms: number; name: string }; last?: { ms: number; name: string } };
   /** `ms` undefined: nothing to load, the page rendered at once. */
   navigations: { at: number; path: string; ms: number | undefined }[];
+  /** Largest contentful paint of the page's load (the browser stops measuring it at the first interaction). */
+  lcp?: { ms: number; element: string };
+  /** Layout shifts: their sum, and the worst session window (shifts less than 1 s apart, 5 s at most: the CLS). */
+  layoutShifts: { count: number; total: number; worstWindow: number };
+  /** Frame rate and heap, sampled while the window is open. */
+  samples: PerfSample[];
+}
+
+export interface PerfSample {
+  at: number;
+  fps: number;
+  /** Used JS heap, in bytes (Chromium). */
+  heap?: number;
+}
+
+/** A file the page loaded (Resource Timing): a script, a style sheet, a font, an image. */
+export interface LoadedResource {
+  id: number;
+  at: number;
+  /** The path for the page's origin, else the URL. */
+  name: string;
+  /** `script`, `link`, `css`, `img`, … (the element or API that asked for it). */
+  type: string;
+  /** Bytes over the network, headers included; 0 from the cache. */
+  transferBytes: number;
+  /** Bytes of the body, uncompressed. */
+  bytes: number;
+  ms: number;
+  cached: boolean;
+}
+
+/**
+ * A `set()` of a store that changed something: the top-level keys it changed, with their values before and after. The
+ * values themselves, not copies: holding them costs only what they keep alive. A value a store changes in place (the
+ * monitor's history, shared with the charts) is the same before and after: its diff shows nothing.
+ */
+export interface StoreChange {
+  id: number;
+  at: number;
+  store: string;
+  keys: string[];
+  prev: Record<string, unknown>;
+  next: Record<string, unknown>;
+}
+
+export interface StoreStats {
+  store: string;
+  /** `set()`s that changed a key. */
+  changes: number;
+  /** `set()`s that changed nothing: the subscribers ran for nothing. */
+  noops: number;
+  /** When the last change happened. */
+  last?: number;
+  /** Changes per second over the last `RATE_WINDOW_MS`. */
+  perSecond: number;
 }
 
 export interface DebugView {
@@ -140,11 +205,22 @@ export interface DebugView {
   streams: ApiCall[];
   renders: RenderStats[];
   perf: PerfStats;
+  resources: LoadedResource[];
+  storeChanges: StoreChange[];
+  storeStats: StoreStats[];
   /** Rejected frames and failed calls since the window was last looked at. */
   unseenErrors: number;
 }
 
 const now = () => performance.now();
+
+const emptyPerf = (): PerfStats => ({
+  longTasks: { count: 0, totalMs: 0, worstMs: 0 },
+  interactions: { count: 0 },
+  navigations: [],
+  layoutShifts: { count: 0, total: 0, worstWindow: 0 },
+  samples: [],
+});
 
 let enabled = false;
 let nextId = 1;
@@ -153,8 +229,12 @@ const calls = new Ring<ApiCall>(API_CALLS);
 const streams = new Ring<ApiCall>(SSE_STREAMS);
 const wsTypes = new Map<string, { count: number; bytes: number; samples: [number, number][] }>();
 const renders = new Map<string, RenderStats>();
+const resources = new Ring<LoadedResource>(RESOURCES);
+const samples = new Ring<PerfSample>(SAMPLES);
+const storeChanges = new Map<string, Ring<StoreChange>>();
+const storeStats = new Map<string, { changes: number; noops: number; last?: number; samples: [number, number][] }>();
 let ws: WsConnection = { status: 'connecting', url: '', reconnects: 0, bootIds: [] };
-let perf: PerfStats = { longTasks: { count: 0, totalMs: 0, worstMs: 0 }, interactions: { count: 0 }, navigations: [] };
+let perf: PerfStats = emptyPerf();
 let errors = 0;
 let seenErrors = 0;
 
@@ -166,7 +246,10 @@ const emptyView = (): DebugView => ({
   calls: [],
   streams: [],
   renders: [],
-  perf: { longTasks: { count: 0, totalMs: 0, worstMs: 0 }, interactions: { count: 0 }, navigations: [] },
+  perf: emptyPerf(),
+  resources: [],
+  storeChanges: [],
+  storeStats: [],
   unseenErrors: 0,
 });
 
@@ -193,7 +276,16 @@ export function snapshot(at = Date.now()): DebugView {
       longTasks: { ...perf.longTasks },
       interactions: { ...perf.interactions },
       navigations: [...perf.navigations],
+      layoutShifts: { ...perf.layoutShifts },
+      samples: [...samples.items()],
     },
+    resources: [...resources.items()],
+    storeChanges: [...storeChanges.values()].flatMap((ring) => ring.items()).toSorted((a, b) => a.id - b.id),
+    storeStats: [...storeStats].map(([store, t]) => {
+      const stats: StoreStats = { store, changes: t.changes, noops: t.noops, perSecond: rate(t.samples, at).perSecond };
+      if (t.last !== undefined) stats.last = t.last;
+      return stats;
+    }),
     unseenErrors: errors - seenErrors,
   };
 }
@@ -224,7 +316,12 @@ export function clearCapture(): void {
   streams.clear();
   wsTypes.clear();
   renders.clear();
-  perf = { longTasks: { count: 0, totalMs: 0, worstMs: 0 }, interactions: { count: 0 }, navigations: [] };
+  resources.clear();
+  samples.clear();
+  storeChanges.clear();
+  storeStats.clear();
+  shiftWindow = undefined;
+  perf = emptyPerf();
   errors = 0;
   seenErrors = 0;
   useDebugCapture.setState({ view: snapshot() });
@@ -255,10 +352,19 @@ export function onCaptureStart(seed: Seed): () => void {
   return () => seeds.delete(seed);
 }
 
+const stops = new Set<() => void>();
+
+/** Runs `stop` each time the capture stops (what a start subscribed to is let go). */
+export function onCaptureStop(stop: () => void): () => void {
+  stops.add(stop);
+  return () => stops.delete(stop);
+}
+
 /** Starts the capture from empty, or stops it and drops what it held. */
 export function setDebugEnabled(on: boolean): void {
   if (on === enabled) return;
   enabled = on;
+  if (!on) for (const stop of stops) stop();
   ws = { status: ws.status, url: ws.url, reconnects: 0, bootIds: [] };
   clearCapture();
   if (on) for (const seed of seeds) seed();
@@ -349,9 +455,27 @@ function eventType(event: unknown): string {
   return 'event';
 }
 
+const DoneWithStats = Schema.Struct({ message: Schema.Struct({ stats: MessageStats }) });
+const decodeDone = Schema.decodeUnknownOption(DoneWithStats);
+
+/** llama-server's measures of a reply, when `event` is the chat's `done` and carries them. */
+function streamStats(event: unknown): NonNullable<ApiCall['stream']>['stats'] {
+  return Option.match(decodeDone(event), {
+    onNone: () => undefined,
+    onSome: ({ message: { stats: m } }) => ({
+      ttftMs: m.ttftMs,
+      promptTokens: m.promptTokens,
+      cachedTokens: m.cachedTokens,
+      genTokens: m.genTokens,
+      ppTps: m.ppTps,
+      tgTps: m.tgTps,
+    }),
+  });
+}
+
 /** The record of one call, given by `debugCall` while the capture runs. */
 export interface DebugCallRecorder {
-  request: (method: string, path: string) => void;
+  request: (method: string, path: string, body?: unknown) => void;
   response: (status: number, bytes: number | undefined) => void;
   event: (event: unknown) => void;
   end: (state: 'ok' | 'error' | 'aborted', detail?: { tag?: string | undefined; reply?: unknown }) => void;
@@ -367,9 +491,10 @@ export function debugCall(stream = false): DebugCallRecorder | undefined {
   if (stream) streams.push(call);
   changed();
   return {
-    request(method, path) {
+    request(method, path, body) {
       call.method = method;
       call.path = path;
+      if (body !== undefined) call.request = body;
       changed();
     },
     response(status, bytes) {
@@ -386,6 +511,8 @@ export function debugCall(stream = false): DebugCallRecorder | undefined {
       const type = eventType(event);
       s.byType[type] = (s.byType[type] ?? 0) + 1;
       s.chars += textLength(event);
+      const stats = streamStats(event);
+      if (stats) s.stats = stats;
       s.last.push({ at: Date.now(), type, data: event });
       if (s.last.length > STREAM_EVENTS) s.last.splice(0, s.last.length - STREAM_EVENTS);
       changed();
@@ -441,5 +568,97 @@ export function debugInteraction(name: string, ms: number): void {
   const i = perf.interactions;
   const worst = i.worst && i.worst.ms >= ms ? i.worst : { ms, name };
   perf = { ...perf, interactions: { count: i.count + 1, worst, last: { ms, name } } };
+  changed();
+}
+
+/** The largest contentful paint so far: the last entry the browser gives is the largest. */
+export function debugLcp(ms: number, element: string): void {
+  if (!enabled) return;
+  perf = { ...perf, lcp: { ms, element } };
+  changed();
+}
+
+/** The session window of the layout shifts in progress. */
+let shiftWindow: { start: number; last: number; value: number } | undefined;
+
+/**
+ * Adds a shift to its session window: a shift less than 1 s after the previous one and less than 5 s after the
+ * window's first joins it, else it opens a new one. The worst window is the CLS.
+ */
+export function addShift(
+  current: { start: number; last: number; value: number } | undefined,
+  at: number,
+  value: number,
+): { start: number; last: number; value: number } {
+  if (current && at - current.last < 1000 && at - current.start < 5000)
+    return { start: current.start, last: at, value: current.value + value };
+  return { start: at, last: at, value };
+}
+
+/** A layout shift without a recent input, at `at` (ms of the page's clock). */
+export function debugLayoutShift(at: number, value: number): void {
+  if (!enabled) return;
+  shiftWindow = addShift(shiftWindow, at, value);
+  const s = perf.layoutShifts;
+  perf = {
+    ...perf,
+    layoutShifts: {
+      count: s.count + 1,
+      total: s.total + value,
+      worstWindow: Math.max(s.worstWindow, shiftWindow.value),
+    },
+  };
+  changed();
+}
+
+export function debugFrameSample(fps: number, heap: number | undefined): void {
+  if (!enabled) return;
+  samples.push(heap === undefined ? { at: Date.now(), fps } : { at: Date.now(), fps, heap });
+  changed();
+}
+
+export function debugResource(resource: Omit<LoadedResource, 'id'>): void {
+  if (!enabled) return;
+  resources.push({ id: nextId++, ...resource });
+  changed();
+}
+
+// --- Stores ---
+
+/** The top-level keys whose value is not the same in `next` as in `prev` (a store's actions are left out). */
+export function changedKeys(prev: object, next: object): string[] {
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  return [...keys].filter((k) => {
+    const before: unknown = Reflect.get(prev, k);
+    const after: unknown = Reflect.get(next, k);
+    return typeof before !== 'function' && typeof after !== 'function' && !Object.is(before, after);
+  });
+}
+
+/** A store's `set()`, from its subscription (`lib/debug/stores.ts`). */
+export function debugStoreChange(store: string, next: unknown, prev: unknown): void {
+  if (!enabled) return;
+  if (typeof next !== 'object' || next === null || typeof prev !== 'object' || prev === null) return;
+  let stats = storeStats.get(store);
+  if (!stats) {
+    stats = { changes: 0, noops: 0, samples: [] };
+    storeStats.set(store, stats);
+  }
+  const keys = changedKeys(prev, next);
+  if (keys.length === 0) {
+    stats.noops++;
+  } else {
+    const at = Date.now();
+    const pick = (state: object) => Object.fromEntries(keys.map((k): [string, unknown] => [k, Reflect.get(state, k)]));
+    stats.changes++;
+    stats.last = at;
+    stats.samples.push([at, 0]);
+    let ring = storeChanges.get(store);
+    if (!ring) {
+      ring = new Ring<StoreChange>(STORE_CHANGES);
+      storeChanges.set(store, ring);
+    }
+    ring.push({ id: nextId++, at, store, keys, prev: pick(prev), next: pick(next) });
+  }
   changed();
 }

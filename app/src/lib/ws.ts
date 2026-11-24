@@ -2,6 +2,7 @@ import { WsMessage } from '@llama-webui/shared';
 import { Option, Result, Schema } from 'effect';
 import { create } from 'zustand';
 import { debugWs, onCaptureStart } from './debug/capture';
+import { debugStore } from './debug/stores';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
 
@@ -139,3 +140,5 @@ if (import.meta.hot) {
     started = false;
   });
 }
+
+debugStore('ws', useWs);

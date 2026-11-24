@@ -1,10 +1,10 @@
 import { CodeXml } from 'lucide-react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { GLASS } from '@/components/glass/glass';
 import { useDebugCapture } from '@/lib/debug/capture';
 import { useDebugMode } from '@/lib/debug/mode';
 import { cn } from '@/lib/utils';
-import { useDebugWindow } from './geometry';
+import { isToggleShortcut, SHORTCUT, useDebugWindow } from './geometry';
 
 // The window's code is loaded when it first opens.
 const DebugWindow = lazy(async () => ({ default: (await import('./DebugWindow')).DebugWindow }));
@@ -15,6 +15,20 @@ export function DebugButton() {
   const open = useDebugWindow((s) => s.open);
   const setOpen = useDebugWindow((s) => s.setOpen);
   const unseen = useDebugCapture((s) => s.view.unseenErrors);
+
+  // The shortcut opens and closes the window from anywhere in the page, a field included.
+  useEffect(() => {
+    if (!on) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isToggleShortcut(e)) return;
+      e.preventDefault();
+      const state = useDebugWindow.getState();
+      state.setOpen(!state.open);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [on]);
+
   if (!on) return null;
 
   return (
@@ -22,8 +36,9 @@ export function DebugButton() {
       <button
         type="button"
         aria-label="Debug window"
-        title="Debug window"
+        title={`Debug window (${SHORTCUT})`}
         aria-pressed={open}
+        aria-keyshortcuts={SHORTCUT}
         onClick={() => setOpen(!open)}
         className={cn(
           GLASS,

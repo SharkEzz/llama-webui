@@ -1,14 +1,23 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
+  addShift,
+  changedKeys,
   clearCapture,
   debugCall,
+  debugFrameSample,
+  debugLayoutShift,
+  debugLcp,
   debugNavigation,
   debugRender,
+  debugResource,
+  debugStoreChange,
   debugWs,
   markErrorsSeen,
   PUBLISH_MS,
   rate,
   Ring,
+  SAMPLES,
+  STORE_CHANGES,
   setDebugEnabled,
   setPaused,
   snapshot,
@@ -48,7 +57,18 @@ test('nothing is captured while the debug mode is off', () => {
   expect(debugCall()).toBeUndefined();
   debugRender('page', 'mount', 1, 1);
   debugNavigation('/', 3);
+  debugLcp(1200, 'h1');
+  debugLayoutShift(10, 0.2);
+  debugFrameSample(60, 1000);
+  debugResource({ at: 1, name: '/assets/a.js', type: 'script', transferBytes: 10, bytes: 20, ms: 3, cached: false });
+  debugStoreChange('s', { n: 1 }, { n: 0 });
   const view = snapshot();
+  expect(view.storeChanges).toEqual([]);
+  expect(view.storeStats).toEqual([]);
+  expect(view.perf.lcp).toBeUndefined();
+  expect(view.perf.layoutShifts.count).toBe(0);
+  expect(view.perf.samples).toEqual([]);
+  expect(view.resources).toEqual([]);
   expect(view.frames).toEqual([]);
   expect(view.calls).toEqual([]);
   expect(view.renders).toEqual([]);
@@ -162,4 +182,103 @@ test('the view is published at most every 250 ms, and not while paused', () => {
   clearCapture();
   expect(useDebugCapture.getState().view.frames).toEqual([]);
   unsubscribe();
+});
+
+test('a call records the body it sent', () => {
+  setDebugEnabled(true);
+  debugCall()?.request('POST', '/api/chat/1/messages', { content: 'Hi' });
+  expect(snapshot().calls[0]).toMatchObject({ method: 'POST', request: { content: 'Hi' } });
+});
+
+test("a stream's done event gives llama-server's measures of the reply", () => {
+  setDebugEnabled(true);
+  const stream = debugCall(true);
+  const stats = {
+    ttftMs: 120,
+    promptTokens: 30,
+    cachedTokens: 10,
+    genTokens: 200,
+    ppTps: 900.5,
+    tgTps: 45.2,
+    draftN: null,
+    draftAccepted: null,
+    durationMs: 4500,
+  };
+  stream?.event({ type: 'delta', content: 'Hi' });
+  expect(snapshot().streams[0]?.stream?.stats).toBeUndefined();
+  stream?.event({ type: 'done', message: { id: 1, content: 'Hi', stats } });
+  expect(snapshot().streams[0]?.stream?.stats).toEqual({
+    ttftMs: 120,
+    promptTokens: 30,
+    cachedTokens: 10,
+    genTokens: 200,
+    ppTps: 900.5,
+    tgTps: 45.2,
+  });
+});
+
+test('layout shifts less than 1 s apart, within 5 s, make one session window', () => {
+  let w = addShift(undefined, 0, 0.1);
+  w = addShift(w, 900, 0.1);
+  expect(w).toEqual({ start: 0, last: 900, value: 0.2 });
+  // A gap of 1 s or more opens a new window.
+  expect(addShift(w, 1900, 0.05)).toEqual({ start: 1900, last: 1900, value: 0.05 });
+  // So does a window of 5 s, gaps or not.
+  let long = addShift(undefined, 0, 0.01);
+  for (const at of [800, 1600, 2400, 3200, 4000, 4800]) long = addShift(long, at, 0.01);
+  expect(addShift(long, 5600, 0.3)).toEqual({ start: 5600, last: 5600, value: 0.3 });
+});
+
+test('the CLS is the worst session window, the total sums every shift', () => {
+  setDebugEnabled(true);
+  debugLayoutShift(0, 0.1);
+  debugLayoutShift(500, 0.1);
+  debugLayoutShift(3000, 0.15);
+  expect(snapshot().perf.layoutShifts).toEqual({ count: 3, total: 0.35, worstWindow: 0.2 });
+});
+
+test('the largest paint, the frame samples and the files loaded are kept, bounded, and cleared', () => {
+  setDebugEnabled(true);
+  debugLcp(800, 'h1');
+  debugLcp(1500, 'img');
+  for (let i = 0; i < SAMPLES + 5; i++) debugFrameSample(60, i);
+  debugResource({ at: 1, name: '/assets/a.js', type: 'script', transferBytes: 0, bytes: 20, ms: 1, cached: true });
+  const view = snapshot();
+  expect(view.perf.lcp).toEqual({ ms: 1500, element: 'img' });
+  expect(view.perf.samples).toHaveLength(SAMPLES);
+  expect(view.perf.samples.at(-1)).toMatchObject({ fps: 60, heap: SAMPLES + 4 });
+  expect(view.resources).toMatchObject([{ name: '/assets/a.js', cached: true }]);
+  clearCapture();
+  expect(snapshot().perf.samples).toEqual([]);
+  expect(snapshot().resources).toEqual([]);
+});
+
+test("a store's changed keys are those whose value is not the same one, its actions left out", () => {
+  const shared = [1];
+  const act = () => {};
+  expect(changedKeys({ a: shared, b: 1, c: 'x', act }, { a: shared, b: 2, d: 'y', act: () => {} })).toEqual([
+    'b',
+    'c',
+    'd',
+  ]);
+});
+
+test('the store changes are kept by reference, bounded, with their rate, and cleared', () => {
+  setDebugEnabled(true);
+  const list = [1, 2];
+  debugStoreChange('quiet', { saved: true }, { saved: false });
+  debugStoreChange('s', { list, n: 1 }, { list: [], n: 1 });
+  expect(snapshot().storeChanges[1]?.next.list).toBe(list);
+  for (let i = 0; i < STORE_CHANGES + 5; i++) debugStoreChange('s', { n: i + 1 }, { n: i });
+  const view = snapshot();
+  // Each store keeps its own last changes: the quiet one's survives the noisy one's, and comes first (the oldest).
+  expect(view.storeChanges).toHaveLength(STORE_CHANGES + 1);
+  expect(view.storeChanges[0]).toMatchObject({ store: 'quiet', keys: ['saved'] });
+  expect(view.storeChanges.filter((c) => c.store === 's')).toHaveLength(STORE_CHANGES);
+  const noisy = view.storeStats.find((t) => t.store === 's');
+  expect(noisy).toMatchObject({ changes: STORE_CHANGES + 6, noops: 0 });
+  expect(noisy?.last).toBeTypeOf('number');
+  clearCapture();
+  expect(snapshot().storeChanges).toEqual([]);
+  expect(snapshot().storeStats).toEqual([]);
 });

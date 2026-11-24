@@ -8,6 +8,7 @@ import {
 } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { errorMessage, call as webCall } from './api';
+import { debugStore } from './debug/stores';
 import { stem } from './stem';
 
 interface ModelsState {
@@ -84,3 +85,5 @@ export function matchingProjector(modelPath: string, models: ReadonlyArray<Model
     });
   return found.length === 1 ? found[0]!.path : null;
 }
+
+debugStore('models', useModels);

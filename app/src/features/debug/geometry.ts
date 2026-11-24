@@ -108,3 +108,16 @@ export const useDebugWindow = create<DebugWindowState>((set, get) => ({
     set({ rect: next });
   },
 }));
+
+/** The keys of the shortcut that opens and closes the window, as the button's title says it. */
+export const SHORTCUT = 'Alt+Shift+D';
+
+/**
+ * Alt+Shift+D, by the key's place (`code`: the same on every layout). Ctrl+Shift+D would be the browsers' “bookmark
+ * all tabs”.
+ */
+export function isToggleShortcut(
+  e: Pick<KeyboardEvent, 'code' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'repeat' | 'isComposing'>,
+): boolean {
+  return e.code === 'KeyD' && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.repeat && !e.isComposing;
+}

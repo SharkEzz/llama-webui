@@ -1,5 +1,14 @@
 import { expect, test } from 'vitest';
-import { clampRect, defaultRect, dragRect, HEADER_HEIGHT, MIN_HEIGHT, MIN_WIDTH, parseRect } from './geometry';
+import {
+  clampRect,
+  defaultRect,
+  dragRect,
+  HEADER_HEIGHT,
+  isToggleShortcut,
+  MIN_HEIGHT,
+  MIN_WIDTH,
+  parseRect,
+} from './geometry';
 
 const view = { width: 1280, height: 800 };
 
@@ -45,4 +54,22 @@ test('a stored rect is read only when it is one', () => {
   expect(parseRect('{"x":1,"y":2,"width":400,"height":300}')).toEqual({ x: 1, y: 2, width: 400, height: 300 });
   for (const raw of [null, '', 'not json', '{"x":1}', '{"x":"1","y":2,"width":400,"height":300}', 'null'])
     expect(parseRect(raw), String(raw)).toBeUndefined();
+});
+
+test('Alt+Shift+D toggles the window, by the position of the key; another chord or a held key does not', () => {
+  const key = {
+    code: 'KeyD',
+    altKey: true,
+    shiftKey: true,
+    ctrlKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+  };
+  expect(isToggleShortcut(key)).toBe(true);
+  expect(isToggleShortcut({ ...key, ctrlKey: true })).toBe(false);
+  expect(isToggleShortcut({ ...key, altKey: false })).toBe(false);
+  expect(isToggleShortcut({ ...key, code: 'KeyS' })).toBe(false);
+  expect(isToggleShortcut({ ...key, repeat: true })).toBe(false);
+  expect(isToggleShortcut({ ...key, isComposing: true })).toBe(false);
 });

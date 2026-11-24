@@ -180,7 +180,9 @@ pnpm --dir site screenshots --live     # Dashboard, System and Topology, during 
 `site/scripts/screenshots.ts` opens each screen in headless Chromium (`/usr/bin/chromium`), switches the theme through
 `PATCH /api/settings` to capture it in dark and light, and restores the theme at the end. `--base` points it at another address.
 `site/scripts/shots.ts` lists the screens and how each is staged; a `manual` shot (the setup checklist) is only taken
-when you name it.
+when you name it. An `animation` shot (`debug`, the debug window tab by tab) plays a scene and captures one region of
+the window frame by frame (`frame(holdMs)`), written as a looping WebP at the region's width and at 800 px; the
+landing page shows it through `<Shot size={…}>`.
 
   </Step>
   <Step title="Update what depends on them">

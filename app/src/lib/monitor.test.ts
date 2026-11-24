@@ -101,6 +101,18 @@ test('a chart shown with the channel open reads the history at once, then each s
   expect(series(monitor)).toEqual({ times: [1, 2, 3], cpu: [10, 20, 30] });
 });
 
+test('a snapshot notifies the subscribers once, with the history it grew', async () => {
+  const { monitor } = setup('open');
+  monitor.wantHistory();
+  await settle();
+  const seen: Array<{ at: number | undefined; version: number }> = [];
+  const unsubscribe = monitor.store.subscribe((st) => seen.push({ at: st.snapshot?.at, version: st.version }));
+  const before = monitor.store.getState().version;
+  monitor.snapshot(snapshot(3, 30));
+  unsubscribe();
+  expect(seen).toEqual([{ at: 3000, version: before + 1 }]);
+});
+
 test('the snapshots that arrive while the history is read are appended to it', async () => {
   const { monitor, release } = setup('open', { hold: true });
   monitor.wantHistory();

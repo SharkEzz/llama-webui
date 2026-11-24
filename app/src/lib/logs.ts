@@ -1,6 +1,7 @@
 import { EMPTY_LOG_VIEW, type LogLine, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { call as webCall } from './api';
+import { debugStore } from './debug/stores';
 import { onWs, useWs, type WsStatus } from './ws';
 
 const MAX_LINES = 10_000;
@@ -89,3 +90,5 @@ export function startLogsSync(): void {
   onWs('log', (m) => logs.lines(m.payload));
   logs.follow();
 }
+
+debugStore('logs', useLogs);

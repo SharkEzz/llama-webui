@@ -2,6 +2,7 @@ import { defer, type ServerView } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { call, errorMessage } from './api';
+import { debugStore } from './debug/stores';
 import { onWs, useWs } from './ws';
 
 interface ServerStore {
@@ -55,3 +56,5 @@ export const stopServer = () => action(() => call((api) => api.server.stop()));
 /** The (managed) server is running: it can be stopped, restarted or switched. */
 export const isRunning = (v: ServerView | null) =>
   v?.state.kind === 'starting' || v?.state.kind === 'ready' || v?.state.kind === 'sleeping';
+
+debugStore('server', useServer);

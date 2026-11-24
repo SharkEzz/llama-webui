@@ -1,6 +1,7 @@
 import { defer, type HistoryDump, type Snapshot } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { call as webCall } from './api';
+import { debugStore } from './debug/stores';
 import { onWs, useWs, type WsStatus } from './ws';
 
 /**
@@ -96,21 +97,21 @@ export const makeMonitor = ({ call, ws }: MonitorDeps) => {
     }
   };
 
-  /** A `snapshot` message. */
+  /** A `snapshot` message: one `set()`, the snapshot and the history grown by it notified together. */
   const snapshot = (s: Snapshot): void => {
-    store.setState({ snapshot: s });
-    if (!wanted) return;
-    if (loading) {
-      pending.push(s);
+    if (!wanted || loading) {
+      if (loading) pending.push(s);
+      store.setState({ snapshot: s });
       return;
     }
     const h = store.getState().history;
     if (s.history.intervalMs !== h.intervalMs || s.history.capacity !== h.capacity) {
+      store.setState({ snapshot: s });
       void reloadHistory();
       return;
     }
     append(h, s);
-    store.setState((st) => ({ version: st.version + 1 }));
+    store.setState((st) => ({ snapshot: s, version: st.version + 1 }));
   };
 
   /** A `hello` message: the one of a different llama-webui boot always precedes its snapshots, the history is worthless. */
@@ -148,3 +149,5 @@ export function startMonitorSync(): void {
   onWs('snapshot', ({ payload }) => monitor.snapshot(payload));
   onWs('hello', ({ payload }) => monitor.hello(payload.bootId));
 }
+
+debugStore('monitor', useMonitor);

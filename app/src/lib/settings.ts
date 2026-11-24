@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { call, errorMessage, errorTag } from './api';
+import { debugStore } from './debug/stores';
 
 export type SettingsErrors = Partial<Record<keyof Settings, string>>;
 
@@ -77,3 +78,5 @@ export function useSettingsEditor() {
 
   return { settings, errors, save };
 }
+
+debugStore('settings', useSettings);

@@ -1,6 +1,6 @@
 import { Api, requestInvalid } from '@llama-webui/shared';
-import { Cause, Effect, Exit, ManagedRuntime, Predicate, Schema, Stream } from 'effect';
-import { FetchHttpClient, HttpClient, HttpClientError, UrlParams } from 'effect/http';
+import { Cause, Effect, Exit, ManagedRuntime, Option, Predicate, Schema, Stream } from 'effect';
+import { FetchHttpClient, type HttpBody, HttpClient, HttpClientError, UrlParams } from 'effect/http';
 import { type HttpApi, HttpApiClient, type HttpApiGroup } from 'effect/http-api';
 import { debugCall, type DebugCallRecorder } from './debug/capture';
 
@@ -40,11 +40,20 @@ const streamFailure = <E>(e: E) => {
 /** The one runtime of the web's calls: Effect's HTTP client on `fetch`. */
 const runtime = ManagedRuntime.make(FetchHttpClient.layer);
 
+const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+/** The body of a request, decoded when it is JSON (the client's payloads are). */
+function sentBody(body: HttpBody.HttpBody): unknown {
+  if (body._tag !== 'Uint8Array') return body._tag === 'Empty' ? undefined : `<${body._tag} body>`;
+  const text = body.text ?? new TextDecoder().decode(body.body);
+  return Option.getOrElse(decodeJson(text), () => text);
+}
+
 /** The HTTP client, telling `recorder` the request it sends and the response's status (the debug window). */
 const recording = (recorder: DebugCallRecorder) => (client: HttpClient.HttpClient) =>
   HttpClient.transform(client, (response, req) => {
     const query = UrlParams.toString(req.urlParams);
-    recorder.request(req.method, query ? `${req.url}?${query}` : req.url);
+    recorder.request(req.method, query ? `${req.url}?${query}` : req.url, sentBody(req.body));
     return Effect.tap(response, (res) =>
       Effect.sync(() => {
         const length = Number(res.headers['content-length']);
