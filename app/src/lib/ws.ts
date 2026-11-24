@@ -1,6 +1,7 @@
 import { WsMessage } from '@llama-webui/shared';
 import { Option, Result, Schema } from 'effect';
 import { create } from 'zustand';
+import { debugWs, onCaptureStart } from './debug/capture';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
 
@@ -22,6 +23,7 @@ const decode = Schema.decodeUnknownResult(Schema.fromJsonString(WsMessage));
 export const decodeFrame = (frame: string): Option.Option<WsMessage> => {
   const decoded = decode(frame);
   if (Result.isSuccess(decoded)) return Option.some(decoded.success);
+  debugWs.frame('in', frame, undefined, decoded.failure.message);
   // oxlint-disable-next-line no-console -- a message of the server that does not decode: the page has no other place to say why it stopped updating
   console.error('llama-webui: a message of the server does not decode', decoded.failure);
   return Option.none();
@@ -29,6 +31,11 @@ export const decodeFrame = (frame: string): Option.Option<WsMessage> => {
 
 type Listener = (msg: WsMessage) => void;
 const listeners = new Map<WsMessage['type'], Set<Listener>>();
+
+/** How many subscribers each message type has (the debug window). */
+export function wsListenerCounts(): ReadonlyMap<string, number> {
+  return new Map([...listeners].map(([type, set]) => [type, set.size]));
+}
 
 /** Subscribes to WS messages of a given type. */
 export function onWs<T extends WsMessage['type']>(
@@ -64,26 +71,38 @@ export const useWs = create<WsState>()((set, get) => {
   const open = () => {
     retryTimer = undefined;
     // After the first drop we stay “closed” while retrying, to avoid flickering.
-    if (get().status !== 'closed') set({ status: 'connecting' });
+    if (get().status !== 'closed') {
+      set({ status: 'connecting' });
+      debugWs.status('connecting', wsUrl());
+    } else debugWs.reconnecting();
     const ws = new WebSocket(wsUrl());
     socket = ws;
 
     ws.addEventListener('open', () => {
       backoff = BACKOFF_START_MS;
       set({ status: 'open' });
+      debugWs.status('open', ws.url);
     });
     ws.addEventListener('message', (event) => {
-      const decoded = decodeFrame(String(event.data));
+      const raw = String(event.data);
+      const decoded = decodeFrame(raw);
       if (Option.isNone(decoded)) return;
       const msg = decoded.value;
-      if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' } satisfies WsMessage));
+      debugWs.frame('in', raw, msg);
+      if (msg.type === 'ping') {
+        const pong = { type: 'pong' } satisfies WsMessage;
+        const frame = JSON.stringify(pong);
+        ws.send(frame);
+        debugWs.frame('out', frame, pong);
+      }
       set({ lastMessage: msg });
       for (const fn of listeners.get(msg.type) ?? []) fn(msg);
     });
-    ws.addEventListener('close', () => {
+    ws.addEventListener('close', (event) => {
       if (socket !== ws) return;
       socket = undefined;
       set({ status: 'closed' });
+      debugWs.closed({ code: event.code, reason: event.reason, clean: event.wasClean }, backoff);
       retryTimer = setTimeout(open, backoff);
       backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
     });
@@ -99,6 +118,9 @@ export const useWs = create<WsState>()((set, get) => {
     },
   };
 });
+
+// The debug capture starts from the socket's state of now.
+onCaptureStart(() => debugWs.status(useWs.getState().status, socket?.url ?? ''));
 
 /** Label and color of the status dot. */
 export const WS_STATUS_UI: Record<WsStatus, { label: string; tone: 'ok' | 'wait' | 'down' }> = {

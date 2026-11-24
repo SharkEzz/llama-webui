@@ -2,6 +2,7 @@ import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { errorMessage, errorTag, makeCall, makeCallStream } from './api';
+import { setDebugEnabled, snapshot } from './debug/capture';
 
 class TestNotFound extends Schema.TaggedError<TestNotFound>()(
   'TestNotFound',
@@ -245,4 +246,49 @@ test('an abort before the response headers ends callStream() without an error an
   await expect(pending).resolves.toBeUndefined();
   expect(seen[0]?.init?.signal?.aborted).toBe(true);
   expect(onEvent).not.toHaveBeenCalled();
+});
+
+test('with the debug mode on, a call records its method, path, status, size and reply, an error its tag', async () => {
+  setDebugEnabled(true);
+  try {
+    const ok = stub(json(200, { id: 7, name: 'seven' }));
+    await ok.call((api) => api.t.get({ params: { id: 7 }, query: { q: 'a' } }));
+    const failed = stub(json(404, { _tag: 'TestNotFound', message: 'No item 7' }));
+    await failed.call((api) => api.t.get({ params: { id: 8 }, query: {} })).catch(() => {});
+    const [get, notFound] = snapshot().calls;
+    expect(get).toMatchObject({
+      method: 'GET',
+      path: '/t/7?q=a',
+      status: 200,
+      state: 'ok',
+      reply: { id: 7, name: 'seven' },
+    });
+    expect(get?.ms).toBeTypeOf('number');
+    expect(notFound).toMatchObject({ path: '/t/8', status: 404, state: 'error', tag: 'TestNotFound' });
+  } finally {
+    setDebugEnabled(false);
+  }
+});
+
+test('with the debug mode on, a stream records its events and its end; off, nothing is recorded', async () => {
+  setDebugEnabled(true);
+  try {
+    const { callStream } = stub(sse(body([item(1), item(2)])));
+    await callStream(
+      (api) => api.t.events({ params: { id: 7 } }),
+      () => {},
+    );
+    const [s] = snapshot().streams;
+    expect(s).toMatchObject({
+      method: 'GET',
+      path: '/t/7/events',
+      state: 'ok',
+      stream: { events: 2, byType: { item: 2 } },
+    });
+  } finally {
+    setDebugEnabled(false);
+  }
+  const { call } = stub(json(200, { id: 7, name: 'seven' }));
+  await call((api) => api.t.get({ params: { id: 7 }, query: {} }));
+  expect(snapshot().calls).toEqual([]);
 });

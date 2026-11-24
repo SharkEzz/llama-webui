@@ -224,7 +224,8 @@ was reloaded). `Markdown.test.ts` checks the retention after a garbage collectio
 - **Dispatch.** `onWs(type, fn)` registers a typed listener for one message type and returns its unsubscribe
   function. Each frame is decoded with the shared `WsMessage` schema and dispatched by `type`; a frame that does not decode
   (not JSON, a type or a field the page does not know) is skipped and logged to the console (`decodeFrame()`:
-  `llama-webui: a message of the server does not decode`, with the schema error).
+  `llama-webui: a message of the server does not decode`, with the schema error). With the debug mode on, the
+  [debug window](#debug-window) also lists it, with the same error.
 - **HMR.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so a hot update
   of the client does not leave ghost sockets behind.
 
@@ -396,6 +397,38 @@ while nobody chose one, so the whole drawing follows the size of the frame. A pr
 frame then captures the pointer and drops the click that follows; the wheel listener is not passive, to keep the page
 from scrolling; the frame clips (`overflow: clip`) and never scrolls, a block focused with the keyboard is brought
 into view by the camera (`reveal()`). A zoom or a drag closes the details popover.
+
+## Debug window
+
+The debug mode ([Settings › Developer](/docs/settings/#developer)) shows what the page receives and how it renders.
+It is a browser setting, `localStorage['llama-webui:debug']` (`on` or `off`), read by `startDebugSync()`
+(`lib/debug/mode.ts`) first thing in `main.tsx`, so the `hello` of the first connection is captured; `useDebugMode`
+holds it for the components.
+
+- **Capture** (`lib/debug/capture.ts`). The taps sit in `lib/ws.ts` (`debugWs`: the status, each frame in and out, a
+  frame that does not decode with its error, a close with its code and the next delay) and `lib/api.ts` (`debugCall()`:
+  a `transformClient` of the Effect `HttpApiClient` for the method, path, status and `content-length`, then the end of
+  `call()` or `callStream()`: the reply, the `_tag` of an error, an abort, the events of a stream). Each tap starts
+  with `if (!enabled) return`: while the mode is off, nothing is kept, and turning it on starts from empty. The
+  entries are kept in bounded rings (500 frames, 300 calls, 50 streams of 200 events at most, 20 navigations), and the
+  window reads a copy, `useDebugCapture((s) => s.view)`, published at most every 250 ms (`PUBLISH_MS`), so a burst of
+  frames does not render the window on each one; pause stops the publishing, not the capture. `capture.ts` imports
+  nothing from the app, so `ws.ts` and `api.ts` can import it without a cycle.
+- **Performance** (`lib/debug/perf.ts`, `features/debug/probes.tsx`). Two `PerformanceObserver`s, started and
+  stopped with the mode: `longtask` (Chromium) and `event` with `durationThreshold: 40`, for the interactions.
+  `AppLayout` wraps the sidebar, the status bar and the page in a `<Profiler>`; they stay in the tree whatever the
+  mode (adding one later would remount the page) and their `onRender` returns at once while the mode is off. React
+  calls `onRender` only in a development build: the Performance tab says so outside `pnpm dev`
+  (`import.meta.env.DEV`). `NavigationTimer` times each navigation from the router leaving `idle` (a lazy page, a
+  loader) to its return. The frame rate is a `requestAnimationFrame` loop that runs only while the Performance tab is
+  shown.
+- **Window** (`features/debug/`). `DebugButton`, in `AppLayout`, renders nothing while the mode is off and loads
+  `DebugWindow` with `lazy()` on its first opening. The window is a Base UI `Dialog` with `modal={false}` and
+  `disablePointerDismissal` (the page stays usable, a click beside it does not close it) holding a `GlassCard`; it is
+  open in a memory store (`useDebugWindow`, `geometry.ts`), so it survives a change of page, not a reload. Its
+  position and size are pure functions (`clampRect`: 360 × 240 at least, its header always on screen; `dragRect`)
+  and are saved in `localStorage['llama-webui:debug-window']` at the end of a drag. A JSON detail is rendered only
+  once its row is opened.
 
 ## Code highlighting
 

@@ -1,5 +1,6 @@
 import { Option } from 'effect';
 import { afterEach, expect, test, vi } from 'vitest';
+import { setDebugEnabled, snapshot } from './debug/capture';
 import { decodeFrame } from './ws';
 
 afterEach(() => {
@@ -24,5 +25,18 @@ test('a frame that does not decode is none, and logged with why', () => {
   for (const [message, error] of logged.mock.calls) {
     expect(message).toBe('llama-webui: a message of the server does not decode');
     expect(error).toHaveProperty('_tag', 'SchemaError');
+  }
+});
+
+test('with the debug mode on, a frame that does not decode is captured with why', () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  setDebugEnabled(true);
+  try {
+    decodeFrame('not json');
+    const [frame] = snapshot().frames;
+    expect(frame).toMatchObject({ dir: 'in', type: '?', data: 'not json' });
+    expect(frame?.error).toBeTypeOf('string');
+  } finally {
+    setDebugEnabled(false);
   }
 });
