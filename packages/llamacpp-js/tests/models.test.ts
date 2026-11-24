@@ -196,6 +196,39 @@ describe('streamModelsSse', () => {
     await assert.rejects(collect(streamModelsSse('http://127.0.0.1:8080', { fetch: impl })), LlamaStreamCutError);
   });
 
+  test('an abort ends the stream without an error, during the stream and before the headers', async () => {
+    // One event, then the response stays open, as llama-server's does
+    const server = await serve((req, res) => {
+      if (req.url !== '/models/sse') return res.writeHead(404).end();
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write(frame({ model: 'm', event: 'status_change', data: { status: 'loaded' } }));
+    });
+    try {
+      const following = new AbortController();
+      const events: ModelsSseEvent[] = [];
+      for await (const event of streamModelsSse(`http://127.0.0.1:${server.port}`, { signal: following.signal })) {
+        events.push(event);
+        following.abort();
+      }
+      assert.equal(events.length, 1);
+      const before = await collect(streamModelsSse(`http://127.0.0.1:${server.port}`, { signal: AbortSignal.abort() }));
+      assert.deepEqual(before, []);
+    } finally {
+      server.close();
+    }
+    // A read that fails for another reason while the signal is not aborted is still a cut
+    const broken = new ReadableStream<Uint8Array>({
+      pull() {
+        throw new Error('reset');
+      },
+    });
+    const impl = (() => Promise.resolve(new Response(broken, { status: 200 }))) as typeof fetch;
+    await assert.rejects(
+      collect(streamModelsSse('http://127.0.0.1:8080', { fetch: impl, signal: new AbortController().signal })),
+      LlamaStreamCutError,
+    );
+  });
+
   test('works against a real HTTP server', async () => {
     const server = await serve((req, res) => {
       if (req.url !== '/models/sse') return res.writeHead(404).end();

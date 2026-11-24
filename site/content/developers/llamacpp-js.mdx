@@ -57,6 +57,11 @@ if (raw.health === 'ok') console.log(kvUsage(raw.slots));
 yields each chunk until `data: [DONE]`. Aborting `signal` stops the request; leaving the loop before `[DONE]` cancels
 the stream.
 
+`streamModelsSse(baseUrl, { fetch, signal })` (`llamacpp-js/models`) follows `GET /models/sse` and yields each event it
+recognizes until the server closes the stream. That stream has no end of its own, so `signal` is how a caller stops
+following: an abort ends the loop without an error, before the headers as during the stream. Leaving the loop cancels
+the stream too.
+
 ```ts title="Streamed chat"
 import { streamChatCompletion } from 'llamacpp-js/client';
 

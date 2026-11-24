@@ -208,20 +208,27 @@ export function parseModelsSseEvent(raw: unknown): ModelsSseEvent | null {
 
 /**
  * Streams `GET <baseUrl>/models/sse`: yields each recognized event until the server closes the stream (clean EOF) or
- * `signal` aborts it. Throws the `fetch` error when nothing answers, `LlamaHttpError` on a non-2xx status (e.g. 404 or
+ * `signal` aborts it: an abort ends the generator without an error, before the headers as during the stream, and
+ * stops the request. Throws the `fetch` error when nothing answers, `LlamaHttpError` on a non-2xx status (e.g. 404 or
  * 503 on older builds without single-model `/models/sse`), `LlamaReplyError` when a 2xx has no body or the body is
- * not bytes, and
- * `LlamaStreamCutError` when reading the body fails mid-stream.
+ * not bytes, and `LlamaStreamCutError` when reading the body fails mid-stream. Leaving the loop cancels the stream.
  */
 export async function* streamModelsSse(
   baseUrl: string,
   o: RequestOptions = {},
 ): AsyncGenerator<ModelsSseEvent, void, undefined> {
-  const res = await (o.fetch ?? fetch)(`${baseUrl}/models/sse`, {
-    method: 'GET',
-    headers: { accept: 'text/event-stream' },
-    ...(o.signal ? { signal: o.signal } : {}),
-  });
+  let res: Response;
+  try {
+    res = await (o.fetch ?? fetch)(`${baseUrl}/models/sse`, {
+      method: 'GET',
+      headers: { accept: 'text/event-stream' },
+      ...(o.signal ? { signal: o.signal } : {}),
+    });
+  } catch (cause) {
+    // Aborted before the headers: the caller stopped following
+    if (o.signal?.aborted) return;
+    throw cause;
+  }
   if (!res.ok) throw new LlamaHttpError(res.status, await res.text().catch(() => ''));
   if (!res.body) throw new LlamaReplyError('the stream has no body');
   const reader = res.body.getReader();
@@ -234,6 +241,8 @@ export async function* streamModelsSse(
       try {
         chunk = await reader.read();
       } catch (cause) {
+        // The caller stopped following: the end of the stream, not a failure
+        if (o.signal?.aborted) return;
         throw new LlamaStreamCutError('the stream broke', { cause });
       }
       if (chunk.done) {
