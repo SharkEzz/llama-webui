@@ -52,7 +52,7 @@ function Panel({ title, runs, pick }: { title: string; runs: BenchRun[]; pick: (
                 <span className="h-3 w-full">
                   {m && (
                     <span
-                      className="block h-full rounded-r-[4px]"
+                      className="block h-full rounded-r-lg"
                       style={{
                         width: `${Math.max(pct, 0.5)}%`,
                         background: TONE_VAR[RUN_TONES[i % RUN_TONES.length]!],
