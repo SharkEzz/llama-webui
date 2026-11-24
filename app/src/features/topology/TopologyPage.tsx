@@ -12,6 +12,8 @@ import { DetailPopover } from './Detail';
 import { detailPopover } from './detailPopover';
 import { gpuTones, linkFlows, linkSpecs, nodeLive, peerLinks } from './flows';
 import { Hud, Legend } from './Hud';
+import { LayerTooltip } from './LayerTooltip';
+import { layerTooltip } from './layerTooltip';
 import { useReducedMotion } from './useReducedMotion';
 import { type TopologyView, useView } from './viewPrefs';
 
@@ -67,8 +69,9 @@ export function TopologyPage() {
                 type="button"
                 aria-pressed={view === v.view}
                 onClick={() => {
-                  // The details belong to a block of the view that leaves
+                  // The details and tooltips belong to a block of the view that leaves
                   detailPopover.close();
+                  layerTooltip.close();
                   setView(v.view);
                 }}
                 className={cn(
@@ -115,6 +118,7 @@ export function TopologyPage() {
         </div>
       </div>
       <DetailPopover graph={graph} live={live} tones={tones} />
+      <LayerTooltip graph={graph} live={live} tones={tones} />
     </div>
   );
 }

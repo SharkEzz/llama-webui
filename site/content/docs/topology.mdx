@@ -76,6 +76,7 @@ In a GPU, the bar is split in layers, in this order:
 The three first sizes come from `llama-server`'s logs (see [How the model split is found](#how-the-model-split-is-found)).
 When they add up to more than the VRAM in use, while the model is still loading or with the estimate of `-sm tensor`,
 they shrink together: the bar never exceeds the measurement. Without a known split, the bar has a single gray layer.
+Hover any segment of a GPU bar, or its free remainder, to see its label, size and share of VRAM.
 
 The memory has a single layer, the RAM in use. Weights mapped from the disk (`mmap`) sit in the page cache, which is
 not counted as used, so the model has no layer of its own there: its size is in the block's details, as **Model in
