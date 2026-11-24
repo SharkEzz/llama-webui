@@ -145,3 +145,9 @@ export const pieces = ({ text, starts, finished }: Blocks): string[] => [
   ...finished,
   detached(text.slice(starts.at(-1))),
 ];
+
+/** Texts parsed recently → their top-level blocks, as their parse found them. */
+export const recent = new Map<string, readonly TopBlock[]>();
+
+/** The top-level blocks of a text parsed recently (by `Block`): where its next blocks can be cut. */
+export const parsedStarts: StartsOf = (text) => recent.get(text);

@@ -5,8 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { describe, expect, test } from 'vitest';
-import { type Blocks, detached, nextBlocks, pieces, type StartsOf } from './blocks';
-import { components, MarkdownBlocks, parsedStarts } from './Markdown';
+import { type Blocks, detached, nextBlocks, parsedStarts, pieces, type StartsOf } from './blocks';
+import { MarkdownBlocks } from './Markdown';
+import { components } from './mdComponents';
 
 /** The reply as one text: the rendering before it was cut into blocks. */
 const whole = (text: string) =>

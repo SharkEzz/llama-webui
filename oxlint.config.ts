@@ -3,7 +3,7 @@
 // each other project has its own `oxlint.config.ts`, which extends `base` (a nested config replaces this one).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'oxlint';
-import { tests } from './configs/oxlint.tests.ts';
+import { tests } from './scripts/oxlint/oxlint.tests.ts';
 
 // The import bans (`no-restricted-imports`), one pattern per boundary, each matched on the specifier as written: the
 // package name and its subpaths (`(/|$)`), and the relative forms that walk into the same directory

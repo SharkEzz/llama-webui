@@ -5,7 +5,7 @@ import type { Tone } from '@/components/glass/tones';
 import { TooltipContent } from '@/components/ui/tooltip';
 import { formatBytes, formatPct } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { layerSwatchColor, toneOfNode } from './blocks';
+import { layerSwatchColor, toneOfNode } from './constants';
 import { layerSlice, type NodeLive } from './flows';
 import { decodeLayerTarget, layerTooltip } from './layerTooltip';
 

@@ -1,6 +1,7 @@
 import { type PerfSample, SAMPLES, useDebugCapture } from '@/lib/debug/capture';
 import { fmt, formatBytes, formatTime } from '@/lib/format';
-import { Empty, Facts, ms, Section, Table } from './parts';
+import { ms } from './helpers';
+import { Empty, Facts, Section, Table } from './parts';
 
 /** A line of the last minute's samples, scaled from 0 to its highest value. */
 function Sparkline({ values, label }: { values: number[]; label: string }) {

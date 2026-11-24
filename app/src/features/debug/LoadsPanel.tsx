@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useDebugCapture } from '@/lib/debug/capture';
 import { formatBytes, formatTime } from '@/lib/format';
-import { Chip, Empty, Facts, ms, Section, SHOWN, Table } from './parts';
+import { ms } from './helpers';
+import { Chip, Empty, Facts, Section, SHOWN, Table } from './parts';
 
 /** The timings of the page's load, from the navigation entry of the document. */
 function pageLoad(): [string, string][] {

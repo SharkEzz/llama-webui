@@ -21,6 +21,7 @@ export const react: OxlintConfig = {
     'jsx-a11y/anchor-ambiguous-text': 'error',
     'react/jsx-no-useless-fragment': 'error',
     'react/no-object-type-as-default-prop': 'error',
+    'react/only-export-components': ['error', { allowConstantExport: true, allowExportNames: ['links', 'meta'] }],
 
     // The React selection (spec, "The selection" › L5)
     'react/no-unescaped-entities': 'error',

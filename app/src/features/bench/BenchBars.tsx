@@ -1,12 +1,10 @@
 import type { BenchRun, Measure } from '@llama-webui/shared';
-import { TONE_VAR, type Tone } from '@/components/glass/tones';
+import { TONE_VAR } from '@/components/glass/tones';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { KIND_LABEL } from '@/lib/bench';
 import { fmt } from '@/lib/format';
+import { RUN_TONES } from './constants';
 import { formatMeasure } from './format';
-
-/** Fixed tone order: the color follows the run's position in the comparison, never its rank. */
-export const RUN_TONES: Tone[] = ['blue', 'teal', 'amber', 'rose'];
 
 /** pp and tg throughput of the compared runs: two small bar charts, each on its own scale (no dual axis). */
 export function BenchBars({ runs }: { runs: BenchRun[] }) {

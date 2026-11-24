@@ -1,5 +1,6 @@
 import { dec } from '@/lib/format';
 import { clock, type HistoryPoint } from '../telemetry';
+import { THROUGHPUT, type ThroughputSeries } from './constants';
 
 /**
  * Generation or prompt tok/s over the last minute, styled like the app's uPlot chart
@@ -9,13 +10,6 @@ import { clock, type HistoryPoint } from '../telemetry';
  */
 const W = 600;
 const H = 100;
-
-export const THROUGHPUT = {
-  gen: { title: 'Generation (tok/s)', label: 'Generation', color: 'var(--chart-1)' },
-  pp: { title: 'Prompt (tok/s)', label: 'Prompt', color: 'var(--chart-2)' },
-} as const;
-
-export type ThroughputSeries = keyof typeof THROUGHPUT;
 
 const STEPS = [10, 25, 50, 100, 250, 500, 1000];
 

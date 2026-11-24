@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { type ApiCall, useDebugCapture } from '@/lib/debug/capture';
 import { fmt, formatBytes, formatRate, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { Chip, Empty, JsonDetails, ms, Section, SHOWN } from './parts';
+import { ms } from './helpers';
+import { Chip, Empty, JsonDetails, Section, SHOWN } from './parts';
 
 const STATE_TONE: Record<ApiCall['state'], string> = {
   pending: 'text-tone-amber',

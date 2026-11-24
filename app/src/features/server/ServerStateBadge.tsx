@@ -13,7 +13,7 @@ const UI: Record<ServerState['kind'], { label: string; dot: string; text: string
 };
 
 /** Details of an abnormal exit, for the tooltip. */
-export function crashDetail(s: ServerState): string | undefined {
+function crashDetail(s: ServerState): string | undefined {
   if (s.kind !== 'crashed') return undefined;
   const parts = [s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal ? `signal ${s.signal}` : null];
   return parts.filter(Boolean).join(', ') || undefined;

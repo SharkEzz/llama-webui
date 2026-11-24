@@ -1,12 +1,8 @@
 import { type ReactNode, useState } from 'react';
-import { fmt } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /** The rows a list shows (the buffers hold more). */
 export const SHOWN = 200;
-
-/** A duration in ms: “12.3 ms”, “—” when unknown. */
-export const ms = (v: number | undefined) => (v === undefined ? '—' : `${fmt(v, 1)} ms`);
 
 /** A value as JSON, rendered only once opened (a snapshot is large, the list is rendered four times a second). */
 export function JsonDetails({ summary, value }: { summary: ReactNode; value: () => unknown }) {

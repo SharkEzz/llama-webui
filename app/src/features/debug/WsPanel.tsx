@@ -1,12 +1,13 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import type { WsFrame } from '@/lib/debug/capture';
 import { useDebugCapture } from '@/lib/debug/capture';
 import { fmt, formatBytes, formatDuration, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { wsListenerCounts } from '@/lib/ws';
-import { Chip, Empty, Facts, JsonDetails, ms, Section, SHOWN, Table } from './parts';
+import { ms } from './helpers';
+import { Chip, Empty, Facts, JsonDetails, Section, SHOWN, Table } from './parts';
 
 /** The text of a frame's content, made once per frame (the list is filtered four times a second). */
 const frameText = new WeakMap<WsFrame, string>();
@@ -38,36 +39,39 @@ export function WsPanel() {
     .slice(-SHOWN)
     .toReversed();
 
+  const items = useMemo(
+    (): [string, React.ReactNode][] => [
+      [
+        'Status',
+        <span key="status" className={cn(ws.status === 'closed' && 'text-destructive')}>
+          {ws.status}
+        </span>,
+      ],
+      ['URL', ws.url || '—'],
+      ['Open since', ws.openedAt ? `${formatTime(ws.openedAt)} (${formatDuration(now - ws.openedAt)})` : '—'],
+      ['Reconnects', String(ws.reconnects)],
+      ['Next attempt in', ws.status === 'closed' ? ms(ws.retryMs) : '—'],
+      [
+        'Last close',
+        ws.lastClose
+          ? `${formatTime(ws.lastClose.at)}, code ${ws.lastClose.code}${ws.lastClose.reason ? ` (${ws.lastClose.reason})` : ''}${ws.lastClose.clean ? '' : ', not clean'}`
+          : '—',
+      ],
+      ['Clock offset', ws.clockOffsetMs === undefined ? '—' : `${fmt(ws.clockOffsetMs, 0)} ms (server − page)`],
+      [
+        'Boot ids',
+        ws.bootIds.length === 0
+          ? '—'
+          : ws.bootIds.map((b) => `${b.bootId.slice(0, 8)} at ${formatTime(b.at)}`).join(', '),
+      ],
+    ],
+    [ws.bootIds, ws.clockOffsetMs, ws.openedAt, ws.url, ws.status, ws.reconnects, ws.retryMs, ws.lastClose, now],
+  );
+
   return (
     <div className="flex flex-col gap-4 pt-3">
       <Section title="Connection">
-        <Facts
-          items={[
-            [
-              'Status',
-              <span key="status" className={cn(ws.status === 'closed' && 'text-destructive')}>
-                {ws.status}
-              </span>,
-            ],
-            ['URL', ws.url || '—'],
-            ['Open since', ws.openedAt ? `${formatTime(ws.openedAt)} (${formatDuration(now - ws.openedAt)})` : '—'],
-            ['Reconnects', String(ws.reconnects)],
-            ['Next attempt in', ws.status === 'closed' ? ms(ws.retryMs) : '—'],
-            [
-              'Last close',
-              ws.lastClose
-                ? `${formatTime(ws.lastClose.at)}, code ${ws.lastClose.code}${ws.lastClose.reason ? ` (${ws.lastClose.reason})` : ''}${ws.lastClose.clean ? '' : ', not clean'}`
-                : '—',
-            ],
-            ['Clock offset', ws.clockOffsetMs === undefined ? '—' : `${fmt(ws.clockOffsetMs, 0)} ms (server − page)`],
-            [
-              'Boot ids',
-              ws.bootIds.length === 0
-                ? '—'
-                : ws.bootIds.map((b) => `${b.bootId.slice(0, 8)} at ${formatTime(b.at)}`).join(', '),
-            ],
-          ]}
-        />
+        <Facts items={items} />
       </Section>
 
       <Section title="Message types">

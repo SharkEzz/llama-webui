@@ -2,9 +2,10 @@ import { Cpu, Layers, ListOrdered, TextCursorInput, Zap } from 'lucide-react';
 import { dec, formatGiB, formatInt, formatPct } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { clock, type Frame } from '../telemetry';
+import { THROUGHPUT, type ThroughputSeries } from './constants';
 import { Gauge } from './Gauge';
 import { Panel, StatTile } from './Panel';
-import { THROUGHPUT, ThroughputChart, ThroughputLegend, type ThroughputSeries } from './ThroughputChart';
+import { ThroughputChart, ThroughputLegend } from './ThroughputChart';
 import { TONE_VAR, type Tone } from './tones';
 
 const GPU_TONES: Tone[] = ['amber', 'rose'];
