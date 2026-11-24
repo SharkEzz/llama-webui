@@ -67,13 +67,13 @@ If you have no profile yet, the card links to the [Profiles](/docs/profiles/) pa
 The profile's arguments are completed with `--metrics`, `--slots` and `--props` (see
 [Flags llama-webui sets itself](/docs/profiles/#flags-llama-webui-sets-itself)) so that llama-webui can read:
 
-| Endpoint      | When                                                        | Used for                                                                                                                     |
-| ------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `/models/sse` | Kept open while the server runs (when supported)            | Live loading progress and stages, instant **Ready** transition, **Sleeping**/wakeup tracking, and fallback memory breakdown. |
-| `/health`     | Every half second on fallback while starting, then per tick | Fallback **Starting…** → **Ready** transition on older builds, and detecting an external server.                             |
-| `/slots`      | At every sample, once ready (skipped while sleeping)        | Live speed and context use per slot on the [Dashboard](/docs/dashboard/).                                                    |
-| `/metrics`    | At every sample, once ready                                 | Per-request stats, the request queue and speculative decoding acceptance on the Dashboard.                                   |
-| `/props`      | When the server becomes ready                               | The **Server info** card, and the context size and default sampling shown in [Chat](/docs/chat/).                            |
+| Endpoint      | When                                                          | Used for                                                                                                                     |
+| ------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `/models/sse` | Kept open while the server runs (when supported)              | Live loading progress and stages, instant **Ready** transition, **Sleeping**/wakeup tracking, and fallback memory breakdown. |
+| `/health`     | Every half second on fallback while starting, then per tick   | Fallback **Starting…** → **Ready** transition on older builds, and detecting an external server.                             |
+| `/slots`      | Once ready, at each sample that `/metrics` shows activity for | Live speed and context use per slot on the [Dashboard](/docs/dashboard/).                                                    |
+| `/metrics`    | At every sample, once ready                                   | Per-request stats, the request queue and speculative decoding acceptance on the Dashboard.                                   |
+| `/props`      | When the server becomes ready                                 | The **Server info** card, and the context size and default sampling shown in [Chat](/docs/chat/).                            |
 
 A sample is taken every polling interval, 1 second by default ([Settings](/docs/settings/)).
 
@@ -118,7 +118,10 @@ and shows its PID when it finds a `llama-server` started with that port; the PID
 
 An external server can be used but not controlled:
 
-- [Chat](/docs/chat/), the [Dashboard](/docs/dashboard/) and the **Server info** card work with it.
+- [Chat](/docs/chat/), the [Dashboard](/docs/dashboard/) and the **Server info** card work with it. Found while its
+  model still loads, it fills the **Server info** card once the model is loaded.
+- It goes to sleep (`--sleep-idle-seconds`) under llama-webui only when it runs with `--metrics`: see
+  [Slots](/docs/dashboard/#slots-and-context).
 - **Start** is refused while it holds the port, with `port in use by an external server`. llama-webui never stops a
   process it did not start: stop it yourself to take back control.
 

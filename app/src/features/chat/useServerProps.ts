@@ -1,11 +1,14 @@
 import { servesRequests } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
-import { getServerProps, type ServerProps, serverPropsOf } from '@/lib/props';
+import { getServerProps, isExternalLoaded, propsRetry, type ServerProps, serverPropsOf } from '@/lib/props';
 import { useServer } from '@/lib/server';
 
 export type { ServerProps };
 
-/** /props of the server that takes requests (reread when the running process changes), otherwise null. */
+/**
+ * /props of the server that takes requests (reread when the running process changes, and once an external server found
+ * while it loaded says it is loaded), otherwise null.
+ */
 export function useServerProps(): ServerProps | null {
   const kind = useServer((s) => s.view?.state.kind);
   const serving = useServer((s) => servesRequests(s.view?.state));
@@ -15,6 +18,10 @@ export function useServerProps(): ServerProps | null {
   const [props, setProps] = useState<ServerProps | null>(null);
   // Out of those states, no props: cleared by the render that leaves it, before the effect of the next state
   if (liveGroup === null && props !== null) setProps(null);
+  const loaded = useServer((s) => isExternalLoaded(s.view?.state));
+  const [retry, setRetry] = useState({ loaded, n: 0 });
+  const nextRetry = propsRetry(retry, { loaded, missing: props === null });
+  if (nextRetry !== retry) setRetry(nextRetry);
   useEffect(() => {
     if (liveGroup === null) return;
     let live = true;
@@ -25,7 +32,7 @@ export function useServerProps(): ServerProps | null {
     return () => {
       live = false;
     };
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- pid is a trigger: /props is reread on every server restart
-  }, [liveGroup, pid]);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- pid and retry.n are triggers: /props is reread on every server restart, and when an external server ends the load it was found in
+  }, [liveGroup, pid, retry.n]);
   return props;
 }

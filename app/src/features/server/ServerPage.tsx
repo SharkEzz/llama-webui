@@ -36,7 +36,7 @@ import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatInt, formatPct } from '@/lib/format';
 import { startLogsSync, useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
-import { getServerProps, isRecord } from '@/lib/props';
+import { getServerProps, isExternalLoaded, isRecord, propsRetry } from '@/lib/props';
 import { isRunning, restartServer, startProfile, stopServer, switchProfile, useServer } from '@/lib/server';
 import { useNow } from '@/lib/useNow';
 import { ServerStateBadge } from './ServerStateBadge';
@@ -263,10 +263,27 @@ function PropsCard() {
     setError(null);
   }
 
+  // An external server found while it loaded answered 503: asked again once it says it is loaded
+  const loaded = isExternalLoaded(state);
+  const [retry, setRetry] = useState({ loaded, n: 0 });
+  const nextRetry = propsRetry(retry, { loaded, missing: props === null });
+  if (nextRetry !== retry) {
+    setRetry(nextRetry);
+    if (nextRetry.n !== retry.n) setError(null);
+  }
+
   useEffect(() => {
     if (!key) return;
-    getServerProps().then(setProps, (e: unknown) => setError(errorMessage(e)));
-  }, [key]);
+    let live = true;
+    getServerProps().then(
+      (p) => live && setProps(p),
+      (e: unknown) => live && setError(errorMessage(e)),
+    );
+    return () => {
+      live = false;
+    };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- retry.n is a trigger: /props is asked again when an external server ends the load it was found in
+  }, [key, retry.n]);
 
   const gen: Props = isRecord(props?.default_generation_settings) ? props.default_generation_settings : {};
   const modalities = Object.entries(isRecord(props?.modalities) ? props.modalities : {})
