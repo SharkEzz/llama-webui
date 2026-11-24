@@ -10,7 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useDebugWindow } from '@/features/debug/geometry';
 import { call } from '@/lib/api';
+import { useDebugMode } from '@/lib/debug/mode';
 import { formatDuration } from '@/lib/format';
 import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
@@ -45,6 +47,7 @@ export function SettingsPage() {
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <TabsTrigger value="developer">Developer</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <General settings={settings} errors={errors} save={save} />
@@ -54,6 +57,9 @@ export function SettingsPage() {
           </TabsContent>
           <TabsContent value="appearance">
             <Appearance />
+          </TabsContent>
+          <TabsContent value="developer">
+            <Developer />
           </TabsContent>
         </Tabs>
       )}
@@ -243,6 +249,25 @@ function Appearance() {
         </Select>
         <p className="text-xs text-muted-foreground">“System” follows the OS light or dark setting.</p>
       </div>
+    </GlassCard>
+  );
+}
+
+function Developer() {
+  const on = useDebugMode((s) => s.on);
+  const setOn = useDebugMode((s) => s.setOn);
+  return (
+    <GlassCard title="Debug">
+      <SwitchRow
+        id="debugMode"
+        label="Debug mode"
+        hint="A button at the bottom right of every page opens a window with what the page receives (WebSocket, HTTP, server-sent events) and how it renders. Captured only while on, in this browser only."
+        checked={on}
+        onChange={(next) => {
+          setOn(next);
+          if (!next) useDebugWindow.getState().setOpen(false);
+        }}
+      />
     </GlassCard>
   );
 }

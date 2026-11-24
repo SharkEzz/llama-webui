@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router/dom';
 import './index.css';
 import { router } from './app/router';
+import { startDebugSync } from './lib/debug/mode';
 import { startDownloadsSync } from './lib/downloads';
 import { startMonitorSync } from './lib/monitor';
 import { startServerSync } from './lib/server';
@@ -10,6 +11,8 @@ import { startThemeSync } from './lib/theme';
 import { startTopologySync } from './lib/topology';
 import { useWs } from './lib/ws';
 
+// Before the WebSocket connects: its `hello` is captured.
+startDebugSync();
 startThemeSync();
 startServerSync();
 startMonitorSync();

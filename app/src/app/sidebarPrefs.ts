@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { debugStore } from '@/lib/debug/stores';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 
 const KEY = 'llama-webui:sidebar';
@@ -42,3 +43,5 @@ export function useSidebarLayout(): { collapsed: boolean; narrow: boolean } {
   const narrow = !useMediaQuery('(min-width: 48rem)');
   return { collapsed: chosen || narrow, narrow };
 }
+
+debugStore('sidebar', useSidebar);

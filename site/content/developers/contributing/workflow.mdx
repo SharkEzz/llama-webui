@@ -33,6 +33,7 @@ soon as a change forgets it.
 | `app/server/profiles/**`                                                                                                                 | [Profiles](/developers/api/profiles/) (API), [Profiles](/docs/profiles/) (user)                                                                                                                                                                                           |
 | `app/server/db/**` (migrations, tables), the `*Repo.ts` of each domain                                                                   | [Database](/developers/server/database/)                                                                                                                                                                                                                                  |
 | `app/src/features/home/setup/**`                                                                                                         | [First run](/docs/getting-started/first-run/)                                                                                                                                                                                                                             |
+| `app/src/features/debug/**`, `app/src/lib/debug/**`                                                                                      | [Settings](/docs/settings/#developer), [Web app](/developers/frontend/#debug-window)                                                                                                                                                                                      |
 | `app/src/features/<page>/**`                                                                                                             | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/))                                                                                                        |
 | `app/src/app/**`, `app/src/lib/**`, `app/src/components/**`                                                                              | [Web app](/developers/frontend/)                                                                                                                                                                                                                                          |
 | `packages/llamacpp-js/**` (a module, an export, an error, a rule of the package)                                                         | [llamacpp-js](/developers/llamacpp-js/) and the server page that uses it ([Supervisor](/developers/server/supervisor/), [Monitor and collectors](/developers/server/monitor/), [Chat runs](/developers/server/chat/), [Benchmarks and sweeps](/developers/server/bench/)) |
@@ -179,7 +180,9 @@ pnpm --dir site screenshots --live     # Dashboard, System and Topology, during 
 `site/scripts/screenshots.ts` opens each screen in headless Chromium (`/usr/bin/chromium`), switches the theme through
 `PATCH /api/settings` to capture it in dark and light, and restores the theme at the end. `--base` points it at another address.
 `site/scripts/shots.ts` lists the screens and how each is staged; a `manual` shot (the setup checklist) is only taken
-when you name it.
+when you name it. An `animation` shot (`debug`, the debug window tab by tab) plays a scene and captures one region of
+the window frame by frame (`frame(holdMs)`), written as a looping WebP at the region's width and at 800 px; the
+landing page shows it through `<Shot size={…}>`.
 
   </Step>
   <Step title="Update what depends on them">

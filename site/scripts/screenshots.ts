@@ -6,7 +6,8 @@
  * Without names: every shot except `live` and `manual` ones; --live: the shots that need a running generation.
  *
  * Targets the demo instance (never the everyday one). The theme is switched through PATCH /api/settings and restored
- * at the end. Output: public/screenshots/<name>-<theme>.webp (1600 px wide) and <name>-<theme>-800.webp.
+ * at the end. Output: public/screenshots/<name>-<theme>.webp (1600 px wide) and <name>-<theme>-800.webp; an animated
+ * shot (`animation`) is a looping WebP of its region, at its width and at 800 px.
  */
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -42,6 +43,14 @@ async function api(path: string, init?: RequestInit): Promise<unknown> {
   return res.json();
 }
 
+/** Frames of an animation, each resized to `width`, as one looping WebP. */
+async function writeAnimation(pngs: Uint8Array[], delay: number[], width: number, quality: number, file: string) {
+  const resized = await Promise.all(pngs.map((png) => sharp(png).resize({ width }).png().toBuffer()));
+  await sharp(resized, { join: { animated: true } })
+    .webp({ quality, delay, loop: 0, effort: 6 })
+    .toFile(file);
+}
+
 const failures: string[] = [];
 const settings = await api('/api/settings');
 const initialTheme: unknown =
@@ -62,6 +71,7 @@ try {
       try {
         if (shot.viewport) await page.setViewport({ ...VIEWPORT, ...shot.viewport });
         if (!shot.motion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+        await shot.beforeLoad?.(page);
         await page.goto(`${base}${shot.path}`, { waitUntil: 'networkidle2' });
         if (shot.readyText) await page.waitForSelector(`::-p-text(${shot.readyText})`, { timeout: 15_000 });
         if (shot.goneText) {
@@ -73,6 +83,21 @@ try {
         }
         await shot.prepare?.(page);
         await new Promise((r) => setTimeout(r, shot.delayMs ?? 1200));
+        if (shot.animation) {
+          const { clip, play } = shot.animation;
+          const pngs: Uint8Array[] = [];
+          const delay: number[] = [];
+          await play(page, async (holdMs) => {
+            pngs.push(await page.screenshot({ type: 'png', clip }));
+            delay.push(holdMs);
+          });
+          await page.close();
+          const file = join(outDir, `${shot.name}-${theme}`);
+          await writeAnimation(pngs, delay, clip.width, 80, `${file}.webp`);
+          await writeAnimation(pngs, delay, 800, 76, `${file}-800.webp`);
+          console.log(`✓ ${shot.name}-${theme} (${pngs.length} frames)`);
+          continue;
+        }
         const png = await page.screenshot({ type: 'png' });
         await page.close();
 

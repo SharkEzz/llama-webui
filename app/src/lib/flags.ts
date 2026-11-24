@@ -2,6 +2,7 @@ import { catalogFrom, type FlagCatalog } from '@llama-webui/shared';
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { call, errorMessage } from './api';
+import { debugStore } from './debug/stores';
 
 interface FlagsStore {
   catalog: FlagCatalog | null;
@@ -33,3 +34,5 @@ export function useFlags(): { catalog: FlagCatalog | null; error: string | undef
   }, []);
   return { catalog, error };
 }
+
+debugStore('flags', useFlagsStore);

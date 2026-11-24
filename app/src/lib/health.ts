@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { call, errorMessage } from './api';
+import { debugStore } from './debug/stores';
 
 /** The reply of `GET /api/health`. */
 export type Health = Awaited<ReturnType<typeof getHealth>>;
@@ -24,3 +25,5 @@ export const useHealth = create<HealthState>()((set) => ({
     }
   },
 }));
+
+debugStore('health', useHealth);

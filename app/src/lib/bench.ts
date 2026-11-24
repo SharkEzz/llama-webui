@@ -19,6 +19,7 @@ import { Result, Schema } from 'effect';
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { errorMessage, errorTag, call as webCall } from './api';
+import { debugStore } from './debug/stores';
 import { plural } from './format';
 import { onWs, useWs } from './ws';
 
@@ -456,3 +457,5 @@ export const STATUS_LABEL: Record<BenchStatus, string> = {
 };
 
 export const KIND_LABEL: Record<BenchKind, string> = { bench: 'llama-bench', server: 'server' };
+
+debugStore('bench', useBench);

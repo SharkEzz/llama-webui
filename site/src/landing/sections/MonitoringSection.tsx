@@ -1,4 +1,5 @@
 import { Activity, Cpu, Network, ScrollText } from 'lucide-react';
+import { Link } from 'react-router';
 import { Shot } from '@/components/Shot';
 import { type AppPage, BentoCard, PageChips, SectionHalo, SHOT_FRAME } from '../Bento';
 
@@ -129,6 +130,33 @@ export function MonitoringSection() {
             }
           >
             The last 10,000 lines of llama-server, with a level filter, search and auto-follow.
+          </BentoCard>
+
+          <BentoCard
+            tone="blue"
+            title="And what the page itself receives"
+            details={
+              <Link
+                to="/docs/settings/#developer"
+                className="mt-3 inline-block text-sm font-medium text-tone-blue underline-offset-4 hover:underline"
+              >
+                Turn on the debug mode
+              </Link>
+            }
+            visual={
+              <Shot
+                name="debug"
+                alt="Debug window over the Dashboard, tab by tab: the WebSocket frames, the API calls, the frame rate and the page's stores, then the change of a store opened on its diff"
+                size={{ width: 1120, height: 770 }}
+                crop={{ x: 0.07, y: 0.07, w: 0.93, h: 0.93 }}
+                width="min(46rem, 90vw)"
+                className={SHOT_FRAME}
+              />
+            }
+          >
+            The debug mode opens a window over any page: the WebSocket frames, every API call and stream, the frame
+            rate, and every change of a store with its diff. Export it as JSON, your conversations and paths left out,
+            to attach to an issue.
           </BentoCard>
         </div>
       </div>

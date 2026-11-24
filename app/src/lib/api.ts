@@ -1,7 +1,8 @@
 import { Api, requestInvalid } from '@llama-webui/shared';
-import { Cause, Effect, Exit, ManagedRuntime, Predicate, Schema, Stream } from 'effect';
-import { FetchHttpClient, type HttpClient, HttpClientError } from 'effect/http';
+import { Cause, Effect, Exit, ManagedRuntime, Option, Predicate, Schema, Stream } from 'effect';
+import { FetchHttpClient, type HttpBody, HttpClient, HttpClientError, UrlParams } from 'effect/http';
 import { type HttpApi, HttpApiClient, type HttpApiGroup } from 'effect/http-api';
+import { debugCall, type DebugCallRecorder } from './debug/capture';
 
 /** A failed call that never reached the server. */
 export class ApiUnreachable extends Error {
@@ -39,6 +40,28 @@ const streamFailure = <E>(e: E) => {
 /** The one runtime of the web's calls: Effect's HTTP client on `fetch`. */
 const runtime = ManagedRuntime.make(FetchHttpClient.layer);
 
+const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+/** The body of a request, decoded when it is JSON (the client's payloads are). */
+function sentBody(body: HttpBody.HttpBody): unknown {
+  if (body._tag !== 'Uint8Array') return body._tag === 'Empty' ? undefined : `<${body._tag} body>`;
+  const text = body.text ?? new TextDecoder().decode(body.body);
+  return Option.getOrElse(decodeJson(text), () => text);
+}
+
+/** The HTTP client, telling `recorder` the request it sends and the response's status (the debug window). */
+const recording = (recorder: DebugCallRecorder) => (client: HttpClient.HttpClient) =>
+  HttpClient.transform(client, (response, req) => {
+    const query = UrlParams.toString(req.urlParams);
+    recorder.request(req.method, query ? `${req.url}?${query}` : req.url, sentBody(req.body));
+    return Effect.tap(response, (res) =>
+      Effect.sync(() => {
+        const length = Number(res.headers['content-length']);
+        recorder.response(res.status, Number.isFinite(length) ? length : undefined);
+      }),
+    );
+  });
+
 /**
  * The client of `api` running `f`, its errors as a page reads them: the endpoint's tagged error as the server sent
  * it, `ApiUnreachable` for a request that got no answer, and for a payload the client refuses to send (it encodes it
@@ -47,9 +70,10 @@ const runtime = ManagedRuntime.make(FetchHttpClient.layer);
 function request<Groups extends HttpApiGroup.Constraint, A, E>(
   api: HttpApi.HttpApi<string, Groups>,
   f: (client: HttpApiClient.Client<Groups>) => Effect.Effect<A, E>,
+  recorder: DebugCallRecorder | undefined,
 ) {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a generic `Groups` hides that the web's APIs declare no client middleware (see the cast's comment)
-  return HttpApiClient.make(api).pipe(
+  return HttpApiClient.make(api, recorder ? { transformClient: recording(recorder) } : undefined).pipe(
     Effect.flatMap(f),
     // The request never got an answer (refused, network down, DNS): the server is unreachable.
     Effect.catchIf(
@@ -87,9 +111,15 @@ export function makeCall<Id extends string, Groups extends HttpApiGroup.Constrai
     f: (client: HttpApiClient.Client<Groups>) => Effect.Effect<A, E>,
     options?: { signal?: AbortSignal | undefined },
   ): Promise<A> => {
-    const exit = await run(request(api, f), fetchImpl, options?.signal);
-    if (Exit.isSuccess(exit)) return exit.value;
-    throw Cause.squash(exit.cause);
+    const recorder = debugCall();
+    const exit = await run(request(api, f, recorder), fetchImpl, options?.signal);
+    if (Exit.isSuccess(exit)) {
+      recorder?.end('ok', { reply: exit.value });
+      return exit.value;
+    }
+    const error = Cause.squash(exit.cause);
+    recorder?.end(...ending(exit.cause, error));
+    throw error;
   };
 }
 
@@ -108,16 +138,32 @@ export function makeCallStream<Id extends string, Groups extends HttpApiGroup.Co
     onEvent: (a: A) => void,
     options?: { signal?: AbortSignal | undefined },
   ): Promise<void> => {
-    const follow = Effect.flatMap(request(api, f), (stream) =>
+    const recorder = debugCall(true);
+    const follow = Effect.flatMap(request(api, f, recorder), (stream) =>
       stream.pipe(
-        Stream.runForEach((a) => Effect.sync(() => onEvent(a))),
+        Stream.runForEach((a) =>
+          Effect.sync(() => {
+            recorder?.event(a);
+            onEvent(a);
+          }),
+        ),
         Effect.mapError(streamFailure),
       ),
     );
     const exit = await run(follow, fetchImpl, options?.signal);
-    if (Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)) return;
-    throw Cause.squash(exit.cause);
+    if (Exit.isSuccess(exit)) return recorder?.end('ok');
+    if (Cause.hasInterruptsOnly(exit.cause)) return recorder?.end('aborted');
+    const error = Cause.squash(exit.cause);
+    recorder?.end(...ending(exit.cause, error));
+    throw error;
   };
+}
+
+/** How a failed call ends, for the debug window: aborted (its signal), else an error and its tag. */
+function ending(cause: Cause.Cause<unknown>, error: unknown): Parameters<DebugCallRecorder['end']> {
+  if (Cause.hasInterruptsOnly(cause)) return ['aborted'];
+  const name = error instanceof Error ? error.name : undefined;
+  return ['error', { tag: errorTag(error) ?? name }];
 }
 
 /** `call((api) => api.health.get())` */
