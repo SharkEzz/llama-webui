@@ -34,7 +34,7 @@ import { probeUrl } from 'llamacpp-js/client';
 import type { ModelMemory, ModelsSseEvent } from 'llamacpp-js/models';
 import type { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { sanitizeLoadProgress, streamModelsSse } from '../llama/modelsSse.ts';
-import { health, isLlamaServer, props } from '../llama/probes.ts';
+import { health, isLlamaServer, readProps } from '../llama/probes.ts';
 import { findLlamaServerPid, isAlive } from '../llama/procScan.ts';
 import { isIdleNoise, linesOf } from '../logs/lines.ts';
 import { LogRing } from '../logs/LogRing.ts';
@@ -449,20 +449,23 @@ export class Supervisor extends Context.Service<
 
         /**
          * Follows `/models/sse` for an external single-model server. A router's events describe individual models.
+         * A server that refuses `/props` (401 or 403: started with `--api-key`) is not followed: it would refuse the
+         * stream too, and log every try.
          */
         const watchExternal = (port: number, pid: number | null): Effect.Effect<void> =>
           Effect.gen(function* () {
             /** One look at `/props`, then one connection to the stream: whether to try again. */
             const round = Effect.gen(function* () {
-              const details = yield* props(probeUrl(null, port)).pipe(Effect.option);
-              if (Option.isNone(details)) {
+              const details = yield* readProps(probeUrl(null, port)).pipe(Effect.result);
+              if (details._tag === 'Failure') {
+                if (details.failure.status === 401 || details.failure.status === 403) return false;
                 // A 503 during the first load, a slow or failed answer: tried again while this server is the one
                 // watched. A server gone leaves `external` (the loop ends at its next round).
                 const status = yield* health({ port });
                 if (Option.isNone(status)) yield* recheckExternal;
                 return true;
               }
-              if (!isServerProps(details.value) || details.value.role === 'router') return false;
+              if (!isServerProps(details.success) || details.success.role === 'router') return false;
               const outcome = yield* streamModelsSse({ port }).pipe(
                 Stream.runForEach((event) => applyExternalEvent(port, pid, event)),
                 Effect.result,

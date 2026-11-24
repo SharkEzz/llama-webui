@@ -888,40 +888,37 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
           FAKE_LOAD_MS: '180',
         },
       }).pipe(Scope.provide(extScope));
-      try {
-        yield* fresh()(
-          Effect.gen(function* () {
-            const supervisor = yield* Supervisor;
-            const client = yield* LlamaHttp;
-            const baseUrl = `http://127.0.0.1:${port}`;
-            const detected = yield* supervisor.detectExternal(port);
-            assert.isTrue(detected);
-            const extReady = yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
-            assert.strictEqual(extReady.kind, 'external');
-            const extMem = yield* supervisor.memory;
-            assert.isNotNull(extMem);
+      // Closed however the block ends: a `finally` around a `yield*` does not run when the yielded effect fails.
+      yield* fresh()(
+        Effect.gen(function* () {
+          const supervisor = yield* Supervisor;
+          const client = yield* LlamaHttp;
+          const baseUrl = `http://127.0.0.1:${port}`;
+          const detected = yield* supervisor.detectExternal(port);
+          assert.isTrue(detected);
+          const extReady = yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+          assert.strictEqual(extReady.kind, 'external');
+          const extMem = yield* supervisor.memory;
+          assert.isNotNull(extMem);
 
-            yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
-            yield* stateWhen((s) => s.kind === 'external' && s.status === 'sleeping');
-            const extSleepMem = yield* supervisor.memory;
-            assert.isNull(extSleepMem);
+          yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+          yield* stateWhen((s) => s.kind === 'external' && s.status === 'sleeping');
+          const extSleepMem = yield* supervisor.memory;
+          assert.isNull(extSleepMem);
 
-            yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
-            yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
-            const wakeMem = yield* supervisor.memory;
-            assert.deepStrictEqual(wakeMem, extMem);
-            const seen = yield* publishedViews;
-            const progress = Arr.map(seen, (view) => stateLoadProgress(view.state));
-            assert.deepInclude(progress, {
-              stages: ['text_model', 'mmproj_model'],
-              current: 'mmproj_model',
-              value: null,
-            });
-          }),
-        );
-      } finally {
-        yield* Scope.close(extScope, Exit.void);
-      }
+          yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+          yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+          const wakeMem = yield* supervisor.memory;
+          assert.deepStrictEqual(wakeMem, extMem);
+          const seen = yield* publishedViews;
+          const progress = Arr.map(seen, (view) => stateLoadProgress(view.state));
+          assert.deepInclude(progress, {
+            stages: ['text_model', 'mmproj_model'],
+            current: 'mmproj_model',
+            value: null,
+          });
+        }),
+      ).pipe(Effect.ensuring(Scope.close(extScope, Exit.void)));
       yield* assertGone(outside.pid);
     }),
   );
@@ -974,6 +971,33 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
         assert.isTrue(detected);
         yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
         assert.isAbove(propsCalls, 1);
+      }),
+    ),
+  );
+  it.effect('an external server that refuses /props (--api-key) is not asked again', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const paths: Array<string> = [];
+        const server = yield* httpStub((req, res) => {
+          paths.push(req.url ?? '');
+          if (req.url === '/health') res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+          else {
+            res
+              .writeHead(401, { 'content-type': 'application/json' })
+              .end('{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}');
+          }
+        });
+        const supervisor = yield* Supervisor;
+        const detected = yield* supervisor.detectExternal(server.port);
+        assert.isTrue(detected);
+        // Ten polls of the watcher (50 ms each): one refusal, then nothing more, and never the stream.
+        yield* Effect.sleep('500 millis');
+        assert.deepStrictEqual(
+          Arr.filter(paths, (path) => path !== '/health'),
+          ['/props'],
+        );
+        // Still the external server, without a status.
+        yield* assertState({ kind: 'external', pid: null, port: server.port });
       }),
     ),
   );

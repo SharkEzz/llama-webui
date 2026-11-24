@@ -98,11 +98,19 @@ const sseClients = new Set<ReadableStreamDefaultController<Uint8Array>>();
 const sseEnc = new TextEncoder();
 let sseLastEvent: unknown = null;
 let isSleeping = false;
+// The first load only: llama-server answers 503 until then, and never again (not during a reload after a sleep).
 let isLoading = loadMs > 0;
+/** The reload after a sleep, while it runs: the requests that need the model wait for it. */
+let waking: Promise<void> | null = null;
 // FAKE_SSE_REFUSE_AFTER_SLEEP=1: entering sleep cuts the /models/sse streams, and the next request of it answers 503.
 const sseRefuseAfterSleep = process.env.FAKE_SSE_REFUSE_AFTER_SLEEP === "1";
 let sseRefusePending = false;
 let sseRefused = 0;
+// FAKE_SLEEP_IDLE_MS: sleeps after that long without a request that needs the model, as --sleep-idle-seconds does.
+// /slots and the completions put the sleep off; /health, /props, /metrics and /models/sse do not. Only the arrival of
+// a request counts: a reply longer than the delay does not hold the sleep off.
+const sleepIdleMs = Number(process.env.FAKE_SLEEP_IDLE_MS ?? 0);
+let idleTimer: NodeJS.Timeout | null = null;
 
 function sseEmit(event: string, data?: Record<string, unknown>) {
   if (!sseEnabled) return;
@@ -119,6 +127,8 @@ function sseEmit(event: string, data?: Record<string, unknown>) {
 }
 
 function enterSleep() {
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = null;
   isSleeping = true;
   sseEmit("status_change", { status: "sleeping" });
   if (sseRefuseAfterSleep) {
@@ -130,52 +140,74 @@ function enterSleep() {
   }
 }
 
-function runLoadCycle(firstLoad: boolean) {
-  isLoading = loadMs > 0;
-  if (!sseEnabled) {
-    if (loadMs > 0) setTimeout(() => { isLoading = false; }, loadMs);
-    return;
-  }
-  sseEmit("status_change", { status: "loading" });
-  if (loadMs <= 0) {
+/** Starts the idle delay over. */
+function touch() {
+  if (sleepIdleMs <= 0) return;
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    if (!isLoading && !isSleeping) enterSleep();
+  }, sleepIdleMs);
+}
+
+/** Loads the model in FAKE_LOAD_MS, telling /models/sse about it; resolves once it is loaded. */
+function runLoadCycle(firstLoad: boolean): Promise<void> {
+  if (firstLoad) isLoading = loadMs > 0;
+  const { promise, resolve } = Promise.withResolvers<void>();
+  const loaded = () => {
     isLoading = false;
     isSleeping = false;
     sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
-    return;
+    touch();
+    resolve();
+  };
+  sseEmit("status_change", { status: "loading" });
+  if (loadMs <= 0) {
+    loaded();
+    return promise;
   }
-  const steps = sseStages.flatMap((stage) => [
-    { stage, value: 0 },
-    { stage, value: 0.5 },
-    { stage, value: 1 },
-  ]);
-  const stepMs = Math.max(10, Math.floor(loadMs / (steps.length + 1)));
-  steps.forEach((step, idx) => {
-    setTimeout(() => {
-      sseEmit("status_change", {
-        status: "loading",
-        progress: sseStageOnly && step.stage === "mmproj_model" && step.value === 0
-          ? { stage: step.stage }
-          : { stages: sseStages, current: step.stage, value: step.value },
-      });
-    }, stepMs * idx);
-  });
+  if (sseEnabled) {
+    const steps = sseStages.flatMap((stage) => [
+      { stage, value: 0 },
+      { stage, value: 0.5 },
+      { stage, value: 1 },
+    ]);
+    const stepMs = Math.max(10, Math.floor(loadMs / (steps.length + 1)));
+    steps.forEach((step, idx) => {
+      setTimeout(() => {
+        sseEmit("status_change", {
+          status: "loading",
+          progress: sseStageOnly && step.stage === "mmproj_model" && step.value === 0
+            ? { stage: step.stage }
+            : { stages: sseStages, current: step.stage, value: step.value },
+        });
+      }, stepMs * idx);
+    });
+  }
   setTimeout(() => {
-    if (process.env.FAKE_SSE_FAIL === "1") {
+    if (sseEnabled && process.env.FAKE_SSE_FAIL === "1") {
       sseEmit("status_change", { status: "unloaded", exit_code: 1 });
       log("failed to load model");
       void exit(1);
       return;
     }
-    isLoading = false;
-    isSleeping = false;
-    sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
+    loaded();
   }, loadMs);
+  return promise;
 }
 
-function wakeIfSleeping() {
-  if (!isSleeping) return;
-  isSleeping = false;
-  runLoadCycle(false);
+/**
+ * A request that needs the model: it puts the idle sleep off, wakes a sleeping server and waits until the model is
+ * back, as llama-server does (it answers /health with 200 meanwhile, and refuses nothing).
+ */
+async function needsModel() {
+  touch();
+  if (isSleeping && waking === null) {
+    waking = runLoadCycle(false).finally(() => {
+      waking = null;
+    });
+  }
+  if (waking !== null) await waking;
 }
 
 const server = serve(port, host, async (req) => {
@@ -220,7 +252,7 @@ const server = serve(port, host, async (req) => {
     return new Response(null, { status: 204 });
   }
   if (path === "/completion" && req.method === "POST") {
-    wakeIfSleeping();
+    await needsModel();
     const body = (await req.json()) as { n_predict?: number };
     if (process.env.FAKE_CRASH_ON_PREDICT !== undefined && body.n_predict === Number(process.env.FAKE_CRASH_ON_PREDICT)) {
       // Dies mid-request, as llama-server does on a CUDA out-of-memory: the socket closes, no answer.
@@ -241,18 +273,19 @@ const server = serve(port, host, async (req) => {
     });
   }
   if (path === "/v1/chat/completions" && req.method === "POST") {
-    wakeIfSleeping();
+    await needsModel();
     return chat(req);
   }
   if (path === "/slots") {
-    wakeIfSleeping();
-    return file(`${dir}/slots-busy.json`);
+    await needsModel();
+    // FAKE_SLOTS_IDLE=1: the slot is idle, as /metrics says (`requests_processing 0`); busy otherwise.
+    return file(process.env.FAKE_SLOTS_IDLE === "1" ? `${dir}/../slots-idle.json` : `${dir}/slots-busy.json`);
   }
   if (path === "/metrics") return file(`${dir}/metrics-after.txt`);
   if (path === "/props") return file(`${dir}/props.json`);
   return new Response("not found", { status: 404 });
 });
-runLoadCycle(true);
+void runLoadCycle(true);
 const ANSWER = [
   "## Simulated reply\n\n",
   "Here is a **list**:\n\n- one\n- two\n- three\n\n",

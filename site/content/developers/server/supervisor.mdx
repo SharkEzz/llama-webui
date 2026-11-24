@@ -14,7 +14,7 @@ to readiness, stops it, and publishes its state to the rest of the server. It is
 | `app/server/supervisor/ExternalWatch.ts` | `ExternalWatch`: detects a `llama-server` llama-webui did not start.                                                          |
 | `app/server/supervisor/http.ts`          | `ServerHandlers`: the `server` group (start, switch, restart, stop, state, props).                                            |
 | `app/server/process/followed.ts`         | `followProgram()`: a long-running program in a scope of its own, followed until it exits.                                     |
-| `app/server/llama/probes.ts`             | `health()`, `isLlamaServer()`, `props()`: requests to `llama-server` through `LlamaHttp`.                                     |
+| `app/server/llama/probes.ts`             | `health()`, `isLlamaServer()`, `props()`, `readProps()`: requests to `llama-server` through `LlamaHttp`.                      |
 | `app/server/llama/modelsSse.ts`          | `streamModelsSse()`, `sanitizeLoadProgress()`: `GET /models/sse` stream over `LlamaHttp` (`ModelsSseUnsupported` on 404/503). |
 | `app/server/llama/procScan.ts`           | `findLlamaServerPid()`: the PID of a `llama-server` read from `/proc`.                                                        |
 | `app/server/flags/Flags.ts`              | `Flags`: the flag catalog of the binary, cached per path.                                                                     |
@@ -205,7 +205,8 @@ inherited variable. Nothing else is added.
    every `healthPoll`, since only the stream sees the end of a wakeup.
    For external servers, `watchExternal()` checks `/props` before subscribing to SSE, and asks again every
    `healthPoll` when `/props` fails (a `503` during the first load, a slow or failed answer; a server that no longer
-   answers `/health` is rechecked and leaves `external`). A router stays in the generic `external` state because its
+   answers `/health` is rechecked and leaves `external`). A `401` or `403` (a server started with `--api-key`) ends
+   the watch instead: the stream would be refused too. A router stays in the generic `external` state because its
    events describe individual models. A single-model server can report `status`, `progress`, and
    `supervisor.memory` once its properties are available. A round of either watcher that dies on a defect is logged
    (`following /models/sse of llama-server`, `… of an external llama-server`) and the next one runs.
@@ -225,7 +226,7 @@ once the model is loaded. The first `200` during the process's cold startup sets
 uses SSE because `/health` also answers `200` during sleep. A wakeup is a `starting` with `waking: true`:
 `llama-server` already answers and queues requests until its model is back, so `servesRequests(state)` (chat target,
 `/api/server/props`, the chat composer) counts it with `ready`, `sleeping` and `external`, the monitor does not read
-`/slots` during it, and the startup metric only measures launches. The supervisor can stay in `starting` for minutes
+`/slots` during it (nor while the server sleeps or stops), and the startup metric only measures launches. The supervisor can stay in `starting` for minutes
 while a large model loads. The benchmark uses the same probe for port occupancy (any status) and readiness (`200`).
 
 ## Following a program

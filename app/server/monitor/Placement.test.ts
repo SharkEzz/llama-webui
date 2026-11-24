@@ -381,4 +381,51 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
       }),
     ),
   );
+  it.effect(
+    'Placement: the /models/sse fallback keeps what the logs told (PCI address, layers) once the launch left the ring',
+    () =>
+      fresh(5)(
+        Effect.gen(function* () {
+          const supervisor = yield* Supervisor;
+          const ring = yield* LogRing;
+          const client = yield* LlamaHttp;
+          yield* startFake({ FAKE_SSE: '1', FAKE_LOAD_MS: '150' });
+          const ready = yield* stateWhen((state) => state.kind === 'ready');
+          assert(ready.kind === 'ready');
+          const baseUrl = `http://127.0.0.1:${ready.port}`;
+          yield* ring.since(0).pipe(when(Arr.some((line) => Str.includes('srv  main: cwd ')(line.text))));
+          const launchSeq = yield* ring.seq;
+          // A profile below -lv 4: the devices and the layers are logged, the buffer sizes are not.
+          yield* pushAll([
+            '[llama-webui] launch: llama-server -m other.gguf',
+            'llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free',
+            'load_tensors: offloaded 10/33 layers to GPU',
+          ]);
+          // No GPU from sysfs: the PCI address can only come from the logs.
+          const placement = yield* buildPlacement;
+          const merged = yield* placement.current.pipe(when((p) => p?.source === 'sse'));
+          assert.deepInclude(merged, { source: 'sse', launchSeq, layers: { offloaded: 10, total: 33 } });
+          assert.deepStrictEqual(
+            Option.map(bufferOf(merged, 'CUDA0'), (b) => b.busId),
+            Option.some('0000:01:00.0'),
+          );
+
+          yield* pushAll(Arr.makeBy(5, (i) => `srv  log_server_r: request ${i}`));
+          const held = yield* ring.since(0);
+          assert.isFalse(Arr.some(held, (line) => Str.startsWith('[llama-webui] launch:')(line.text)));
+
+          // A sleep and a wake read the placement again, the launch line gone.
+          yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+          yield* stateWhen((state) => state.kind === 'sleeping');
+          yield* placement.current.pipe(when((value) => value === null));
+          yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+          yield* stateWhen((state) => state.kind === 'ready');
+          const restored = yield* placement.current.pipe(when((value) => value !== null));
+          assert.deepStrictEqual(restored, merged);
+
+          yield* supervisor.stop;
+          yield* assertGone(ready.pid);
+        }),
+      ),
+  );
 });

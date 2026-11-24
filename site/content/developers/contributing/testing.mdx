@@ -263,6 +263,12 @@ it was given:
   is off), then Markdown, one chunk at a time; a prompt larger than the simulated context gets `llama-server`'s
   context-size error.
 - `/slots`, `/metrics` and `/props` serve `slots-busy.json`, `metrics-after.txt` and `props.json` from `testdata/fake/`.
+- With `FAKE_SSE=1`, `GET /models/sse` streams `llama-server`'s `status_change` events (`loading` with its progress,
+  `loaded` with a `memory` report, `sleeping`), the last one first to a new connection. `POST /test/sleep` puts the
+  server to sleep, and `GET /test/sse-refused` counts the streams refused (`FAKE_SSE_REFUSE_AFTER_SLEEP`).
+- Asleep, it behaves as `llama-server` does: `/health`, `/metrics` and `/props` still answer, and a request that
+  needs the model (`/slots`, `/completion`, `/v1/chat/completions`) wakes it and waits until the model is back,
+  without a `503`.
 - `--version` prints a fake build line and exits; `--help` prints a one-flag catalogue and exits.
 
 The supervisor, the bench runner, the profiles' endpoints, the contract suite and the lifecycle tests use it, as the
@@ -270,20 +276,28 @@ The supervisor, the bench runner, the profiles' endpoints, the contract suite an
 
 Environment variables shape its behavior:
 
-| Variable                                | Effect                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| `FAKE_LOAD_MS`                          | Loading time before `/health` is ready (default 300 ms)                  |
-| `FAKE_SLOW_ARG`, `FAKE_SLOW_MS`         | A longer load (default 5000 ms) when that argument is present            |
-| `FAKE_FAIL_ARG`                         | Logs a CUDA out-of-memory and exits with 1 when that argument is present |
-| `FAKE_EXIT_LINES`                       | Logs these `\|`-separated lines, then exits with 1                       |
-| `FAKE_TAIL`                             | Writes this last line without its newline                                |
-| `FAKE_ECHO_ENV`                         | `A,B`: logs one line per variable, with its value as the fake sees it    |
-| `FAKE_CRASH_ON_PREDICT`                 | Dies mid-request on a `/completion` with that `n_predict`                |
-| `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`      | Reported prompt and generation speeds, draft statistics when `1`         |
-| `FAKE_N_CTX`                            | Simulated context size (default 40192 tokens)                            |
-| `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES` | Delay between streamed chunks (default 60 ms), extra reply lines         |
-| `FAKE_IGNORE_TERM`                      | Ignores `SIGTERM` when `1`                                               |
-| `FAKE_EXIT_AFTER_MS`, `FAKE_EXIT_CODE`  | Exits on its own after a delay, with that code (default 1)               |
+| Variable                                | Effect                                                                                          |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `FAKE_LOAD_MS`                          | Loading time before `/health` is ready (default 300 ms)                                         |
+| `FAKE_SLOW_ARG`, `FAKE_SLOW_MS`         | A longer load (default 5000 ms) when that argument is present                                   |
+| `FAKE_FAIL_ARG`                         | Logs a CUDA out-of-memory and exits with 1 when that argument is present                        |
+| `FAKE_EXIT_LINES`                       | Logs these `\|`-separated lines, then exits with 1                                              |
+| `FAKE_TAIL`                             | Writes this last line without its newline                                                       |
+| `FAKE_ECHO_ENV`                         | `A,B`: logs one line per variable, with its value as the fake sees it                           |
+| `FAKE_CRASH_ON_PREDICT`                 | Dies mid-request on a `/completion` with that `n_predict`                                       |
+| `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`      | Reported prompt and generation speeds, draft statistics when `1`                                |
+| `FAKE_N_CTX`                            | Simulated context size (default 40192 tokens)                                                   |
+| `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES` | Delay between streamed chunks (default 60 ms), extra reply lines                                |
+| `FAKE_IGNORE_TERM`                      | Ignores `SIGTERM` when `1`                                                                      |
+| `FAKE_EXIT_AFTER_MS`, `FAKE_EXIT_CODE`  | Exits on its own after a delay, with that code (default 1)                                      |
+| `FAKE_SSE`                              | Serves `GET /models/sse` and `POST /test/sleep` when `1` (a `404` otherwise, as an older build) |
+| `FAKE_SSE_STAGES`                       | The loading stages announced, comma-separated (default `text_model`)                            |
+| `FAKE_SSE_STAGE_ONLY`                   | When `1`, `mmproj_model` starts with a stage-only event (`{ stage }`, no list, no value)        |
+| `FAKE_SSE_FAIL`                         | When `1`, the load ends with `unloaded` (`exit_code: 1`) and the process exits with 1           |
+| `FAKE_SSE_STALL`                        | `headers`: the stream never answers; `events`: it answers, then sends no event                  |
+| `FAKE_SSE_REFUSE_AFTER_SLEEP`           | When `1`, a sleep cuts the streams and the next `/models/sse` answers `503`                     |
+| `FAKE_SLEEP_IDLE_MS`                    | Sleeps after that long without a request that needs the model, as `--sleep-idle-seconds` does   |
+| `FAKE_SLOTS_IDLE`                       | When `1`, `/slots` serves `testdata/slots-idle.json` (an idle slot, as `/metrics` says)         |
 
 ### Fake llama-bench
 

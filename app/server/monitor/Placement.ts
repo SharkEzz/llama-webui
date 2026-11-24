@@ -7,7 +7,10 @@ import { WsHub } from '../ws/WsHub.ts';
 import { parseBusIds, parsePlacement, RELEVANT } from './placementLog.ts';
 import { placementFromMemory, readSysfsGpus, type SysfsGpu } from './placementMemory.ts';
 
-/** What the placement holds: the last state and SSE memory seen, the published placement, and the last log placement by pid. */
+/**
+ * What the placement holds: the last state and SSE memory seen, the published placement, and the last placement read
+ * of a pid (from its logs, or from `/models/sse` with what its logs told).
+ */
 interface Held {
   readonly state: ServerState;
   readonly memory: ModelMemory | null;
@@ -16,6 +19,14 @@ interface Held {
   /** A managed model is asleep or has yet to finish waking up. */
   readonly suspended: boolean;
 }
+
+/** The PCI address of each device of `placement` that has one. */
+const busIdsOf = (placement: ModelPlacement | null): ReadonlyMap<string, string> =>
+  new Map(
+    Arr.flatMap(placement?.buffers ?? [], (buffer) =>
+      buffer.busId === null ? [] : [[buffer.device, buffer.busId] as const],
+    ),
+  );
 
 /** `state` without its loading `progress`. */
 const withoutProgress = (state: ServerState): ServerState => {
@@ -77,29 +88,39 @@ export class Placement extends Context.Service<
             return Effect.succeed({ ...next, current: null, last: kept, suspended: true });
           }
           return Effect.map(ring.since(0), (lines): Held => {
+            const remembered = (placement: ModelPlacement): Held => ({
+              ...next,
+              current: placement,
+              last: Option.some({ pid: state.pid, placement }),
+            });
             const parsed = parsePlacement(lines);
-            if (parsed !== null && parsed.buffers.length > 0) {
-              return { ...next, current: parsed, last: Option.some({ pid: state.pid, placement: parsed }) };
+            if (parsed !== null && parsed.buffers.length > 0) return remembered(parsed);
+            // The launch line left the ring: what was read of this server while it was there stands.
+            const known = parsed === null ? Option.map(kept, (last) => last.placement) : Option.none();
+            if (Option.exists(known, (p) => p.source !== 'sse' && p.buffers.length > 0)) {
+              return { ...next, current: Option.getOrNull(known), last: kept };
             }
-            if (Option.isSome(kept)) {
-              return { ...next, current: kept.value.placement, last: kept };
-            }
+            // What the logs told beside the sizes (the launch, the layers, P2P, the PCI addresses), with the sizes of
+            // `/models/sse`.
+            const logs = parsed ?? Option.getOrNull(known);
             if (memory !== null) {
               const fromSse = placementFromMemory({
                 memory,
-                busIds: parseBusIds(lines),
+                busIds: parsed === null ? busIdsOf(logs) : parseBusIds(lines),
                 gpus,
-                ...(parsed === null
+                ...(logs === null
                   ? {}
                   : {
-                      launchSeq: parsed.launchSeq,
-                      layers: parsed.layers,
-                      ...(parsed.p2p === undefined ? {} : { p2p: parsed.p2p }),
+                      launchSeq: logs.launchSeq,
+                      layers: logs.layers,
+                      ...(logs.p2p === undefined ? {} : { p2p: logs.p2p }),
                     }),
               });
-              if (fromSse !== null) return { ...next, current: fromSse, last: Option.none() };
+              if (fromSse !== null) return remembered(fromSse);
             }
-            return { ...next, current: parsed, last: Option.none() };
+            if (parsed !== null) return remembered(parsed);
+            // Sizes of `/models/sse` without its memory are of a model that is no longer loaded.
+            return { ...next, current: Option.getOrNull(Option.filter(known, (p) => p.source !== 'sse')), last: kept };
           });
         };
 

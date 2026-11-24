@@ -128,23 +128,35 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
     }),
   );
 
-  it.effect('readLlama skips /slots while sleeping so llama-server stays asleep', () =>
+  it.effect('readLlama reads /slots only when its caller says so of the metrics just read', () =>
     Effect.gen(function* () {
-      let slotsCalled = 0;
+      const paths: Array<string> = [];
       const server = yield* httpStub((req, res) => {
+        paths.push(req.url ?? '');
         if (req.url === '/health') res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
-        else if (req.url === '/slots') {
-          slotsCalled++;
-          res.writeHead(200, { 'content-type': 'application/json' }).end(SLOTS);
-        } else if (req.url === '/metrics') res.writeHead(200, { 'content-type': 'text/plain' }).end(METRICS);
+        else if (req.url === '/slots') res.writeHead(200, { 'content-type': 'application/json' }).end(SLOTS);
+        else if (req.url === '/metrics') res.writeHead(200, { 'content-type': 'text/plain' }).end(METRICS);
         else res.writeHead(404).end();
       });
-      const raw = yield* readLlama({ port: server.port }, { sleeping: true });
-      assert.strictEqual(raw.health, 'ok');
-      assert.isNull(raw.slots);
-      assert.strictEqual(raw.metrics?.get('llamacpp:tokens_predicted_total'), 300);
-      assert.strictEqual(slotsCalled, 0);
-      assert.strictEqual(server.requests(), 2);
+      const seen: Array<number | undefined> = [];
+      const left = yield* readLlama(
+        { port: server.port },
+        {
+          slots: (metrics) => {
+            seen.push(metrics?.get('llamacpp:requests_processing'));
+            return false;
+          },
+        },
+      );
+      assert.strictEqual(left.health, 'ok');
+      assert.isNull(left.slots);
+      assert.strictEqual(left.metrics?.get('llamacpp:tokens_predicted_total'), 300);
+      assert.deepStrictEqual(paths, ['/health', '/metrics']);
+      const read = yield* readLlama({ port: server.port }, { slots: () => true });
+      assert.lengthOf(read.slots ?? [], 1);
+      assert.deepStrictEqual(paths, ['/health', '/metrics', '/health', '/metrics', '/slots']);
+      // The decision is made on the metrics of this read.
+      assert.deepStrictEqual(seen, [1]);
     }),
   );
 
@@ -169,15 +181,23 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
       assert.deepStrictEqual([raw.health, raw.slots, raw.metrics], ['down', null, null]);
       assert.isAtLeast(waited, 750);
       assert.isBelow(waited, 1000);
-      // Health answered, then /slots and /metrics silent: each gives up after 800 ms, together.
+      // Health answered, then /metrics silent: a caller that reads no slots without metrics waits 800 ms once.
       const halfSilent = yield* httpStub((req, res) => {
         if (req.url === '/health') res.writeHead(200).end('{"status":"ok"}');
       });
       const t0 = yield* Clock.currentTimeMillis;
-      const partial = yield* readLlama({ port: halfSilent.port });
+      const partial = yield* readLlama({ port: halfSilent.port }, { slots: (metrics) => metrics !== null });
       const took = (yield* Clock.currentTimeMillis) - t0;
       assert.deepStrictEqual([partial.health, partial.slots, partial.metrics], ['ok', null, null]);
       assert.isBelow(took, 1500);
+      assert.strictEqual(halfSilent.requests(), 2);
+      // Without a say, /slots is read after it, within its own 800 ms.
+      const t1 = yield* Clock.currentTimeMillis;
+      const both = yield* readLlama({ port: halfSilent.port });
+      const tookBoth = (yield* Clock.currentTimeMillis) - t1;
+      assert.deepStrictEqual([both.health, both.slots, both.metrics], ['ok', null, null]);
+      assert.isAtLeast(tookBoth, 1500);
+      assert.isBelow(tookBoth, 2300);
     }),
   );
 });

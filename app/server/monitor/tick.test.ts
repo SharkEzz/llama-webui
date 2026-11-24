@@ -3,7 +3,7 @@ import { type GpuSample, SERIES, Snapshot, type SystemSample } from '@llama-webu
 import { Array as Arr, Effect, Option, Order, Record as Rec, Schema } from 'effect';
 import type { LlamaRaw, SlotView } from 'llamacpp-js/metrics';
 import { History } from './History.ts';
-import { beginTick, endTick, initialMemory, type TickMemory, type TickReading } from './tick.ts';
+import { beginTick, endTick, initialMemory, slotsPlan, type TickMemory, type TickReading } from './tick.ts';
 
 const gpu = (over: Partial<GpuSample> = {}): GpuSample => ({
   key: 'nvidia:GPU-1',
@@ -57,6 +57,7 @@ const idle = (at: number, over: Partial<TickReading> = {}): TickReading => ({
   at,
   active: false,
   pid: null,
+  noSlots: false,
   raw: null,
   allGpus: [],
   proc: null,
@@ -226,6 +227,87 @@ describe('tick', () => {
     // A server that does not answer is down.
     const down = run(initialMemory, new History(10, 1000), active(1000, 7, { raw: null }));
     assert.strictEqual(down.snapshot.health, 'down');
+  });
+
+  it('slotsPlan reads /slots only when the slots may have moved', () => {
+    const quiet = metrics({ requests_processing: 0, requests_deferred: 0, n_decode_total: 128 });
+    const idleSlot = slot({ processing: false });
+    const known = (slots: LlamaRaw['slots'], before: ReadonlyMap<string, number> | null = quiet): TickMemory => ({
+      ...initialMemory,
+      prevRaw: raw({ slots }),
+      prevMetrics: before,
+    });
+    const plan = (memory: TickMemory, now: ReadonlyMap<string, number> | null, noSlots = false) =>
+      slotsPlan(memory, { noSlots, metrics: now });
+    // Nothing moved since the last read: the known slots are kept, and llama-server may go to sleep.
+    assert.strictEqual(plan(known([idleSlot]), quiet), 'keep');
+    // A server whose /slots is off answers no slot: nothing to read again either.
+    assert.strictEqual(plan(known([]), quiet), 'keep');
+    // No slots known yet (the first tick, after a sleep, after a failed read).
+    assert.strictEqual(plan(initialMemory, quiet), 'read');
+    assert.strictEqual(plan(known(null), quiet), 'read');
+    assert.strictEqual(plan(known([idleSlot], null), quiet), 'read');
+    // A request running, or waiting for a slot.
+    assert.strictEqual(plan(known([idleSlot]), metrics({ requests_processing: 1, n_decode_total: 128 })), 'read');
+    assert.strictEqual(
+      plan(known([idleSlot]), metrics({ requests_processing: 0, requests_deferred: 1, n_decode_total: 128 })),
+      'read',
+    );
+    // The last read left a slot busy: read once more to see it end.
+    assert.strictEqual(plan(known([slot({ processing: true })]), quiet), 'read');
+    // A request that came and went between two ticks moved a counter.
+    for (const key of ['prompt_tokens_total', 'tokens_predicted_total', 'n_decode_total']) {
+      const moved = metrics({ requests_processing: 0, requests_deferred: 0, n_decode_total: 128, [key]: 500 });
+      assert.strictEqual(plan(known([idleSlot]), moved), 'read');
+    }
+    // Without --metrics nothing tells: read on every tick.
+    assert.strictEqual(plan(known([idleSlot], metrics({})), metrics({})), 'read');
+    // Asleep, waking up or stopping, and when /metrics did not answer: no read, no slots.
+    assert.strictEqual(plan(known([idleSlot]), quiet, true), 'skip');
+    assert.strictEqual(plan(known([slot({ processing: true })]), metrics({ requests_processing: 1 }), true), 'skip');
+    assert.strictEqual(plan(known([idleSlot]), null), 'skip');
+    assert.strictEqual(slotsPlan({ noSlots: false, metrics: quiet })(known([idleSlot])), 'keep');
+  });
+
+  it('a tick that leaves /slots unread keeps the known slots; a barred or failed read has none', () => {
+    const history = new History(10, 1000);
+    const quiet = metrics({ requests_processing: 0, requests_deferred: 0, n_decode_total: 128 });
+    const idleSlot = slot({ processing: false, nPromptTokens: 250, nCtx: 1000 });
+    const first = run(
+      initialMemory,
+      history,
+      active(1000, 5, { raw: raw({ at: 1000, slots: [idleSlot], metrics: quiet }) }),
+    );
+    // The monitor read no slots (the plan was `keep`): the snapshot still has them, and the context they hold.
+    const kept = run(first.memory, history, active(2000, 5, { raw: raw({ at: 2000, slots: null, metrics: quiet }) }));
+    assert.deepStrictEqual(kept.snapshot.slots, first.snapshot.slots);
+    assert.deepStrictEqual(kept.snapshot.kv, { usedTokens: 250, totalTokens: 1000 });
+    assert.deepStrictEqual(kept.snapshot.rates, { genTps: 0, ppTps: 0 });
+    // A request starts: the read slots replace the kept ones, the rate is over one tick.
+    const busy = metrics({ requests_processing: 1, requests_deferred: 0, n_decode_total: 140 });
+    const reading = raw({ at: 3000, slots: [slot({ idTask: 2, nDecoded: 30, nPromptProcessed: 0 })], metrics: busy });
+    const third = run(kept.memory, history, active(3000, 5, { raw: reading }));
+    assert.deepStrictEqual(third.snapshot.rates, { genTps: 30, ppTps: 0 });
+    // A read that was due and failed gives no slots, as before.
+    const failed = run(third.memory, history, active(4000, 5, { raw: raw({ at: 4000, slots: null, metrics: busy }) }));
+    assert.deepStrictEqual([failed.snapshot.slots, failed.snapshot.kv], [null, null]);
+    // Asleep: no slots, whatever was known; nor when /metrics did not answer or the server is not `ok`.
+    const asleep = run(
+      kept.memory,
+      history,
+      active(5000, 5, { noSlots: true, raw: raw({ at: 5000, slots: null, metrics: quiet }) }),
+    );
+    assert.deepStrictEqual([asleep.snapshot.slots, asleep.snapshot.kv], [null, null]);
+    const silent = run(kept.memory, history, active(5000, 5, { raw: raw({ at: 5000, slots: null, metrics: null }) }));
+    assert.isNull(silent.snapshot.slots);
+    const loading = run(
+      kept.memory,
+      history,
+      active(5000, 5, { raw: raw({ at: 5000, health: 'loading', slots: null, metrics: null }) }),
+    );
+    assert.isNull(loading.snapshot.slots);
+    // Once awake again, no slots are known: the next tick reads them.
+    assert.strictEqual(slotsPlan(asleep.memory, { noSlots: false, metrics: quiet }), 'read');
   });
 
   it.effect('a tick fed non-finite readings still encodes as a Snapshot', () =>

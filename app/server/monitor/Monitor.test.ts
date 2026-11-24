@@ -10,6 +10,7 @@ import {
   Duration,
   Effect,
   Exit,
+  Fiber,
   FileSystem,
   Layer,
   Logger,
@@ -22,6 +23,7 @@ import {
   Schedule,
   Schema,
   Scope,
+  Stream,
   String as Str,
   Struct,
 } from 'effect';
@@ -30,6 +32,7 @@ import { Collectors, CollectorsNotApplied } from '../collectors/Collectors.ts';
 import * as Db from '../db/Db.ts';
 import { PciIds } from '../hardware/PciIds.ts';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
+import { streamModelsSse } from '../llama/modelsSse.ts';
 import { isAlive } from '../llama/procScan.ts';
 import { LogRing } from '../logs/LogRing.ts';
 import { CLOSE_BOUND } from '../process/followed.ts';
@@ -166,12 +169,12 @@ const next = (within: Duration.Input = '2 seconds') =>
 /** Drops the snapshots published so far. */
 const drain = Published.use((published) => Effect.asVoid(Queue.clear(published)));
 
-/** A profile of the fake on a free port, started by the supervisor and loaded: its pid. */
-const startFake = Effect.gen(function* () {
+/** A profile of the fake on a free port, with `env` (its `FAKE_*` variables), started by the supervisor and loaded: its pid. */
+const startFakeWith = Effect.fnUntraced(function* (env: Readonly<Record<string, string>>) {
   const supervisor = yield* Supervisor;
   const profiles = yield* ProfilesRepo;
   const port = yield* freePort;
-  const profile = yield* profiles.create({ name: 'fake', model: 'm.gguf', port, args: [], env: {} });
+  const profile = yield* profiles.create({ name: 'fake', model: 'm.gguf', port, args: [], env });
   const settings = { ...DEFAULT_SETTINGS, binary: FAKE, host: '127.0.0.1' };
   const cmd = yield* buildCommand({ profile, settings });
   yield* supervisor.start(cmd);
@@ -181,6 +184,8 @@ const startFake = Effect.gen(function* () {
   );
   return ready.kind === 'ready' ? ready.pid : -1;
 });
+
+const startFake = startFakeWith({});
 
 /** Stops the fake: its process is gone. */
 const stopFake = Effect.fnUntraced(function* (pid: number) {
@@ -214,6 +219,90 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         }),
       );
       yield* stopFake(pid);
+    }),
+  );
+
+  it.effect('an idle llama-server goes to sleep under the monitor, which keeps its slots without reading them', () =>
+    Effect.gen(function* () {
+      // The fake sleeps 700 ms after its last request that needs the model, /slots among them: read on every tick
+      // (250 ms), it would never sleep.
+      const pid = yield* startFakeWith({
+        FAKE_SSE: '1',
+        FAKE_LOAD_MS: '50',
+        FAKE_SLEEP_IDLE_MS: '700',
+        FAKE_SLOTS_IDLE: '1',
+      });
+      yield* withMonitor({}, () =>
+        Effect.gen(function* () {
+          const supervisor = yield* Supervisor;
+          const [first, second] = yield* Effect.all([next(), next()]);
+          assert.lengthOf(first.slots ?? [], 1);
+          // Read once, then kept: the context stays on screen.
+          assert.deepStrictEqual(second.slots, first.slots);
+          assert.isNotNull(second.kv);
+          const asleep = yield* supervisor.state.pipe(
+            Effect.repeat({ until: (s) => s.kind === 'sleeping', schedule: Schedule.spaced('20 millis') }),
+            Effect.timeout('3 seconds'),
+          );
+          assert.strictEqual(asleep.kind, 'sleeping');
+          // Asleep, it is left alone: still asleep four ticks later, without slots.
+          yield* drain;
+          const later = yield* Effect.all([next(), next(), next(), next()]);
+          assert.deepStrictEqual(
+            Arr.map(later, (s) => (s.slots === null ? s.health : 'slots read')),
+            ['ok', 'ok', 'ok', 'ok'],
+          );
+          const still = yield* supervisor.state;
+          assert.strictEqual(still.kind, 'sleeping');
+        }),
+      );
+      yield* stopFake(pid);
+    }),
+  );
+
+  it.effect('a sleeping llama-server that is stopping is not woken by the monitor', () =>
+    Effect.gen(function* () {
+      // It ignores SIGTERM: `stopping` lasts the kill timeout (1 s), four ticks.
+      const pid = yield* startFakeWith({
+        FAKE_SSE: '1',
+        FAKE_LOAD_MS: '50',
+        FAKE_SLEEP_IDLE_MS: '200',
+        FAKE_SLOTS_IDLE: '1',
+        FAKE_IGNORE_TERM: '1',
+      });
+      yield* withMonitor({}, () =>
+        Effect.gen(function* () {
+          const supervisor = yield* Supervisor;
+          const asleep = yield* supervisor.state.pipe(
+            Effect.repeat({ until: (s) => s.kind === 'sleeping', schedule: Schedule.spaced('20 millis') }),
+            Effect.timeout('3 seconds'),
+          );
+          const port = asleep.kind === 'sleeping' ? asleep.port : -1;
+          const stopping = yield* Effect.forkChild(supervisor.stop);
+          yield* supervisor.state.pipe(
+            Effect.repeat({ until: (s) => s.kind === 'stopping', schedule: Schedule.spaced('10 millis') }),
+            Effect.timeout('1 second'),
+          );
+          yield* drain;
+          const during = yield* Effect.all([next(), next()]);
+          assert.deepStrictEqual(
+            Arr.map(during, (s) => s.slots),
+            [null, null],
+          );
+          // A `/slots` would have woken it: the stream would then replay `loading` or `loaded`.
+          const last = yield* streamModelsSse({ port }).pipe(Stream.runHead);
+          assert.strictEqual(
+            Option.match(last, {
+              onNone: () => 'none',
+              onSome: (event) => (event.event === 'status_change' ? event.status : event.event),
+            }),
+            'sleeping',
+          );
+          yield* Fiber.join(stopping);
+        }),
+      );
+      const alive = yield* isAlive(pid);
+      assert.isFalse(alive);
     }),
   );
 

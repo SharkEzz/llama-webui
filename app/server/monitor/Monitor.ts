@@ -1,5 +1,6 @@
 import {
   type HistoryDump,
+  isServerLoading,
   isServerSleeping,
   type NvidiaSource,
   type ServerState,
@@ -44,7 +45,7 @@ import { Supervisor } from '../supervisor/Supervisor.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { collectGpus } from './gpus.ts';
 import { History, historyPoints } from './History.ts';
-import { beginTick, endTick, initialMemory, type TickMemory, type TickReading } from './tick.ts';
+import { beginTick, endTick, initialMemory, slotsPlan, type TickMemory, type TickReading } from './tick.ts';
 
 /** The settings the monitor follows. */
 export type MonitorSettings = Pick<Settings, 'collectors' | 'pollIntervalMs' | 'historySeconds' | 'hiddenGpus'>;
@@ -57,10 +58,14 @@ export const monitorSettingsOf = (settings: MonitorSettings): MonitorSettings =>
   hiddenGpus: settings.hiddenGpus,
 });
 
-/** Where the active server listens, and its pid when known; none while no server is active. */
+/**
+ * Where the active server listens, its pid when known, and whether `/slots` is barred (`noSlots`); none while no
+ * server is active. llama-server holds a `GET /slots` until its model is loaded: asleep, it would wake for it, and
+ * waking up or stopping, the read would wait out its 800 ms on every tick.
+ */
 const activeOf = (
   state: ServerState,
-): Option.Option<{ readonly target: Target; readonly pid: number | null; readonly sleeping: boolean }> => {
+): Option.Option<{ readonly target: Target; readonly pid: number | null; readonly noSlots: boolean }> => {
   switch (state.kind) {
     case 'starting':
     case 'ready':
@@ -69,14 +74,17 @@ const activeOf = (
       return Option.some({
         target: { host: stateHost(state), port: state.port },
         pid: state.pid,
-        // Waking up too: llama-server would hold `/slots` until its model is back.
-        sleeping: state.kind === 'sleeping' || (state.kind === 'starting' && state.waking === true),
+        noSlots:
+          state.kind === 'sleeping' ||
+          state.kind === 'stopping' ||
+          (state.kind === 'starting' && state.waking === true),
       });
     case 'external':
       return Option.some({
         target: { port: state.port },
         pid: state.pid,
-        sleeping: isServerSleeping(state),
+        // `loading` once it answers: the reload after a sleep.
+        noSlots: isServerSleeping(state) || isServerLoading(state),
       });
     default:
       return Option.none();
@@ -262,10 +270,9 @@ export class Monitor extends Context.Service<
               Option.match(active, {
                 onNone: () => none,
                 onSome: (a) =>
-                  readLlama(a.target, { sleeping: a.sleeping }).pipe(
-                    Effect.provideContext(context),
-                    fallbackOnDefect('llama', null),
-                  ),
+                  readLlama(a.target, {
+                    slots: (metrics) => slotsPlan(begun, { noSlots: a.noSlots, metrics }) === 'read',
+                  }).pipe(Effect.provideContext(context), fallbackOnDefect('llama', null)),
               }),
               gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(fallbackOnDefect('gpus', [])),
               pid === null
@@ -294,6 +301,7 @@ export class Monitor extends Context.Service<
             at,
             active: Option.isSome(active),
             pid,
+            noSlots: Option.exists(active, (a) => a.noSlots),
             raw,
             allGpus,
             proc,
