@@ -2,6 +2,7 @@ import { Array as Arr, Effect, Option, Predicate, Schema, String as Str } from '
 import { dual } from 'effect/Function';
 import type { BenchMeasure, BenchDevice as LlamaBenchDevice } from 'llamacpp-js/bench';
 import { reservedFlag, reservedFlagMessage } from './profile.ts';
+import { LoadProgress } from './server.ts';
 import type { FitVerdict } from './tuning.ts';
 
 export const CACHE_TYPES = ['f32', 'f16', 'bf16', 'f8_e4m3', 'q8_0', 'q4_0', 'q4_1', 'iq4_nl', 'q5_0', 'q5_1'] as const;
@@ -257,6 +258,8 @@ export const BenchLive = Schema.Struct({
   startedAt: Schema.Int,
   /** The tool's last 20 lines. */
   lines: Schema.Array(Schema.String),
+  /** Live loading progress from llama-server's `/models/sse` during a server trial's `loading` phase. */
+  loadProgress: Schema.optionalKey(LoadProgress),
 });
 export type BenchLive = typeof BenchLive.Type;
 

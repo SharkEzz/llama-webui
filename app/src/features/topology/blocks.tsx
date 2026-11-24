@@ -1,5 +1,6 @@
-import type { TopologyNode } from '@llama-webui/shared';
-import type { CSSProperties, ReactNode } from 'react';
+import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip';
+import type { TopologyNode, TopologyNodeKind } from '@llama-webui/shared';
+import React, { useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { GLASS } from '@/components/glass/glass';
 import type { Tone } from '@/components/glass/tones';
 import { PopoverTrigger } from '@/components/ui/popover';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { detailPopover } from './detailPopover';
 import type { LayerKind, Level, NodeLive } from './flows';
 import type { Rect } from './geometry';
+import { encodeLayerTarget, layerTooltip } from './layerTooltip';
 import { LAYER_TINT, tint } from './themeColors';
 
 /*
@@ -20,15 +22,15 @@ import { LAYER_TINT, tint } from './themeColors';
 export type BlockTone = Tone | 'indigo' | 'primary' | 'neutral';
 
 /** A block's kind, in words. */
-export const KIND_LABEL: Record<TopologyNode['kind'], string> = {
+export const KIND_LABEL = {
   cpu: 'Processor',
   ram: 'Memory',
   gpu: 'GPU',
   nvme: 'NVMe drive',
   chipset: 'Chipset',
-};
+} as const satisfies Record<TopologyNodeKind, string>;
 
-const TONE_CSS: Record<BlockTone, string> = {
+const TONE_CSS = {
   blue: 'var(--tone-blue)',
   teal: 'var(--tone-teal)',
   amber: 'var(--tone-amber)',
@@ -36,7 +38,7 @@ const TONE_CSS: Record<BlockTone, string> = {
   indigo: 'var(--tone-indigo)',
   primary: 'var(--primary-ink)',
   neutral: 'var(--muted-foreground)',
-};
+} as const satisfies Record<BlockTone, string>;
 
 export const toneVar = (tone: BlockTone) => TONE_CSS[tone];
 
@@ -113,44 +115,101 @@ const LAYER_COLOR: Record<LayerKind, string> = {
 /** The four layers a GPU can hold, always in the DOM so that one appearing eases in like the others. */
 const GPU_LAYERS: readonly LayerKind[] = ['model', 'kv', 'compute', 'other'];
 
+/** Color of a memory layer for use outside a block (tooltips, swatches), matching `Layers`. */
+export function layerSwatchColor(kind: LayerKind, tone: BlockTone, neutral = false): string {
+  if (kind === 'other' || (neutral && kind === 'used')) return NEUTRAL;
+  const base = toneVar(tone);
+  if (kind === 'kv') return tint(base, LAYER_TINT.kv);
+  if (kind === 'compute') return tint(base, LAYER_TINT.compute);
+  return base;
+}
+
 /**
  * The memory a block holds, as stacked layers: each one is a full-size bar moved and scaled by a transform, so a
  * change never lays the block out again. The level is also in the figure beside it (see `FillPct`).
  */
 export function Layers({
   live,
+  nodeId,
   vertical = false,
   neutral = false,
   className,
 }: {
   live: NodeLive;
+  /** When set (GPUs), each layer and the free remainder trigger the shared VRAM tooltip on hover. */
+  nodeId?: string;
   vertical?: boolean;
   /** A GPU whose split is not known: its memory in use is gray, since its tone stands for the model. */
   neutral?: boolean;
   className?: string;
 }) {
   const single = live.layers.length <= 1;
-  const kinds = single ? [live.layers[0]?.kind ?? 'used'] : GPU_LAYERS;
-  const shares = kinds.map((kind) => (live.layers.find((l) => l.kind === kind)?.pct ?? 0) / 100);
+  const kinds = useMemo(() => (single ? [live.layers[0]?.kind ?? 'used'] : GPU_LAYERS), [single, live.layers]);
+  const shares = useMemo(
+    () => kinds.map((kind) => (live.layers.find((l) => l.kind === kind)?.pct ?? 0) / 100),
+    [kinds, live.layers],
+  );
+  const usedShare = useMemo(() => shares.reduce((a, b) => a + b, 0), [shares]);
+  const freeShare = live.capacityBytes !== null && live.capacityBytes > 0 ? Math.max(0, 1 - usedShare) : 0;
+  const segmentTransform = useCallback(
+    (at: number, share: number) =>
+      vertical
+        ? `translateY(${(-at * 100).toFixed(2)}%) scaleY(${share.toFixed(4)})`
+        : `translateX(${(at * 100).toFixed(2)}%) scaleX(${share.toFixed(4)})`,
+    [vertical],
+  );
+
+  const parts = useMemo((): React.ReactNode[] => {
+    const elements = kinds.map((kind, i) => {
+      const share = shares[i];
+      if (share == null) {
+        throw new Error(`Share not found for kind: "${kind}"`);
+      }
+      const at = shares.slice(0, i).reduce((a, b) => a + b, 0);
+      const style = {
+        transform: segmentTransform(at, share),
+        background: neutral && kind === 'used' ? NEUTRAL : LAYER_COLOR[kind],
+      };
+      const baseClass = cn('absolute inset-0', vertical ? 'origin-bottom' : 'origin-left', STEPPED);
+      if (!nodeId) return <span key={kind} className={baseClass} style={style} />;
+      const empty = !(share > 0);
+      return (
+        <TooltipPrimitive.Trigger
+          key={kind}
+          handle={layerTooltip}
+          payload={encodeLayerTarget(nodeId, kind)}
+          disabled={empty}
+          render={<span />}
+          className={cn(baseClass, empty ? 'pointer-events-none' : 'data-popup-open:brightness-125')}
+          style={style}
+        />
+      );
+    });
+
+    return elements;
+  }, [kinds, shares, vertical, nodeId, segmentTransform, neutral]);
+
   return (
     <span
       aria-hidden="true"
       className={cn('relative block overflow-hidden bg-well inset-shadow-well', LEVEL_RING[live.fillLevel], className)}
     >
-      {kinds.map((kind, i) => {
-        const share = shares[i]!;
-        const at = shares.slice(0, i).reduce((a, b) => a + b, 0);
-        const transform = vertical
-          ? `translateY(${(-at * 100).toFixed(2)}%) scaleY(${share.toFixed(4)})`
-          : `translateX(${(at * 100).toFixed(2)}%) scaleX(${share.toFixed(4)})`;
-        return (
-          <span
-            key={kind}
-            className={cn('absolute inset-0', vertical ? 'origin-bottom' : 'origin-left', STEPPED)}
-            style={{ transform, background: neutral && kind === 'used' ? NEUTRAL : LAYER_COLOR[kind] }}
-          />
-        );
-      })}
+      {parts}
+      {nodeId && (
+        <TooltipPrimitive.Trigger
+          handle={layerTooltip}
+          payload={encodeLayerTarget(nodeId, 'free')}
+          disabled={!(freeShare > 0)}
+          render={<span />}
+          className={cn(
+            'absolute inset-0',
+            vertical ? 'origin-bottom' : 'origin-left',
+            STEPPED,
+            !(freeShare > 0) ? 'pointer-events-none' : 'data-popup-open:bg-foreground/10',
+          )}
+          style={{ transform: segmentTransform(usedShare, freeShare) }}
+        />
+      )}
     </span>
   );
 }

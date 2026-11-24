@@ -75,19 +75,21 @@ export const P2pStatus = Schema.Literals(['active', 'unavailable', 'requested'])
 export type P2pStatus = typeof P2pStatus.Type;
 
 export const ModelPlacement = Schema.Struct({
-  /** Number of the “[llama-webui] launch:” line it comes from. */
+  /** Number of the “[llama-webui] launch:” line it comes from (0 when read from `/models/sse` without logs). */
   launchSeq: Schema.Int,
-  /** “offloaded N/M layers to GPU”; null until that line has gone by. */
+  /** “offloaded N/M layers to GPU”; null until that line has gone by (or when read from `/models/sse`). */
   layers: Schema.NullOr(Schema.Struct({ offloaded: Schema.Int, total: Schema.Int })),
   buffers: Schema.Array(PlacementBuffer),
   /** Direct transfers between the GPUs of a backend (peer-to-peer); absent when neither requested nor reported. */
   p2p: Schema.optionalKey(P2pStatus),
+  /** Where the buffer breakdown came from; absent on legacy records (treated as logs). */
+  source: Schema.optionalKey(Schema.Literals(['logs', 'sse'])),
 });
 export type ModelPlacement = typeof ModelPlacement.Type;
 
-/** Host-side (RAM) buffers: `CPU`, `CPU_Mapped` (mmap from disk), `CPU_REPACK`, `CUDA_Host` (pinned)… */
+/** Host-side (RAM) buffers: `CPU`, `CPU_Mapped` (mmap from disk), `CPU_REPACK`, `CUDA_Host` (pinned), `Host` (`/models/sse`)… */
 export function hostDevice(device: string): boolean {
-  return /^CPU(?:_|$)|_Host$/.test(device);
+  return /^(?:CPU(?:_|$)|Host$)|_Host$/.test(device);
 }
 
 export function placementTotals(p: ModelPlacement): {
@@ -104,12 +106,13 @@ export function placementTotals(p: ModelPlacement): {
   return { modelBytes: gpu + host, gpuModelBytes: gpu, hostModelBytes: host };
 }
 
-export const Phase = Schema.Literals(['stopped', 'loading', 'idle', 'prompt', 'generating']);
+export const Phase = Schema.Literals(['stopped', 'loading', 'sleeping', 'idle', 'prompt', 'generating']);
 export type Phase = typeof Phase.Type;
 
 export const PHASE_LABEL: Record<Phase, string> = {
   stopped: 'Stopped',
   loading: 'Loading',
+  sleeping: 'Sleeping',
   idle: 'Idle',
   prompt: 'Prompt',
   generating: 'Generating',
@@ -123,7 +126,16 @@ export const phaseOf: {
   if (state === undefined || state.kind === 'idle' || state.kind === 'stopping' || state.kind === 'crashed') {
     return 'stopped';
   }
-  if (state.kind === 'starting' || snapshot?.health === 'loading') return 'loading';
+  if (
+    state.kind === 'starting' ||
+    (state.kind === 'external' && state.status === 'loading') ||
+    snapshot?.health === 'loading'
+  ) {
+    return 'loading';
+  }
+  if (state.kind === 'sleeping' || (state.kind === 'external' && state.status === 'sleeping')) {
+    return 'sleeping';
+  }
   const busy = Arr.filter(snapshot?.slots ?? [], (s) => s.processing);
   if (Arr.isReadonlyArrayEmpty(busy)) return 'idle';
   // No token generated yet: the prompt is being processed. `n_prompt_tokens` won't do: it is the slot's context, which

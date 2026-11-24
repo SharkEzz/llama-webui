@@ -84,12 +84,175 @@ if (process.env.FAKE_FAIL_ARG !== undefined && args.includes(process.env.FAKE_FA
   if (process.env.FAKE_TAIL !== undefined) process.stderr.write(process.env.FAKE_TAIL);
   await exit(1);
 }
+const sseEnabled = process.env.FAKE_SSE === "1";
+const sseStages = (process.env.FAKE_SSE_STAGES ?? "text_model").split(",").filter(Boolean);
+const sseStageOnly = process.env.FAKE_SSE_STAGE_ONLY === "1";
+const sseMemory = {
+  n_ctx: Number(process.env.FAKE_N_CTX ?? 40192),
+  devices: [
+    { kind: "device", name: "CUDA0", total: 24 * 1024 ** 3, free: 10 * 1024 ** 3, model: 12 * 1024 ** 3, context: 2 * 1024 ** 3, compute: 512 * 1024 ** 2 },
+    { kind: "host", name: "Host", model: 0, context: 0, compute: 128 * 1024 ** 2 },
+  ],
+};
+const sseClients = new Set<ReadableStreamDefaultController<Uint8Array>>();
+const sseEnc = new TextEncoder();
+let sseLastEvent: unknown = null;
+let isSleeping = false;
+// The first load only: llama-server answers 503 until then, and never again (not during a reload after a sleep).
+let isLoading = loadMs > 0;
+/** The reload after a sleep, while it runs: the requests that need the model wait for it. */
+let waking: Promise<void> | null = null;
+// FAKE_SSE_REFUSE_AFTER_SLEEP=1: entering sleep cuts the /models/sse streams, and the next request of it answers 503.
+const sseRefuseAfterSleep = process.env.FAKE_SSE_REFUSE_AFTER_SLEEP === "1";
+let sseRefusePending = false;
+let sseRefused = 0;
+// FAKE_SLEEP_IDLE_MS: sleeps after that long without a request that needs the model, as --sleep-idle-seconds does.
+// /slots and the completions put the sleep off; /health, /props, /metrics and /models/sse do not. Only the arrival of
+// a request counts: a reply longer than the delay does not hold the sleep off.
+const sleepIdleMs = Number(process.env.FAKE_SLEEP_IDLE_MS ?? 0);
+let idleTimer: NodeJS.Timeout | null = null;
+
+function sseEmit(event: string, data?: Record<string, unknown>) {
+  if (!sseEnabled) return;
+  const payload = { model: "fake-model", event, ...(data === undefined ? {} : { data }) };
+  sseLastEvent = payload;
+  const bytes = sseEnc.encode(`data: ${JSON.stringify(payload)}\n\n`);
+  for (const client of sseClients) {
+    try {
+      client.enqueue(bytes);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+function enterSleep() {
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = null;
+  isSleeping = true;
+  sseEmit("status_change", { status: "sleeping" });
+  if (sseRefuseAfterSleep) {
+    sseRefusePending = true;
+    for (const client of sseClients) {
+      try { client.close(); } catch {}
+    }
+    sseClients.clear();
+  }
+}
+
+/** Starts the idle delay over. */
+function touch() {
+  if (sleepIdleMs <= 0) return;
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    if (!isLoading && !isSleeping) enterSleep();
+  }, sleepIdleMs);
+}
+
+/** Loads the model in FAKE_LOAD_MS, telling /models/sse about it; resolves once it is loaded. */
+function runLoadCycle(firstLoad: boolean): Promise<void> {
+  if (firstLoad) isLoading = loadMs > 0;
+  const { promise, resolve } = Promise.withResolvers<void>();
+  const loaded = () => {
+    isLoading = false;
+    isSleeping = false;
+    sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
+    touch();
+    resolve();
+  };
+  sseEmit("status_change", { status: "loading" });
+  if (loadMs <= 0) {
+    loaded();
+    return promise;
+  }
+  if (sseEnabled) {
+    const steps = sseStages.flatMap((stage) => [
+      { stage, value: 0 },
+      { stage, value: 0.5 },
+      { stage, value: 1 },
+    ]);
+    const stepMs = Math.max(10, Math.floor(loadMs / (steps.length + 1)));
+    steps.forEach((step, idx) => {
+      setTimeout(() => {
+        sseEmit("status_change", {
+          status: "loading",
+          progress: sseStageOnly && step.stage === "mmproj_model" && step.value === 0
+            ? { stage: step.stage }
+            : { stages: sseStages, current: step.stage, value: step.value },
+        });
+      }, stepMs * idx);
+    });
+  }
+  setTimeout(() => {
+    if (sseEnabled && process.env.FAKE_SSE_FAIL === "1") {
+      sseEmit("status_change", { status: "unloaded", exit_code: 1 });
+      log("failed to load model");
+      void exit(1);
+      return;
+    }
+    loaded();
+  }, loadMs);
+  return promise;
+}
+
+/**
+ * A request that needs the model: it puts the idle sleep off, wakes a sleeping server and waits until the model is
+ * back, as llama-server does (it answers /health with 200 meanwhile, and refuses nothing).
+ */
+async function needsModel() {
+  touch();
+  if (isSleeping && waking === null) {
+    waking = runLoadCycle(false).finally(() => {
+      waking = null;
+    });
+  }
+  if (waking !== null) await waking;
+}
+
 const server = serve(port, host, async (req) => {
   const path = new URL(req.url).pathname;
-  const loading = Date.now() - t0 < loadMs;
-  if (path === "/health") return loading ? new Response('{"error":"loading"}', { status: 503 }) : Response.json({ status: "ok" });
+  const loading = isLoading || Date.now() - t0 < loadMs;
+  if (path === "/test/sse-refused") return Response.json({ refused: sseRefused });
+  if (path === "/models/sse" && sseEnabled) {
+    if (sseRefusePending) {
+      sseRefusePending = false;
+      sseRefused++;
+      return new Response("", { status: 503 });
+    }
+    if (process.env.FAKE_SSE_STALL === "headers") {
+      await new Promise<void>((done) => req.signal.addEventListener("abort", () => done(), { once: true }));
+      return new Response(null, { status: 204 });
+    }
+    let ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        ctrl = c;
+        if (process.env.FAKE_SSE_STALL === "events") {
+          c.enqueue(sseEnc.encode(": waiting\n\n"));
+        } else {
+          sseClients.add(c);
+          if (sseLastEvent !== null) c.enqueue(sseEnc.encode(`data: ${JSON.stringify(sseLastEvent)}\n\n`));
+        }
+        req.signal.addEventListener("abort", () => {
+          sseClients.delete(c);
+          try { c.close(); } catch {}
+        });
+      },
+      cancel() {
+        if (ctrl !== null) sseClients.delete(ctrl);
+      },
+    });
+    return new Response(stream, { headers: { "content-type": "text/event-stream" } });
+  }
+  if (path === "/health") return loading ? new Response('{"error":{"type":"unavailable_error"}}', { status: 503 }) : Response.json({ status: "ok" });
   if (loading) return new Response("", { status: 503 });
+  if (path === "/test/sleep" && req.method === "POST" && sseEnabled) {
+    enterSleep();
+    return new Response(null, { status: 204 });
+  }
   if (path === "/completion" && req.method === "POST") {
+    await needsModel();
     const body = (await req.json()) as { n_predict?: number };
     if (process.env.FAKE_CRASH_ON_PREDICT !== undefined && body.n_predict === Number(process.env.FAKE_CRASH_ON_PREDICT)) {
       // Dies mid-request, as llama-server does on a CUDA out-of-memory: the socket closes, no answer.
@@ -109,12 +272,20 @@ const server = serve(port, host, async (req) => {
       },
     });
   }
-  if (path === "/v1/chat/completions" && req.method === "POST") return chat(req);
-  if (path === "/slots") return file(`${dir}/slots-busy.json`);
+  if (path === "/v1/chat/completions" && req.method === "POST") {
+    await needsModel();
+    return chat(req);
+  }
+  if (path === "/slots") {
+    await needsModel();
+    // FAKE_SLOTS_IDLE=1: the slot is idle, as /metrics says (`requests_processing 0`); busy otherwise.
+    return file(process.env.FAKE_SLOTS_IDLE === "1" ? `${dir}/../slots-idle.json` : `${dir}/slots-busy.json`);
+  }
   if (path === "/metrics") return file(`${dir}/metrics-after.txt`);
   if (path === "/props") return file(`${dir}/props.json`);
   return new Response("not found", { status: 404 });
 });
+void runLoadCycle(true);
 const ANSWER = [
   "## Simulated reply\n\n",
   "Here is a **list**:\n\n- one\n- two\n- three\n\n",

@@ -251,7 +251,7 @@ function Slot({ node, live }: { node: TopologyNode; live: NodeLive }) {
         </span>
         <span className={cn(SUB, FIGURE)}>{live.sub ?? '—'}</span>
       </span>
-      <Layers live={live} neutral className="h-3.5 rounded-[5px]" />
+      <Layers live={live} nodeId={node.id} neutral className="h-3.5 rounded-[5px]" />
     </>
   );
 }

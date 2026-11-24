@@ -24,7 +24,8 @@ started it:
 - Any number of clients can follow the same run: the route that started it streams it, and
   [`GET /api/chat/:id/stream`](#follow-a-reply-in-progress) attaches to it later.
 
-The target is the server the supervisor reports: a `ready` managed server, or an `external` one (its model is then
+The target is the server the supervisor reports: a managed server that is `ready`, `sleeping` (the request wakes it)
+or waking up (`llama-server` holds the request until its model is back), or an `external` one (its model is then
 unknown). Otherwise sending is refused with `409 llama-server is not ready`.
 
 What is sent to `llama-server` (`buildChatRequest()` in `app/server/chat/request.ts`): the system prompt if it is not blank,

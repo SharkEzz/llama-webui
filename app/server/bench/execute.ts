@@ -166,8 +166,27 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
   const cancelled = yield* Ref.make(false);
   const current = yield* Ref.make(Option.none<Followed>());
 
-  const setLive = (patch: Partial<Pick<BenchLive, 'phase' | 'step'>>, lines = false) =>
-    Ref.updateAndGet(live, (l) => ({ ...l, ...patch })).pipe(Effect.flatMap((l) => options.onLive(l, lines)));
+  const setLive = (
+    patch: Partial<Pick<BenchLive, 'phase' | 'step'>> & { readonly loadProgress?: BenchLive['loadProgress'] | null },
+    lines = false,
+  ) =>
+    Ref.updateAndGet(live, (l): BenchLive => {
+      const nextPhase = patch.phase ?? l.phase;
+      const nextStep = patch.step !== undefined ? patch.step : l.step;
+      const nextProgress =
+        patch.loadProgress === null
+          ? undefined
+          : (patch.loadProgress ?? (nextPhase === 'loading' ? l.loadProgress : undefined));
+      return {
+        runId: l.runId,
+        kind: l.kind,
+        phase: nextPhase,
+        step: nextStep,
+        startedAt: l.startedAt,
+        lines: l.lines,
+        ...(nextProgress === undefined ? {} : { loadProgress: nextProgress }),
+      };
+    }).pipe(Effect.flatMap((l) => options.onLive(l, lines)));
   const line = Effect.fnUntraced(function* (text: string) {
     yield* ring.push(`[bench] ${text}`);
     const lines = yield* Ref.updateAndGet(tail, (t) => Arr.takeRight(Arr.append(t, text), TAIL));
@@ -306,7 +325,9 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
       p: spec.p,
       n: spec.n,
       r: spec.r,
-      onPhase: (phase, step) => setLive({ phase, step }),
+      // Every phase starts without a loading progress: only `onLoadProgress` sets one, for the load in progress.
+      onPhase: (phase, step) => setLive({ phase, step, loadProgress: null }),
+      onLoadProgress: (loadProgress) => setLive({ loadProgress }),
       onLine: (text) => line(text).pipe(Effect.andThen(setLive({}, true))),
       onSpawn: spawned,
       say,

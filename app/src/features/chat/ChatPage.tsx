@@ -1,4 +1,4 @@
-import { contextUsed } from '@llama-webui/shared';
+import { contextUsed, servesRequests } from '@llama-webui/shared';
 import { SlidersHorizontal } from 'lucide-react';
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -57,9 +57,8 @@ export function ChatPage() {
   const create = useChat((s) => s.create);
   const send = useChat((s) => s.send);
   const stop = useChat((s) => s.stop);
-  const kind = useServer((s) => s.view?.state.kind);
+  const canSend = useServer((s) => servesRequests(s.view?.state));
   const props = useServerProps();
-  const canSend = kind === 'ready' || kind === 'external';
   const convId = id ? Number(id) : null;
 
   useEffect(() => void loadList(), [loadList]);

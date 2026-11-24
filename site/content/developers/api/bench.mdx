@@ -34,12 +34,12 @@ A run is created with status `running` and executes in the background. Its progr
 `BenchRunner` and the gate refuse to start, with a `409`, in these cases (`BenchStartErrors` of `BenchApi`, with
 `BenchFileMissing`). They apply to `POST /api/bench/run` and to the endpoints that start a sweep.
 
-| `_tag`                  | Message                                                                                             | When                                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `BenchRunning`          | `A benchmark is running`                                                                            | A run or a sweep is already running, or the gate is still held.                              |
-| `ServerRunning`         | `llama-server is running (profile <name>): it will be stopped during the benchmark, then restarted` | The managed server is `starting` or `ready` and the request did not send `stopServer: true`. |
-| `ExternalServerRunning` | `An external llama-server is running on port <port>: stop it first`                                 | A `llama-server` that llama-webui did not start holds the port.                              |
-| `ServerStopTooSlow`     | `llama-server is taking too long to stop: try again`                                                | A stop of `llama-server` already in progress does not end in time.                           |
+| `_tag`                  | Message                                                                                             | When                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `BenchRunning`          | `A benchmark is running`                                                                            | A run or a sweep is already running, or the gate is still held.                                          |
+| `ServerRunning`         | `llama-server is running (profile <name>): it will be stopped during the benchmark, then restarted` | The managed server is `starting`, `ready` or `sleeping` and the request did not send `stopServer: true`. |
+| `ExternalServerRunning` | `An external llama-server is running on port <port>: stop it first`                                 | A `llama-server` that llama-webui did not start holds the port.                                          |
+| `ServerStopTooSlow`     | `llama-server is taking too long to stop: try again`                                                | A stop of `llama-server` already in progress does not end in time.                                       |
 
 The web app tells them apart by `_tag`. `ServerRunning` is a confirmation request: the web app asks the user, then
 sends the same request again with `stopServer: true`. The stop is not awaited by the route: the run shows the phase
@@ -132,14 +132,15 @@ standard deviation of the `r` requests' `timings`.
 
 `BenchLive`, the payload of `bench-progress`:
 
-| Field       | Type                       | Description                                                                                                                                  |
-| ----------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runId`     | number                     | Running run.                                                                                                                                 |
-| `kind`      | `"bench"` \| `"server"`    | Tool.                                                                                                                                        |
-| `phase`     | `BenchPhase`               | `stopping-server`, `loading`, `warmup`, `prompt`, `generation` (`llama-bench` progress), `measure` (`server` requests), `restarting-server`. |
-| `step`      | `{ index, total }` \| null | Position in the measurements: tests × repetitions for `llama-bench`, requests for `server`.                                                  |
-| `startedAt` | number                     | Epoch ms.                                                                                                                                    |
-| `lines`     | string[]                   | The tool's last 20 lines.                                                                                                                    |
+| Field          | Type                       | Description                                                                                                                                  |
+| -------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runId`        | number                     | Running run.                                                                                                                                 |
+| `kind`         | `"bench"` \| `"server"`    | Tool.                                                                                                                                        |
+| `phase`        | `BenchPhase`               | `stopping-server`, `loading`, `warmup`, `prompt`, `generation` (`llama-bench` progress), `measure` (`server` requests), `restarting-server`. |
+| `step`         | `{ index, total }` \| null | Position in the measurements: tests × repetitions for `llama-bench`, requests for `server`.                                                  |
+| `startedAt`    | number                     | Epoch ms.                                                                                                                                    |
+| `lines`        | string[]                   | The tool's last 20 lines.                                                                                                                    |
+| `loadProgress` | `LoadProgress`, optional   | Live loading progress from `llama-server`'s `/models/sse` during a `server` run's `loading` phase.                                           |
 
 ## Runs
 

@@ -34,10 +34,15 @@ const healthOf = (status: number): Health => (status === 200 ? 'ok' : status ===
 
 /**
  * One monitoring read of llama-server: `/health` (200 `ok`, 503 `loading`, another status `error`, nothing within
- * 800 ms `down`), then, once it is `ok`, `/slots` and `/metrics` together, each within 800 ms, null on any failure.
- * `at` is the time of the read.
+ * 800 ms `down`), then, once it is `ok`, `/metrics`, then `/slots` when `slots` says so of the metrics just read (null
+ * when they failed; always, without `slots`), each within 800 ms, null on any failure. The caller decides because
+ * `GET /slots` is activity for llama-server: it puts off the sleep of `--sleep-idle-seconds`, and wakes a sleeping
+ * server or waits for its model, whereas `/health` and `/metrics` do neither. `at` is the time of the read.
  */
-export const readLlama = Effect.fn('probes.readLlama')(function* (target: Target) {
+export const readLlama = Effect.fn('probes.readLlama')(function* (
+  target: Target,
+  options?: { readonly slots?: (metrics: ReadonlyMap<string, number> | null) => boolean },
+) {
   const client = yield* LlamaHttp;
   const at = yield* Clock.currentTimeMillis;
   const status = yield* health(target);
@@ -52,13 +57,11 @@ export const readLlama = Effect.fn('probes.readLlama')(function* (target: Target
       Effect.map(Option.getOrNull),
       Effect.orElseSucceed(() => null),
     );
-  const [slots, metrics] = yield* Effect.all(
-    [
-      read('/slots', (res) => Effect.map(res.json, parseSlots)),
-      read('/metrics', (res) => Effect.map(res.text, parsePrometheus)),
-    ],
-    { concurrency: 2 },
-  );
+  const metrics = yield* read('/metrics', (res) => Effect.map(res.text, parsePrometheus));
+  const slots =
+    options?.slots === undefined || options.slots(metrics)
+      ? yield* read('/slots', (res) => Effect.map(res.json, parseSlots))
+      : null;
   return { at, health: state, slots, metrics } satisfies LlamaRaw;
 });
 
@@ -86,25 +89,47 @@ const isHealthBody = Schema.is(
   ]),
 );
 
-const unavailable = (message: string) => PropsUnavailable.make({ message });
+/** `/props` gave no JSON: nothing answered (`silent`), an error `status`, or a body that is not JSON (`body`). */
+export class PropsFailed extends Schema.TaggedError<PropsFailed, { readonly PropsFailed: unique symbol }>()(
+  'PropsFailed',
+  {
+    reason: Schema.Literals(['silent', 'status', 'body']),
+    /** The status answered, when one was. */
+    status: Schema.NullOr(Schema.Int),
+  },
+) {}
+
+const silent = PropsFailed.make({ reason: 'silent', status: null });
+
+/** llama-server's `/props` at `baseUrl`, its JSON as it is, within 2 s; `PropsFailed` says why there is none. */
+export const readProps = Effect.fn('probes.readProps')(function* (baseUrl: string) {
+  const client = yield* LlamaHttp;
+  return yield* client.get(`${baseUrl}/props`).pipe(
+    Effect.mapError(() => silent),
+    Effect.flatMap((res) =>
+      res.status < 200 || res.status >= 300
+        ? Effect.fail(PropsFailed.make({ reason: 'status', status: res.status }))
+        : res.json.pipe(Effect.mapError(() => PropsFailed.make({ reason: 'body', status: res.status }))),
+    ),
+    Effect.scoped,
+    Effect.timeoutOrElse({ duration: PROPS_TIMEOUT, orElse: () => Effect.fail(silent) }),
+  );
+});
+
+const unavailable = (failure: PropsFailed) =>
+  PropsUnavailable.make({
+    message:
+      failure.reason === 'status'
+        ? `llama-server /props: HTTP ${failure.status}`
+        : failure.reason === 'body'
+          ? 'llama-server /props: the reply is not JSON'
+          : 'llama-server is not responding on /props',
+  });
 
 /**
  * llama-server's `/props` at `baseUrl`, its JSON as it is, within 2 s. An error status, a body that is not JSON and no
  * answer are each a `PropsUnavailable` with its own message (#37).
  */
 export const props = Effect.fn('probes.props')(function* (baseUrl: string) {
-  const client = yield* LlamaHttp;
-  return yield* client.get(`${baseUrl}/props`).pipe(
-    Effect.mapError(() => unavailable('llama-server is not responding on /props')),
-    Effect.flatMap((res) =>
-      res.status < 200 || res.status >= 300
-        ? Effect.fail(unavailable(`llama-server /props: HTTP ${res.status}`))
-        : res.json.pipe(Effect.mapError(() => unavailable('llama-server /props: the reply is not JSON'))),
-    ),
-    Effect.scoped,
-    Effect.timeoutOrElse({
-      duration: PROPS_TIMEOUT,
-      orElse: () => Effect.fail(unavailable('llama-server is not responding on /props')),
-    }),
-  );
+  return yield* readProps(baseUrl).pipe(Effect.mapError(unavailable));
 });

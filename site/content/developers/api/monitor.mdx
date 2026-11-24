@@ -120,7 +120,10 @@ curl http://127.0.0.1:7860/api/system/info
 
 A `Snapshot` (`packages/webui-shared/src/monitor.ts`) is the state of one tick. When no server is active (supervisor `idle` or
 `crashed`), the `llama-server` fields are null or empty and only the machine is sampled; `starting`, `ready`,
-`stopping` and `external` count as active.
+`sleeping`, `stopping` and `external` count as active. While the server sleeps, wakes up or stops, `slots` is null:
+`/slots` is not read, as it would wake `llama-server` or wait for its model. While the server is idle, `slots` repeats
+the last read: `/slots` is only asked again when `/metrics` shows activity, so that `--sleep-idle-seconds` can run
+out (see [Monitor](/developers/server/monitor/#llama-server-health-slots-metrics)).
 
 | Field            | Type                             | Description                                                                                                                          |
 | ---------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -128,7 +131,7 @@ A `Snapshot` (`packages/webui-shared/src/monitor.ts`) is the state of one tick. 
 | `tick`           | number                           | Tick counter, from 1 when the monitor starts.                                                                                        |
 | `health`         | string \| null                   | `llama-server`'s `/health`: `ok` (200), `loading` (503), `error` (any other status), `down` (no answer); null with no active server. |
 | `rates`          | object                           | `genTps`, `ppTps`: live tokens/s from the [slots](#slots), 0 when idle.                                                              |
-| `slots`          | `SlotView[]` \| null             | [Slots](#slots) from `/slots`; null when the server is not healthy or the read failed.                                               |
+| `slots`          | `SlotView[]` \| null             | [Slots](#slots) from `/slots`; null when the server is not healthy, sleeps, wakes up or stops, or the read failed.                   |
 | `kv`             | object \| null                   | `usedTokens`, `totalTokens`: context used and allocated, summed over the slots.                                                      |
 | `queue`          | object \| null                   | [Request queue](#queue) from `/metrics`.                                                                                             |
 | `lastRequest`    | `RequestStats` \| null           | [Rates of the last request](#lastrequest).                                                                                           |

@@ -7,25 +7,25 @@ The monitor samples `llama-server` and the machine on a fixed interval, whether 
 tick produces a `Snapshot`, appends one point to every history series, and is broadcast over the WebSocket. The loop
 lives in `app/server/monitor/`, the readers of each data source in `app/server/collectors/`.
 
-| File                                                 | Role                                                                                                                   |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `app/server/monitor/Monitor.ts`                      | `Monitor`: the service of the ticks, its latest `Snapshot` and the history.                                            |
-| `app/server/monitor/tick.ts`                         | `beginTick()` and `endTick()`: what a tick derives from its readings, the series it feeds, the snapshot.               |
-| `app/server/monitor/gpus.ts`                         | `collectGpus()`: every card, with `llama-server`'s VRAM on it.                                                         |
-| `app/server/monitor/History.ts`                      | `History` (named rings plus timestamps), `Ring` and `historyPoints()`.                                                 |
-| `app/server/monitor/Placement.ts`, `placementLog.ts` | `Placement` and `parsePlacement()`: how the model is split across devices, from the logs.                              |
-| `app/server/llama/probes.ts`                         | `readLlama()`: `/health`, `/slots` and `/metrics` of a `llama-server`, through `LlamaHttp`.                            |
-| `llamacpp-js/metrics`                                | `parseSlots()`, `parsePrometheus()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
-| `app/server/collectors/Collectors.ts`                | `Collectors`: builds the readers and follows the settings.                                                             |
-| `app/server/collectors/gpu.ts`                       | `GpuNeeds`, `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.                                               |
-| `app/server/collectors/nvml/`                        | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `Nvml.ts`, `protocol.ts`).                     |
-| `app/server/collectors/nvidia.ts`                    | The `nvidia-smi` fallback.                                                                                             |
-| `app/server/collectors/amdgpu.ts`                    | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                                                   |
-| `app/server/collectors/proc.ts`                      | `makeProcSampler()`: CPU and RSS of the `llama-server` process.                                                        |
-| `app/server/collectors/system.ts`                    | `makeSystemSampler()`: machine CPU, memory, load, frequency, temperature.                                              |
-| `app/server/collectors/disk.ts`                      | `makeDiskSampler()`, `physicalDisks()` and `resolveModelDisk()`.                                                       |
-| `app/server/collectors/membw.ts`                     | DRAM bandwidth through `perf stat`.                                                                                    |
-| `packages/webui-shared/src/monitor.ts`               | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring schemas.                                     |
+| File                                                                       | Role                                                                                                                                              |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/server/monitor/Monitor.ts`                                            | `Monitor`: the service of the ticks, its latest `Snapshot` and the history.                                                                       |
+| `app/server/monitor/tick.ts`                                               | `beginTick()` and `endTick()`: what a tick derives from its readings, the series it feeds, the snapshot.                                          |
+| `app/server/monitor/gpus.ts`                                               | `collectGpus()`: every card, with `llama-server`'s VRAM on it.                                                                                    |
+| `app/server/monitor/History.ts`                                            | `History` (named rings plus timestamps), `Ring` and `historyPoints()`.                                                                            |
+| `app/server/monitor/Placement.ts`, `placementLog.ts`, `placementMemory.ts` | `Placement`, `parsePlacement()` and `placementFromMemory()`: how the model is split across devices, from logs with `/models/sse` memory fallback. |
+| `app/server/llama/probes.ts`                                               | `readLlama()`: `/health`, `/slots` and `/metrics` of a `llama-server`, through `LlamaHttp`.                                                       |
+| `llamacpp-js/metrics`                                                      | `parseSlots()`, `parsePrometheus()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)).                            |
+| `app/server/collectors/Collectors.ts`                                      | `Collectors`: builds the readers and follows the settings.                                                                                        |
+| `app/server/collectors/gpu.ts`                                             | `GpuNeeds`, `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.                                                                          |
+| `app/server/collectors/nvml/`                                              | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `Nvml.ts`, `protocol.ts`).                                                |
+| `app/server/collectors/nvidia.ts`                                          | The `nvidia-smi` fallback.                                                                                                                        |
+| `app/server/collectors/amdgpu.ts`                                          | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                                                                              |
+| `app/server/collectors/proc.ts`                                            | `makeProcSampler()`: CPU and RSS of the `llama-server` process.                                                                                   |
+| `app/server/collectors/system.ts`                                          | `makeSystemSampler()`: machine CPU, memory, load, frequency, temperature.                                                                         |
+| `app/server/collectors/disk.ts`                                            | `makeDiskSampler()`, `physicalDisks()` and `resolveModelDisk()`.                                                                                  |
+| `app/server/collectors/membw.ts`                                           | DRAM bandwidth through `perf stat`.                                                                                                               |
+| `packages/webui-shared/src/monitor.ts`                                     | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring schemas.                                                                |
 
 The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/system/) and
 [Topology](/docs/topology/); the routes are in [Monitor and system](/developers/api/monitor/).
@@ -45,8 +45,11 @@ list) and leaves the rest of the tick intact.
 
 Each tick (`Monitor.tick`):
 
-1. Reads `supervisor.state`. A server is active in `starting`, `ready`, `stopping` and `external`; its PID comes from
-   the state (it can be `null` for an external server).
+1. Reads `supervisor.state`. A server is active in `starting`, `ready`, `sleeping`, `stopping` and `external`; its PID comes from
+   the state (it can be `null` for an external server). `/slots` is barred (`noSlots`) while the server sleeps (managed
+   or external), wakes up (`starting` with `waking`, an external server `loading`) or stops: `llama-server` holds a
+   `GET /slots` until its model is loaded, so the read would wake a sleeping server, or wait out its timeout on every
+   tick. `/health` and `/metrics` are still read: both are answered without the model.
 2. `beginTick()`: when the PID differs from the previous tick (restart, other profile, stop), resets everything
    derived from the previous process: the last `/slots` and `/metrics` readings, `lastRequest`, `spec`,
    `recentRequests`. Counters are never diffed across two processes.
@@ -79,7 +82,8 @@ wait for the next tick follows the new interval. A change refused by the collect
 Details worth knowing:
 
 - `health` is `ok` (`/health` answered `200`), `loading` (`503`), `error` (another status), `down` (no answer), or
-  `null` when no server is active. `/slots` and `/metrics` are only read when it is `ok`.
+  `null` when no server is active. `/metrics` is only read when it is `ok`, and `/slots` only when `/metrics` shows
+  that the slots may have moved (see [`/health`, `/slots`, `/metrics`](#llama-server-health-slots-metrics)).
 - `rates` (`genTps`, `ppTps`) come from `/slots`: for each processing slot, the growth of its decoded and processed
   prompt tokens since the previous tick (the whole count when the slot started a new task), divided by the elapsed
   time.
@@ -172,12 +176,27 @@ figure.
 
 ### `llama-server`: `/health`, `/slots`, `/metrics`
 
-`readLlama(target)` (`app/server/llama/probes.ts`) requests `/health` through `LlamaHttp`, then, when it answered
-`200`, `/slots` and `/metrics` in parallel, each with a timeout of 800 ms. `parseSlots()` (`llamacpp-js/metrics`) maps the `/slots` JSON to `SlotView`. `parsePrometheus()` reads the `/metrics` text format into
-a `Map` keyed by the metric name with its labels verbatim (for example
+`readLlama(target, { slots })` (`app/server/llama/probes.ts`) requests `/health` through `LlamaHttp`, then, when it
+answered `200`, `/metrics`, then `/slots` when its caller says so of the metrics just read, each with a timeout of
+800 ms. `parseSlots()` (`llamacpp-js/metrics`) maps the `/slots` JSON to `SlotView`. `parsePrometheus()` reads the
+`/metrics` text format into a `Map` keyed by the metric name with its labels verbatim (for example
 `llamacpp:spec_decode_num_accepted_tokens_per_pos_total{position="0"}`), skipping comments and non-numeric values. The
 managed server always has these endpoints, since `buildCommand()` adds `--metrics` and `--slots` (see
 [Supervisor](/developers/server/supervisor/#building-the-command)).
+
+For `llama-server`, a `GET /slots` is activity: it starts the delay of `--sleep-idle-seconds` over, and it wakes a
+sleeping server. Read on every tick, it would keep the server awake for ever. `/health` and `/metrics` do neither, so
+the monitor decides from `/metrics` (`slotsPlan()` in `tick.ts`):
+
+| Plan   | When                                                                                                                                                                                                                 | Snapshot's `slots`         |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `skip` | `/slots` is barred (asleep, waking up, stopping), or `/metrics` did not answer                                                                                                                                       | `null`                     |
+| `read` | No slots known yet for this process; a request is running or waiting (`requests_processing`, `requests_deferred`); the last read left a slot busy; or a work counter moved since the previous tick (`WORK_COUNTERS`) | What `/slots` answers      |
+| `keep` | Otherwise: nothing moved since the last read                                                                                                                                                                         | The slots of the last read |
+
+An idle server is therefore read once on `/slots`, then left alone until it works again, and goes to sleep after its
+delay. A server without `--metrics` (an external one: `/metrics` answers `501`, parsed as an empty map) gives no such
+sign: its `/slots` is read on every tick, which keeps it from sleeping while llama-webui watches it.
 
 ### NVIDIA through NVML
 
@@ -340,9 +359,16 @@ connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line
 
 `Placement` reads the log ring when its layer is built, and keeps the last placement it read with the PID of its
 server, so once the launch lines have left the ring it still knows the placement of the same PID. It follows the new
-log lines (only those that can change the result, `RELEVANT`) and the supervisor's state, and publishes each change
-as a `placement` message.
-An external server has no placement: it writes nothing to the ring.
+log lines (only those that can change the result, `RELEVANT`), the supervisor's state and `supervisor.memoryChanges`,
+and publishes each change as a `placement` message. A state that only brings a new loading `progress` does not reread
+the ring. During managed sleep and wakeup, placement is published as
+`null`. The cached placement is available again once the same process is ready. When startup buffer logs are missing
+(an external single-model server, or a managed profile with `-lv < 4`),
+`placementFromMemory()` (`placementMemory.ts`) falls back to the `data.memory` report from `/models/sse` (`source: 'sse'`),
+matching PCI `busId` from `using device` logs or, for recognized local backends, an unambiguous GPU in sysfs.
+Remote RPC buffers have no local PCI mapping. That placement is kept with the PID like one read from the logs: once
+the launch lines have left the ring, the fallback takes the launch, the layers, peer-to-peer and the PCI addresses
+from it, so a later `data.memory` (after a wakeup) does not lose them.
 
 ## Add a collector
 

@@ -1,4 +1,12 @@
-import { isLoopback, stateHost } from '@llama-webui/shared';
+import {
+  isLoopback,
+  isServerSleeping,
+  loadProgressPct,
+  loadStageLabel,
+  servesRequests,
+  stateHost,
+  stateLoadProgress,
+} from '@llama-webui/shared';
 import {
   CircleAlert,
   Copy,
@@ -20,14 +28,15 @@ import { GlassCard } from '@/components/glass/GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
 import { call, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
-import { formatDuration, formatInt } from '@/lib/format';
+import { formatDuration, formatInt, formatPct } from '@/lib/format';
 import { startLogsSync, useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
-import { getServerProps, isRecord } from '@/lib/props';
+import { getServerProps, isExternalLoaded, isRecord, propsRetry } from '@/lib/props';
 import { isRunning, restartServer, startProfile, stopServer, switchProfile, useServer } from '@/lib/server';
 import { useNow } from '@/lib/useNow';
 import { ServerStateBadge } from './ServerStateBadge';
@@ -177,31 +186,62 @@ function StateDetails() {
   const now = useNow(1000);
   const s = view?.state;
   if (!s || s.kind === 'idle') return <p className="text-sm text-muted-foreground">No server running.</p>;
+  const progress = stateLoadProgress(s);
+  const pct = progress ? loadProgressPct(progress) : null;
+  const stageIdx = progress ? progress.stages.indexOf(progress.current) : -1;
+  const sleeping = isServerSleeping(s);
   return (
-    <dl className="divide-y divide-border">
-      {'profile' in s && <Row label="Profile">{s.profile}</Row>}
-      {'pid' in s && s.pid !== null && (
-        <Row label="PID">
-          <span className="num">{s.pid}</span>
-        </Row>
+    <div className="flex flex-col gap-3">
+      <dl className="divide-y divide-border">
+        {'profile' in s && <Row label="Profile">{s.profile}</Row>}
+        {'pid' in s && s.pid !== null && (
+          <Row label="PID">
+            <span className="num">{s.pid}</span>
+          </Row>
+        )}
+        {'port' in s && (
+          <Row label="Port">
+            <span className="num">{s.port}</span>
+          </Row>
+        )}
+        {(s.kind === 'starting' || s.kind === 'ready' || s.kind === 'sleeping') && (
+          <Row
+            label={
+              s.kind === 'ready'
+                ? 'Ready for'
+                : s.kind === 'sleeping'
+                  ? 'Sleeping for'
+                  : s.waking === true
+                    ? 'Waking for'
+                    : 'Starting for'
+            }
+          >
+            <span className="num">{formatDuration(now - s.since)}</span>
+          </Row>
+        )}
+        {s.kind === 'crashed' && (
+          <Row label="Exit">
+            {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(', ') ||
+              'unexpected'}
+          </Row>
+        )}
+      </dl>
+      {progress && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              Loading {loadStageLabel(progress.current).toLowerCase()}
+              {stageIdx >= 0 && progress.stages.length > 1 ? ` (${stageIdx + 1}/${progress.stages.length})` : ''}
+            </span>
+            {pct !== null && <span className="num">{formatPct(pct)}</span>}
+          </div>
+          <Progress value={pct} aria-label="Model loading progress" />
+        </div>
       )}
-      {'port' in s && (
-        <Row label="Port">
-          <span className="num">{s.port}</span>
-        </Row>
+      {sleeping && (
+        <p className="text-xs text-muted-foreground">Model unloaded from memory; it will reload on the next request.</p>
       )}
-      {(s.kind === 'starting' || s.kind === 'ready') && (
-        <Row label={s.kind === 'ready' ? 'Ready for' : 'Starting for'}>
-          <span className="num">{formatDuration(now - s.since)}</span>
-        </Row>
-      )}
-      {s.kind === 'crashed' && (
-        <Row label="Exit">
-          {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(', ') ||
-            'unexpected'}
-        </Row>
-      )}
-    </dl>
+    </div>
   );
 }
 
@@ -211,8 +251,8 @@ const scalar = (v: unknown): string | undefined =>
 
 function PropsCard() {
   const state = useServer((s) => s.view?.state);
-  const live = state?.kind === 'ready' || state?.kind === 'external';
-  const key = live ? `${state.kind}-${state.pid}` : null;
+  // One key for ready, sleeping and waking up with the same PID: /props is not reread on a sleep or a wake-up
+  const key = servesRequests(state) ? `${state.kind === 'external' ? 'external' : 'managed'}-${state.pid}` : null;
   const [props, setProps] = useState<Props | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Another server (or none): the previous one's /props go, in the render that sees it
@@ -223,10 +263,27 @@ function PropsCard() {
     setError(null);
   }
 
+  // An external server found while it loaded answered 503: asked again once it says it is loaded
+  const loaded = isExternalLoaded(state);
+  const [retry, setRetry] = useState({ loaded, n: 0 });
+  const nextRetry = propsRetry(retry, { loaded, missing: props === null });
+  if (nextRetry !== retry) {
+    setRetry(nextRetry);
+    if (nextRetry.n !== retry.n) setError(null);
+  }
+
   useEffect(() => {
     if (!key) return;
-    getServerProps().then(setProps, (e: unknown) => setError(errorMessage(e)));
-  }, [key]);
+    let live = true;
+    getServerProps().then(
+      (p) => live && setProps(p),
+      (e: unknown) => live && setError(errorMessage(e)),
+    );
+    return () => {
+      live = false;
+    };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- retry.n is a trigger: /props is asked again when an external server ends the load it was found in
+  }, [key, retry.n]);
 
   const gen: Props = isRecord(props?.default_generation_settings) ? props.default_generation_settings : {};
   const modalities = Object.entries(isRecord(props?.modalities) ? props.modalities : {})
@@ -235,7 +292,7 @@ function PropsCard() {
 
   return (
     <GlassCard title="Server info" icon={Info}>
-      {!live ? (
+      {key === null ? (
         <p className="text-sm text-muted-foreground">Available once the server is ready.</p>
       ) : error ? (
         <Alert variant="destructive">

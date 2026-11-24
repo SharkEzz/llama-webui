@@ -53,4 +53,5 @@ export const restartServer = () => action(() => call((api) => api.server.restart
 export const stopServer = () => action(() => call((api) => api.server.stop()));
 
 /** The (managed) server is running: it can be stopped, restarted or switched. */
-export const isRunning = (v: ServerView | null) => v?.state.kind === 'starting' || v?.state.kind === 'ready';
+export const isRunning = (v: ServerView | null) =>
+  v?.state.kind === 'starting' || v?.state.kind === 'ready' || v?.state.kind === 'sleeping';

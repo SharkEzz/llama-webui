@@ -1,4 +1,4 @@
-import { phaseOf } from '@llama-webui/shared';
+import { phaseOf, stateLoadProgress } from '@llama-webui/shared';
 import { useEffect, useMemo } from 'react';
 import type { Tone } from '@/components/glass/tones';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +12,8 @@ import { DetailPopover } from './Detail';
 import { detailPopover } from './detailPopover';
 import { gpuTones, linkFlows, linkSpecs, nodeLive, peerLinks } from './flows';
 import { Hud, Legend } from './Hud';
+import { LayerTooltip } from './LayerTooltip';
+import { layerTooltip } from './layerTooltip';
 import { useReducedMotion } from './useReducedMotion';
 import { type TopologyView, useView } from './viewPrefs';
 
@@ -67,8 +69,9 @@ export function TopologyPage() {
                 type="button"
                 aria-pressed={view === v.view}
                 onClick={() => {
-                  // The details belong to a block of the view that leaves
+                  // The details and tooltips belong to a block of the view that leaves
                   detailPopover.close();
+                  layerTooltip.close();
                   setView(v.view);
                 }}
                 className={cn(
@@ -102,11 +105,20 @@ export function TopologyPage() {
         </div>
 
         <div className="grid min-h-0 items-start gap-3 @2xl:grid-cols-2 @[60rem]:col-start-2 @[60rem]:row-start-2 @[60rem]:-m-1 @[60rem]:flex @[60rem]:flex-col @[60rem]:items-stretch @[60rem]:overflow-y-auto @[60rem]:p-1">
-          <Hud phase={phase} snapshot={snapshot} graph={graph} placement={placement} tones={tones} error={error} />
+          <Hud
+            phase={phase}
+            loadProgress={stateLoadProgress(state)}
+            snapshot={snapshot}
+            graph={graph}
+            placement={placement}
+            tones={tones}
+            error={error}
+          />
           <Legend snapshot={snapshot} graph={graph} tones={tones} view={view} reducedMotion={reducedMotion} />
         </div>
       </div>
       <DetailPopover graph={graph} live={live} tones={tones} />
+      <LayerTooltip graph={graph} live={live} tones={tones} />
     </div>
   );
 }

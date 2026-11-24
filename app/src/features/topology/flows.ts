@@ -83,11 +83,36 @@ export interface Fact {
 /** What a tank layer holds: the model's buffers (from the loading logs), the rest of the memory in use. */
 export type LayerKind = 'model' | 'kv' | 'compute' | 'other' | 'used';
 
+/** Every hoverable slice of a GPU VRAM bar: its filled layers, plus the unallocated remainder. */
+export type LayerSegmentKind = LayerKind | 'free';
+
 export interface TankLayer {
   kind: LayerKind;
   /** Share of the tank's capacity (0..100). */
   pct: number;
+  /** Bytes of the tank this layer takes: measured, or the size the logs announce, shrunk with the others to the measurement. */
+  bytes: number;
+  /** The size the logs announce for it, when the layer is shrunk below it (see `gpuLayers`). */
+  announcedBytes?: number;
 }
+
+export interface LayerSlice {
+  kind: LayerSegmentKind;
+  label: string;
+  bytes: number;
+  pct: number;
+  /** The size the logs announce, when the slice is shrunk below it: the one the block's details list. */
+  announcedBytes?: number;
+}
+
+export const LAYER_LABEL = {
+  model: 'Model',
+  kv: 'KV cache',
+  compute: 'Compute buffers',
+  other: 'Other VRAM',
+  used: 'Used VRAM',
+  free: 'Free VRAM',
+} as const satisfies Record<LayerSegmentKind, string>;
 
 export interface NodeLive {
   /** 0..100: load (GPU, CPU utilization, a drive's share of its link); null = unknown. */
@@ -95,6 +120,8 @@ export interface NodeLive {
   /** 0..100: fill (VRAM, RAM); null = not applicable. */
   fillPct: number | null;
   fillLevel: Level;
+  /** Total memory capacity of a tank (VRAM, RAM), in bytes; null = not a tank or unknown. */
+  capacityBytes: number | null;
   /** Tank contents from the bottom up; their sum is the measured fill. Empty: not a tank, or nothing known. */
   layers: TankLayer[];
   /** Load of each CPU thread (0..100); empty for other blocks or without a sample. */
@@ -114,8 +141,9 @@ export interface NodeLive {
 }
 
 /** Values of a block that is not a tank and has nothing to add to its name and headline. */
-const PLAIN: Pick<NodeLive, 'fillLevel' | 'layers' | 'cores' | 'barPct' | 'sub' | 'lanes'> = {
+const PLAIN: Pick<NodeLive, 'fillLevel' | 'capacityBytes' | 'layers' | 'cores' | 'barPct' | 'sub' | 'lanes'> = {
   fillLevel: 'ok',
+  capacityBytes: null,
   layers: [],
   cores: [],
   barPct: null,
@@ -238,18 +266,45 @@ function gpuLayers(g: GpuSample, buf: PlacementBuffer | undefined): { layers: Ta
   if (!(total > 0)) return { layers: [], otherBytes: null };
   const used = Math.min(g.vramUsedBytes, total);
   const known = buf ? buf.modelBytes + buf.kvBytes + buf.computeBytes : 0;
-  if (!buf || known <= 0) return { layers: [{ kind: 'used', pct: (100 * used) / total }], otherBytes: null };
+  if (!buf || known <= 0)
+    return { layers: [{ kind: 'used', pct: (100 * used) / total, bytes: used }], otherBytes: null };
   const scale = known > used ? used / known : 1;
   const other = Math.max(0, used - known);
-  const layer = (kind: LayerKind, bytes: number): TankLayer => ({ kind, pct: (100 * bytes) / total });
+  const layer = (kind: LayerKind, bytes: number): TankLayer => ({ kind, pct: (100 * bytes) / total, bytes });
+  /** A layer of the announced size, shrunk when the three exceed the measurement. */
+  const announced = (kind: LayerKind, bytes: number): TankLayer =>
+    scale < 1 ? { ...layer(kind, bytes * scale), announcedBytes: bytes } : layer(kind, bytes);
   return {
     layers: [
-      layer('model', buf.modelBytes * scale),
-      layer('kv', buf.kvBytes * scale),
-      layer('compute', buf.computeBytes * scale),
+      announced('model', buf.modelBytes),
+      announced('kv', buf.kvBytes),
+      announced('compute', buf.computeBytes),
       layer('other', other),
     ],
     otherBytes: other,
+  };
+}
+
+/**
+ * Data for one slice of a GPU's VRAM bar tooltip; null if capacity is unknown or the slice is empty. A slice shrunk to
+ * the measurement also gives the size the logs announce, so the tooltip agrees with the block's details.
+ */
+export function layerSlice(live: NodeLive | undefined, kind: LayerSegmentKind): LayerSlice | null {
+  if (!live || live.capacityBytes === null || !(live.capacityBytes > 0)) return null;
+  if (kind === 'free') {
+    const usedBytes = live.layers.reduce((s, l) => s + l.bytes, 0);
+    const bytes = Math.max(0, live.capacityBytes - usedBytes);
+    if (!(bytes > 0)) return null;
+    return { kind: 'free', label: LAYER_LABEL.free, bytes, pct: (100 * bytes) / live.capacityBytes };
+  }
+  const layer = live.layers.find((l) => l.kind === kind);
+  if (!layer || !(layer.bytes > 0)) return null;
+  return {
+    kind,
+    label: LAYER_LABEL[kind],
+    bytes: layer.bytes,
+    pct: layer.pct,
+    ...(layer.announcedBytes === undefined ? {} : { announcedBytes: layer.announcedBytes }),
   };
 }
 
@@ -328,6 +383,7 @@ export function nodeLive(
         loadPct: g?.utilPct ?? null,
         fillPct: fill,
         fillLevel: levelOf(fill, FILL_WARN_PCT, FILL_CRIT_PCT),
+        capacityBytes: g && g.vramTotalBytes > 0 ? g.vramTotalBytes : null,
         layers: tank.layers,
         cores: [],
         dim: false,
@@ -385,7 +441,8 @@ export function nodeLive(
         loadPct: fill,
         fillPct: fill,
         fillLevel: levelOf(fill, FILL_WARN_PCT, FILL_CRIT_PCT),
-        layers: fill !== null ? [{ kind: 'used', pct: fill }] : [],
+        capacityBytes: mem && mem.totalBytes > 0 ? mem.totalBytes : null,
+        layers: fill !== null && used !== null ? [{ kind: 'used', pct: fill, bytes: used }] : [],
         dim: false,
         headline: usage ?? '—',
         facts,

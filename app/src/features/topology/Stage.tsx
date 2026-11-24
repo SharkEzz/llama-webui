@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { type Camera, fitCamera, panBy, resolveCamera, reveal, ZOOM_MAX, ZOOM_STEP, zoomAt } from './camera';
 import { detailPopover } from './detailPopover';
 import { type Level, type LinkFlow, linkBadge, type NodeLive, type PeerLink } from './flows';
+import { layerTooltip } from './layerTooltip';
 import { createStreakLoop, laneStates, type StreakLoop, trackLook } from './streaks';
 import { resolveColor } from './themeColors';
 import type { ViewLayout } from './tree';
@@ -121,8 +122,9 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
   /** Zooms around a point of the frame, its center by default. */
   const zoom = (factor: number, at?: { x: number; y: number }) => {
     if (!room) return;
-    // The details stand beside a block that is about to move
+    // The details and tooltips stand beside a block that is about to move
     detailPopover.close();
+    layerTooltip.close();
     const next = zoomAt(camera, factor, at ?? { x: room.w / 2, y: room.h / 2 }, room, natural);
     setChosen(next.scale <= fit.scale ? null : next);
   };
@@ -162,6 +164,7 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
       // From here the press is a drag: the frame keeps the pointer, and the block under it gets no click
       event.currentTarget.setPointerCapture(event.pointerId);
       detailPopover.close();
+      layerTooltip.close();
       setDragging(true);
     }
     d.x = event.clientX;
@@ -364,6 +367,7 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
           disabled={chosen === null}
           onClick={() => {
             detailPopover.close();
+            layerTooltip.close();
             setChosen(null);
           }}
         >

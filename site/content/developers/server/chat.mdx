@@ -45,10 +45,11 @@ uninterruptibly, before writing anything:
 | No run is in progress for it                                                  | `409` `ReplyInProgress` `A reply is already in progress in this conversation` |
 | llama-webui is not stopping, and a server can answer (`chatTarget` gives one) | `409` `ServerNotReady` `llama-server is not ready`                            |
 
-`chatTarget` (`app/server/chat/target.ts`) reads the [supervisor](/developers/server/supervisor/) state: a `ready`
-managed server gives its `--host`, port, profile and model path (from `profilePaths()`, `null` when the profile is
-gone), an `external` server gives its port on loopback with no profile or model path, and every other state gives
-none.
+`chatTarget` (`app/server/chat/target.ts`) reads the [supervisor](/developers/server/supervisor/) state: a managed
+server that takes requests (`servesRequests()`: `ready`, `sleeping`, or `starting` with `waking`) gives its `--host`,
+port, profile and model path (from `resolveProfilePaths()`, `null` when the profile is gone), an `external` server
+gives its port on loopback with no profile or model path, and every other state gives none. A request sent to a
+sleeping server wakes it, and one sent during a wakeup waits in `llama-server` until the model is back.
 
 Then:
 

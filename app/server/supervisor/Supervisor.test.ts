@@ -1,6 +1,13 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
-import { DEFAULT_SETTINGS, type Profile, type ServerState, type ServerView, type WsMessage } from '@llama-webui/shared';
+import {
+  DEFAULT_SETTINGS,
+  type Profile,
+  type ServerState,
+  type ServerView,
+  type WsMessage,
+  stateLoadProgress,
+} from '@llama-webui/shared';
 import {
   Array as Arr,
   Clock,
@@ -14,6 +21,7 @@ import {
   Metric,
   Option,
   type Path,
+  Predicate,
   Ref,
   Schedule,
   Scope,
@@ -65,6 +73,7 @@ const supervisorWith = (options: Options) =>
 type Services =
   | Supervisor
   | LogRing
+  | LlamaHttp
   | Published
   | FileSystem.FileSystem
   | Path.Path
@@ -756,5 +765,240 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
       yield* assertGone(pidOf(stubborn));
       assert.isBelow(after - before, 3000);
     }),
+  );
+
+  it.effect('a managed server becomes ready through /health while SSE headers are stalled', () =>
+    fresh()(
+      Effect.gen(function* () {
+        yield* startFake({ env: { FAKE_SSE: '1', FAKE_SSE_STALL: 'headers' } });
+        const ready = yield* stateWhen(kindIs('ready')).pipe(Effect.timeout('2 seconds'));
+        const supervisor = yield* Supervisor;
+        yield* supervisor.stop;
+        yield* assertGone(pidOf(ready));
+      }),
+    ),
+  );
+
+  it.effect('an external router keeps its generic state instead of consuming individual model events', () =>
+    fresh()(
+      Effect.gen(function* () {
+        let propsRequested = false;
+        const router = yield* httpStub((req, res) => {
+          if (req.url === '/props') {
+            res.writeHead(200, { 'content-type': 'application/json' }).end('{"role":"router"}');
+            propsRequested = true;
+          } else if (req.url === '/models/sse') {
+            res.writeHead(200, { 'content-type': 'text/event-stream' });
+            res.write('data: {"model":"first","event":"status_change","data":{"status":"loaded"}}\n\n');
+            res.write('data: {"model":"second","event":"status_change","data":{"status":"sleeping"}}\n\n');
+          } else {
+            res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+          }
+        });
+        const supervisor = yield* Supervisor;
+        const detected = yield* supervisor.detectExternal(router.port);
+        assert.isTrue(detected);
+        yield* Effect.raceFirst(
+          Effect.sync(() => propsRequested).pipe(
+            Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (requested) => requested }),
+          ),
+          stateWhen((s) => s.kind === 'external' && s.status === 'sleeping'),
+        );
+        const state = yield* supervisor.state;
+        assert.deepStrictEqual(state, { kind: 'external', port: router.port, pid: null });
+        const memory = yield* supervisor.memory;
+        assert.isNull(memory);
+      }),
+    ),
+  );
+
+  it.effect('/models/sse streams loading progress, transitions to ready with memory, and handles sleep/wake', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const client = yield* LlamaHttp;
+        const cmd = yield* startFake({
+          env: {
+            FAKE_SSE: '1',
+            FAKE_SSE_STAGES: 'text_model,mmproj_model',
+            FAKE_SSE_STAGE_ONLY: '1',
+            FAKE_LOAD_MS: '180',
+          },
+        });
+        const baseUrl = `http://127.0.0.1:${cmd.port}`;
+        const ready = yield* stateWhen(kindIs('ready'));
+        const memOnReady = yield* supervisor.memory.pipe(
+          Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (memory) => memory !== null }),
+          Effect.timeout('2 seconds'),
+        );
+        assert.isNotNull(memOnReady);
+        assert.strictEqual(memOnReady.devices[0]?.name, 'CUDA0');
+
+        const seen = yield* publishedViews;
+        assert.isTrue(
+          Arr.some(seen, (v) => v.state.kind === 'starting' && v.state.progress !== undefined),
+          'expected at least one starting state with SSE load progress',
+        );
+
+        // The fake enters idle sleep when asked so the test observes loaded memory first.
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+        const sleeping = yield* stateWhen(kindIs('sleeping'));
+        assert.strictEqual(sleeping.kind, 'sleeping');
+        const memWhileSleeping = yield* supervisor.memory;
+        assert.isNull(memWhileSleeping);
+
+        // Waking up via /slots transitions sleeping -> starting -> ready and restores memory.
+        yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+        yield* stateWhen(kindIs('ready'));
+        const memAfterWake = yield* supervisor.memory;
+        assert.deepStrictEqual(memAfterWake, memOnReady);
+        const afterWake = yield* publishedViews;
+        const isWaking = (view: ServerView) => view.state.kind === 'starting' && view.state.waking === true;
+        assert.isFalse(Arr.some(seen, isWaking), 'a launch is not a wake-up');
+        assert.isTrue(Arr.some(Arr.drop(afterWake, seen.length), isWaking), 'the reload after a sleep is a wake-up');
+        const wakeProgress = Arr.map(Arr.drop(afterWake, seen.length), (view) => stateLoadProgress(view.state));
+        assert.deepInclude(wakeProgress, {
+          stages: ['text_model', 'mmproj_model'],
+          current: 'mmproj_model',
+          value: null,
+        });
+
+        // Stopping a sleeping server works cleanly too.
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+        yield* stateWhen(kindIs('sleeping'));
+        yield* supervisor.stop;
+        yield* assertState({ kind: 'idle' });
+        const memAfterStop = yield* supervisor.memory;
+        assert.isNull(memAfterStop);
+        yield* assertGone(pidOf(ready));
+      }),
+    ),
+  );
+
+  it.effect('/models/sse tracks external server loading, ready, memory, and sleeping states', () =>
+    Effect.gen(function* () {
+      const port = yield* freePort;
+      const extScope = yield* Scope.make();
+      const outside = yield* fakeOutside({
+        port,
+        env: {
+          FAKE_SSE: '1',
+          FAKE_SSE_STAGES: 'text_model,mmproj_model',
+          FAKE_SSE_STAGE_ONLY: '1',
+          FAKE_LOAD_MS: '180',
+        },
+      }).pipe(Scope.provide(extScope));
+      // Closed however the block ends: a `finally` around a `yield*` does not run when the yielded effect fails.
+      yield* fresh()(
+        Effect.gen(function* () {
+          const supervisor = yield* Supervisor;
+          const client = yield* LlamaHttp;
+          const baseUrl = `http://127.0.0.1:${port}`;
+          const detected = yield* supervisor.detectExternal(port);
+          assert.isTrue(detected);
+          const extReady = yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+          assert.strictEqual(extReady.kind, 'external');
+          const extMem = yield* supervisor.memory;
+          assert.isNotNull(extMem);
+
+          yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+          yield* stateWhen((s) => s.kind === 'external' && s.status === 'sleeping');
+          const extSleepMem = yield* supervisor.memory;
+          assert.isNull(extSleepMem);
+
+          yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+          yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+          const wakeMem = yield* supervisor.memory;
+          assert.deepStrictEqual(wakeMem, extMem);
+          const seen = yield* publishedViews;
+          const progress = Arr.map(seen, (view) => stateLoadProgress(view.state));
+          assert.deepInclude(progress, {
+            stages: ['text_model', 'mmproj_model'],
+            current: 'mmproj_model',
+            value: null,
+          });
+        }),
+      ).pipe(Effect.ensuring(Scope.close(extScope, Exit.void)));
+      yield* assertGone(outside.pid);
+    }),
+  );
+
+  it.effect('a managed server wakes up to ready when /models/sse refuses a reconnect during its sleep', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const client = yield* LlamaHttp;
+        const cmd = yield* startFake({ env: { FAKE_SSE: '1', FAKE_SSE_REFUSE_AFTER_SLEEP: '1', FAKE_LOAD_MS: '100' } });
+        const baseUrl = `http://127.0.0.1:${cmd.port}`;
+        const ready = yield* stateWhen(kindIs('ready'));
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+        yield* stateWhen(kindIs('sleeping'));
+        // The stream was cut and the watcher's reconnect answered 503: it keeps following the server.
+        yield* client.get(`${baseUrl}/test/sse-refused`).pipe(
+          Effect.flatMap((res) => res.json),
+          Effect.scoped,
+          Effect.repeat({
+            schedule: Schedule.spaced('10 millis'),
+            until: (body) => Predicate.hasProperty(body, 'refused') && body.refused === 1,
+          }),
+          Effect.timeout('2 seconds'),
+        );
+        yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+        yield* stateWhen(kindIs('ready'));
+        yield* supervisor.stop;
+        yield* assertGone(pidOf(ready));
+      }),
+    ),
+  );
+
+  it.effect('an external watcher asks /props again after a failed answer', () =>
+    fresh()(
+      Effect.gen(function* () {
+        let propsCalls = 0;
+        const server = yield* httpStub((req, res) => {
+          if (req.url === '/props') {
+            propsCalls++;
+            res.writeHead(propsCalls === 1 ? 500 : 200, { 'content-type': 'application/json' }).end('{}');
+          } else if (req.url === '/models/sse') {
+            res.writeHead(200, { 'content-type': 'text/event-stream' });
+            res.write('data: {"model":"m","event":"status_change","data":{"status":"loaded"}}\n\n');
+          } else {
+            res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+          }
+        });
+        const supervisor = yield* Supervisor;
+        const detected = yield* supervisor.detectExternal(server.port);
+        assert.isTrue(detected);
+        yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+        assert.isAbove(propsCalls, 1);
+      }),
+    ),
+  );
+  it.effect('an external server that refuses /props (--api-key) is not asked again', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const paths: Array<string> = [];
+        const server = yield* httpStub((req, res) => {
+          paths.push(req.url ?? '');
+          if (req.url === '/health') res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+          else {
+            res
+              .writeHead(401, { 'content-type': 'application/json' })
+              .end('{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}');
+          }
+        });
+        const supervisor = yield* Supervisor;
+        const detected = yield* supervisor.detectExternal(server.port);
+        assert.isTrue(detected);
+        // Ten polls of the watcher (50 ms each): one refusal, then nothing more, and never the stream.
+        yield* Effect.sleep('500 millis');
+        assert.deepStrictEqual(
+          Arr.filter(paths, (path) => path !== '/health'),
+          ['/props'],
+        );
+        // Still the external server, without a status.
+        yield* assertState({ kind: 'external', pid: null, port: server.port });
+      }),
+    ),
   );
 });

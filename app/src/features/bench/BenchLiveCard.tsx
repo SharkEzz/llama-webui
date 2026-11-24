@@ -1,4 +1,4 @@
-import type { Measure } from '@llama-webui/shared';
+import { loadProgressPct, loadStageLabel, type Measure } from '@llama-webui/shared';
 import { Activity, Square } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { KIND_LABEL, PHASE_LABEL, STATUS_LABEL, useBench } from '@/lib/bench';
-import { formatDuration, formatRate, formatStddev } from '@/lib/format';
+import { formatDuration, formatPct, formatRate, formatStddev } from '@/lib/format';
 import { useNow } from '@/lib/useNow';
 import { formatAccept, modelName, vramTotal } from './format';
 
@@ -46,7 +46,16 @@ export function BenchLiveCard() {
     );
   }
 
-  const pct = live.step ? Math.round((live.step.index / Math.max(1, live.step.total)) * 100) : null;
+  const loadPct = live.phase === 'loading' && live.loadProgress ? loadProgressPct(live.loadProgress) : null;
+  const pct = live.step
+    ? Math.round((live.step.index / Math.max(1, live.step.total)) * 100)
+    : loadPct !== null
+      ? Math.round(loadPct)
+      : null;
+  const phaseLabel =
+    live.phase === 'loading' && live.loadProgress
+      ? `${PHASE_LABEL[live.phase]} · ${loadStageLabel(live.loadProgress.current)}`
+      : PHASE_LABEL[live.phase];
   return (
     <GlassCard
       title="Running"
@@ -66,9 +75,10 @@ export function BenchLiveCard() {
         {run && <RunHeader kind={run.kind} model={run.spec.modelPath} />}
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between text-sm">
-            <span className="font-medium">{PHASE_LABEL[live.phase]}</span>
+            <span className="font-medium">{phaseLabel}</span>
             <span className="num text-muted-foreground">
               {live.step && `${live.step.index} / ${live.step.total} · `}
+              {!live.step && loadPct !== null && `${formatPct(loadPct)} · `}
               {formatDuration(now - live.startedAt)}
             </span>
           </div>

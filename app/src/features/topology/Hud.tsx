@@ -1,4 +1,7 @@
 import {
+  type LoadProgress,
+  loadProgressPct,
+  loadStageLabel,
   type ModelPlacement,
   PHASE_LABEL,
   type Phase,
@@ -11,7 +14,7 @@ import { GLASS } from '@/components/glass/glass';
 import { TONE_VAR, type Tone } from '@/components/glass/tones';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { fmt, formatBytes, formatRate } from '@/lib/format';
+import { fmt, formatBytes, formatPct, formatRate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { FILL_CRIT_PCT, FILL_WARN_PCT, LINK_CRIT, LINK_WARN, p2pSummary, placementSeries } from './flows';
 import { LAYER_TINT, tint } from './themeColors';
@@ -24,6 +27,7 @@ import type { TopologyView } from './viewPrefs';
 
 export interface HudProps {
   phase: Phase;
+  loadProgress?: LoadProgress | null;
   snapshot: Snapshot | null;
   graph: TopologyGraph | null;
   placement: ModelPlacement | null;
@@ -42,6 +46,7 @@ export interface LegendProps {
 const PHASE_UI: Record<Phase, { dot: string; text: string }> = {
   stopped: { dot: 'bg-muted-foreground/60', text: 'text-muted-foreground' },
   loading: { dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
+  sleeping: { dot: 'bg-tone-blue/70', text: 'text-tone-blue' },
   idle: { dot: 'bg-success', text: 'text-success' },
   prompt: { dot: 'bg-tone-blue shadow-[0_0_10px] shadow-tone-blue/60', text: 'text-tone-blue' },
   generating: { dot: 'bg-tone-teal shadow-[0_0_10px] shadow-tone-teal/60', text: 'text-tone-teal' },
@@ -56,11 +61,12 @@ function colorOf(tones: Map<string, Tone>, nodeId: string | null): string {
   return tone ? TONE_VAR[tone] : 'var(--muted-foreground)';
 }
 
-export function Hud({ phase, snapshot, graph, placement, tones, error }: HudProps) {
+export function Hud({ phase, loadProgress = null, snapshot, graph, placement, tones, error }: HudProps) {
   const ui = PHASE_UI[phase];
   const series = graph ? placementSeries(graph, placement) : [];
   const total = series.reduce((s, x) => s + x.bytes, 0);
   const p2p = p2pSummary(placement);
+  const loadPct = phase === 'loading' && loadProgress ? loadProgressPct(loadProgress) : null;
 
   return (
     <>
@@ -69,6 +75,12 @@ export function Hud({ phase, snapshot, graph, placement, tones, error }: HudProp
         <p className={cn('mt-1 flex items-center gap-2 font-medium', ui.text)}>
           <span className={cn('size-2 shrink-0 rounded-full', ui.dot)} aria-hidden="true" />
           {PHASE_LABEL[phase]}
+          {phase === 'loading' && loadProgress && (
+            <span className="num text-xs opacity-80">
+              {loadStageLabel(loadProgress.current)}
+              {loadPct !== null ? ` ${formatPct(loadPct)}` : ''}
+            </span>
+          )}
         </p>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
           <dt className="text-muted-foreground">Generation</dt>
@@ -87,7 +99,9 @@ export function Hud({ phase, snapshot, graph, placement, tones, error }: HudProp
               ? 'No managed server: split unknown.'
               : phase === 'loading'
                 ? 'Loading: the split arrives with the logs.'
-                : 'Split unknown: an external server, or a profile whose -lv is below 4 (buffer sizes not logged).'}
+                : phase === 'sleeping'
+                  ? 'Model is sleeping: VRAM released until the next request.'
+                  : 'Split unknown: an external server without /models/sse, or a profile whose -lv is below 4.'}
           </p>
         ) : (
           <>
@@ -126,6 +140,7 @@ export function Hud({ phase, snapshot, graph, placement, tones, error }: HudProp
                 </>
               )}
               {placement?.buffers.some((b) => b.estimated) && ' · estimate (tensor parallel)'}
+              {placement?.source === 'sse' && !placement.layers && ' · from /models/sse'}
             </p>
             {p2p && <p className="mt-1 text-xs text-muted-foreground">Peer-to-peer: {p2p}.</p>}
           </>

@@ -92,6 +92,22 @@ export const parsePlacement = (lines: ReadonlyArray<LogLine>): ModelPlacement | 
     Option.getOrNull,
   );
 
+/** Device → PCI busId map from the last launch in `lines` (“using device” and NCCL rank lines). */
+export const parseBusIds = (lines: ReadonlyArray<LogLine>): ReadonlyMap<string, string> =>
+  Arr.findLastIndex(lines, (line) => Str.startsWith(LAUNCH_MARK)(line.text)).pipe(
+    Option.map((start) => {
+      const after = Arr.drop(lines, start + 1);
+      const busIds = ncclBusIds(after);
+      for (const line of after) {
+        const body = Str.replace(PREFIX, '')(line.text);
+        const using = USING.exec(body);
+        if (using !== null) busIds.set(group(using, 1), Str.toLowerCase(group(using, 2)));
+      }
+      return busIds;
+    }),
+    Option.getOrElse((): ReadonlyMap<string, string> => new Map()),
+  );
+
 const placementAt = (lines: ReadonlyArray<LogLine>, start: number, launch: LogLine): ModelPlacement => {
   const after = Arr.drop(lines, start + 1);
   const busIds = ncclBusIds(after);

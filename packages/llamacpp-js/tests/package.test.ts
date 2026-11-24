@@ -58,11 +58,24 @@ async function bundle(spec: string, names: string[]): Promise<string> {
 test('importing one function from the root keeps only what it needs', needsBundler, async () => {
   const js = await bundle('src/index.ts', ['parseHelp']);
   assert.ok(js.includes('function parseHelp'));
-  for (const unused of ['streamChatCompletion', 'SseParser', 'parsePrometheus', 'LlamaHttpError', 'parseBenchJson'])
+  for (const unused of [
+    'streamChatCompletion',
+    'streamModelsSse',
+    'SseParser',
+    'parsePrometheus',
+    'LlamaHttpError',
+    'parseBenchJson',
+  ])
     assert.deepEqual({ unused, kept: js.includes(unused) }, { unused, kept: false });
 });
 
 test('the browser-safe modules bundle for the browser without Node built-ins', needsBundler, async () => {
-  const js = await bundle('src/index.ts', ['streamChatCompletion', 'fetchLlama', 'parseBenchJson', 'describeFlag']);
+  const js = await bundle('src/index.ts', [
+    'streamChatCompletion',
+    'streamModelsSse',
+    'fetchLlama',
+    'parseBenchJson',
+    'describeFlag',
+  ]);
   assert.doesNotMatch(js, /node:|child_process/);
 });

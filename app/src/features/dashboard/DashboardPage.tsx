@@ -1,3 +1,4 @@
+import { isServerLoading, isServerSleeping, stateLoadProgress } from '@llama-webui/shared';
 import { CircleStop } from 'lucide-react';
 import { Link } from 'react-router';
 import { GLASS } from '@/components/glass/glass';
@@ -86,7 +87,12 @@ export function DashboardPage() {
 
       {active && (
         <>
-          <ContextCard snapshot={snapshot} loading={state?.kind === 'starting'} />
+          <ContextCard
+            snapshot={snapshot}
+            loading={isServerLoading(state)}
+            loadProgress={stateLoadProgress(state)}
+            sleeping={isServerSleeping(state)}
+          />
           <RequestsTable requests={snapshot.recentRequests} />
         </>
       )}

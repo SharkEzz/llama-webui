@@ -26,7 +26,7 @@ charts already hold the last few minutes when you open the page. The history is 
 clears it. You can change the interval and the history length in [Settings](/docs/settings/) (see
 [Change the sampling](#change-the-sampling)).
 
-The page title shows the state of the server: **Stopped**, **Starting…**, **Ready**, **Stopping…**, **Crashed**, or
+The page title shows the state of the server: **Stopped**, **Starting…**, **Ready**, **Sleeping**, **Stopping…**, **Crashed**, or
 **External** (with its PID) for a server that answers on the configured port but that llama-webui did not launch.
 
 ## Tiles
@@ -92,7 +92,11 @@ many there are. The **Slots and context** card lists them.
   slot's size, with a bar.
 - The tokens in a slot are the whole conversation: the prompt plus everything generated so far. They stay there after
   the request ends, kept for the next one, so a free slot can still show a full context.
-- While the model loads, the card says **Loading the model…**.
+- While the model loads, the card shows the live loading progress bar when `llama-server` supports `/models/sse`, or **Loading the model…** otherwise.
+- While the server is **Sleeping** (`--sleep-idle-seconds`), `/slots` is skipped so the model stays unloaded until the next request.
+- While the server is idle, llama-webui stops asking `/slots` and keeps showing the last answer, because `llama-server`
+  counts that request as activity and would never go to sleep. This relies on `/metrics`: a server you started yourself
+  without `--metrics` is asked `/slots` at every sample, and does not go to sleep while llama-webui runs.
 - The message **/slots unavailable for this server.** appears when a ready server does not answer on `/slots`, for
   example an external server started with `--no-slots`.
 

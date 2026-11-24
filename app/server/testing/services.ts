@@ -46,7 +46,10 @@ import { WsHub } from '../ws/WsHub.ts';
  * built with: a test sets them (a fake Hub, no token of the user's).
  */
 export const ServicesWithoutBench = Layer.mergeAll(TuningHardware.layer, TuningMemo.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(Monitor.layerStub, Placement.layer, ChatRuns.layer)),
+  // No GPU of the machine read from sysfs: a placement from `/models/sse` is the same on every machine.
+  Layer.provideMerge(
+    Layer.mergeAll(Monitor.layerStub, Placement.layerWith({ gpus: Effect.succeed([]) }), ChatRuns.layer),
+  ),
   Layer.provideMerge(Supervisor.layerWith({ killTimeout: '1 second', healthPoll: '50 millis' })),
   Layer.provideMerge(Layer.mergeAll(Flags.layer, BenchHardware.layer)),
   Layer.provideMerge(

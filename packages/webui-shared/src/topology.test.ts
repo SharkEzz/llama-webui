@@ -38,9 +38,15 @@ test('phaseOf: no server, stopping or crashed → stopped', () => {
   );
 });
 
-test('phaseOf: starting, or ready while health is still loading → loading', () => {
+test('phaseOf: starting, external loading, or ready while health is still loading → loading', () => {
   expect(phaseOf({ ...ready, kind: 'starting' }, null)).toBe('loading');
   expect(phaseOf(ready, snap({ health: 'loading' }))).toBe('loading');
+  expect(phaseOf({ kind: 'external', pid: 1, port: 8080, status: 'loading' }, null)).toBe('loading');
+});
+
+test('phaseOf: sleeping (managed or external) → sleeping', () => {
+  expect(phaseOf({ ...ready, kind: 'sleeping' }, snap({}))).toBe('sleeping');
+  expect(phaseOf({ kind: 'external', pid: 1, port: 8080, status: 'sleeping' }, snap({}))).toBe('sleeping');
 });
 
 test('phaseOf: ready with no busy slot → idle', () => {
@@ -95,6 +101,7 @@ test('hostDevice: CPU-side buffers are not GPUs', () => {
   expect(hostDevice('CPU_Mapped')).toBe(true);
   expect(hostDevice('CUDA_Host')).toBe(true);
   expect(hostDevice('CPU_REPACK')).toBe(true);
+  expect(hostDevice('Host')).toBe(true);
   expect(hostDevice('CUDA0')).toBe(false);
   expect(hostDevice('ROCm0')).toBe(false);
   expect(hostDevice('Vulkan3')).toBe(false);

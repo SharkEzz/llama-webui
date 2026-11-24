@@ -2,6 +2,7 @@ import type { GpuSample, ModelPlacement, Snapshot, TopologyGraph } from '@llama-
 import { expect, test } from 'vitest';
 import {
   detailOf,
+  layerSlice,
   levelOf,
   linkBadge,
   linkFlows,
@@ -11,6 +12,7 @@ import {
   peerLinks,
   placementSeries,
 } from './flows';
+import { decodeLayerTarget, encodeLayerTarget } from './layerTooltip';
 
 const graph: TopologyGraph = {
   at: 0,
@@ -428,13 +430,13 @@ test('nodeLive: the measured VRAM wins over the sizes announced by the logs (loa
   const loading = nodeLive(graph, withGpu({ vramUsedBytes: 4 * GIB }), placement).get('pci:0000:01:00.0')!;
   expect(loading.layers.reduce((s, l) => s + l.pct, 0)).toBeCloseTo(25, 6);
   expect(loading.layers[0]!.pct / loading.layers[1]!.pct).toBeCloseTo(12e9 / 80e6, 6);
-  expect(loading.layers[3]).toEqual({ kind: 'other', pct: 0 });
+  expect(loading.layers[3]).toEqual({ kind: 'other', pct: 0, bytes: 0 });
   expect(loading.facts.some((f) => f.label === 'Other VRAM')).toBe(false);
 });
 
 test('nodeLive: without a known split a GPU tank has one layer; a hidden GPU has none', () => {
   const live = nodeLive(graph, snapshot, null);
-  expect(live.get('pci:0000:01:00.0')!.layers).toEqual([{ kind: 'used', pct: 75 }]);
+  expect(live.get('pci:0000:01:00.0')!.layers).toEqual([{ kind: 'used', pct: 75, bytes: 12 * GIB }]);
   expect(live.get('pci:0000:0d:00.0')).toMatchObject({ layers: [], barPct: null, sub: null, fillLevel: 'ok' });
   // No sample yet: an empty tank, not a broken one.
   expect(nodeLive(graph, null, placement).get('pci:0000:01:00.0')).toMatchObject({ layers: [], headline: '—' });
@@ -450,7 +452,7 @@ test('nodeLive: tank alerts from 85% and 95% full', () => {
 test('nodeLive: memory is a single layer (mapped weights are page cache), the CPU carries its threads', () => {
   const live = nodeLive(graph, snapshot, placement);
   expect(live.get('ram')).toMatchObject({
-    layers: [{ kind: 'used', pct: 37.5 }],
+    layers: [{ kind: 'used', pct: 37.5, bytes: 12 * GIB }],
     headline: '12.0 GiB / 32.0 GiB',
     barPct: null,
     fillLevel: 'ok',
@@ -736,4 +738,63 @@ test('detailOf: the selected block with its figures, nothing once it is not in t
   expect(detailOf(graph, live, 'pci:0000:99:00.0')).toBeNull();
   expect(detailOf(graph, live, null)).toBeNull();
   expect(detailOf(graph, new Map(), 'cpu')).toBeNull();
+});
+
+test('layerSlice: returns label, bytes and VRAM share for each filled GPU layer and its free remainder', () => {
+  const total = 16 * GIB;
+  const rtx = nodeLive(graph, snapshot, placement).get('pci:0000:01:00.0')!;
+  expect(layerSlice(rtx, 'model')).toEqual({ kind: 'model', label: 'Model', bytes: 12e9, pct: (100 * 12e9) / total });
+  expect(layerSlice(rtx, 'kv')).toEqual({ kind: 'kv', label: 'KV cache', bytes: 80e6, pct: (100 * 80e6) / total });
+  expect(layerSlice(rtx, 'compute')).toEqual({
+    kind: 'compute',
+    label: 'Compute buffers',
+    bytes: 285e6,
+    pct: (100 * 285e6) / total,
+  });
+  const otherBytes = 12 * GIB - 12.365e9;
+  expect(layerSlice(rtx, 'other')).toEqual({
+    kind: 'other',
+    label: 'Other VRAM',
+    bytes: otherBytes,
+    pct: (100 * otherBytes) / total,
+  });
+  expect(layerSlice(rtx, 'free')).toEqual({ kind: 'free', label: 'Free VRAM', bytes: 4 * GIB, pct: 25 });
+  expect(layerSlice(rtx, 'used')).toBeNull();
+});
+
+test('layerSlice: handles unsplit VRAM, empty, full, scaled loading and missing samples', () => {
+  const unsplit = nodeLive(graph, snapshot, null).get('pci:0000:01:00.0')!;
+  expect(layerSlice(unsplit, 'used')).toEqual({ kind: 'used', label: 'Used VRAM', bytes: 12 * GIB, pct: 75 });
+  expect(layerSlice(unsplit, 'free')).toEqual({ kind: 'free', label: 'Free VRAM', bytes: 4 * GIB, pct: 25 });
+
+  const empty = nodeLive(graph, withGpu({ vramUsedBytes: 0 }), null).get('pci:0000:01:00.0')!;
+  expect(layerSlice(empty, 'used')).toBeNull();
+  expect(layerSlice(empty, 'free')).toEqual({ kind: 'free', label: 'Free VRAM', bytes: 16 * GIB, pct: 100 });
+
+  const full = nodeLive(graph, withGpu({ vramUsedBytes: 16 * GIB }), null).get('pci:0000:01:00.0')!;
+  expect(layerSlice(full, 'used')).toEqual({ kind: 'used', label: 'Used VRAM', bytes: 16 * GIB, pct: 100 });
+  expect(layerSlice(full, 'free')).toBeNull();
+
+  // Loading: scaled layers still leave the measured free VRAM, and say the size the logs announce (the details' one)
+  const loading = nodeLive(graph, withGpu({ vramUsedBytes: 4 * GIB }), placement).get('pci:0000:01:00.0')!;
+  const shrunk = layerSlice(loading, 'model')!;
+  expect(shrunk.announcedBytes).toBe(12e9);
+  expect(shrunk.bytes).toBeCloseTo((12e9 * 4 * GIB) / 12.365e9, 0);
+  expect(shrunk.pct).toBeCloseTo((100 * shrunk.bytes) / (16 * GIB), 6);
+  expect(loading.facts).toContainEqual({ label: 'Model', value: '11.2 GiB' });
+  expect(layerSlice(loading, 'other')).toBeNull();
+  expect(layerSlice(loading, 'free')!.bytes).toBeCloseTo(12 * GIB, 0);
+  expect(layerSlice(loading, 'free')!.pct).toBeCloseTo(75, 6);
+
+  // Hidden GPU and missing sample have no capacity
+  expect(layerSlice(nodeLive(graph, snapshot, placement).get('pci:0000:0d:00.0'), 'free')).toBeNull();
+  expect(layerSlice(nodeLive(graph, null, placement).get('pci:0000:01:00.0'), 'free')).toBeNull();
+  expect(layerSlice(undefined, 'model')).toBeNull();
+});
+
+test('layerTooltip target encoding round-trips node ids containing colons', () => {
+  const encoded = encodeLayerTarget('pci:0000:01:00.0', 'kv');
+  expect(decodeLayerTarget(encoded)).toEqual({ nodeId: 'pci:0000:01:00.0', kind: 'kv' });
+  expect(decodeLayerTarget('invalid')).toBeNull();
+  expect(decodeLayerTarget('pci:0000:01:00.0\0bogus')).toBeNull();
 });

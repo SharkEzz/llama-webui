@@ -62,6 +62,50 @@ export const initialMemory: TickMemory = {
   spec: null,
 };
 
+/** What a tick does about `/slots`: reads it, keeps the slots it knows (nothing moved), or has none to give. */
+export type SlotsPlan = 'read' | 'keep' | 'skip';
+
+/** The counters of `/metrics` that move whenever llama-server worked on a request. */
+const WORK_COUNTERS = ['prompt_tokens_total', 'tokens_predicted_total', 'n_decode_total'] as const;
+
+const metricOf = (metrics: ReadonlyMap<string, number>, key: string) => metrics.get(`llamacpp:${key}`) ?? 0;
+
+/**
+ * What a tick does about `/slots`, from the `/metrics` it just read. For llama-server a `GET /slots` is activity: read
+ * on every tick, it would put off the sleep of `--sleep-idle-seconds` for ever, and it wakes a sleeping server or
+ * waits for its model. `/metrics` does neither, so the slots are read only when they may have moved: none known yet, a
+ * request running or waiting, a slot the last read left busy, or work counted since the last tick; else the known
+ * ones are kept. A server without `--metrics` gives no such sign and is read on every tick. `skip`: no read and no
+ * slots, when they are barred (`noSlots`: asleep, waking up or stopping) or when `/metrics` did not answer (`/slots`
+ * waits on the same queue).
+ */
+export const slotsPlan: {
+  (read: {
+    readonly noSlots: boolean;
+    readonly metrics: ReadonlyMap<string, number> | null;
+  }): (memory: TickMemory) => SlotsPlan;
+  (
+    memory: TickMemory,
+    read: { readonly noSlots: boolean; readonly metrics: ReadonlyMap<string, number> | null },
+  ): SlotsPlan;
+} = dual(
+  2,
+  (
+    memory: TickMemory,
+    { noSlots, metrics }: { readonly noSlots: boolean; readonly metrics: ReadonlyMap<string, number> | null },
+  ): SlotsPlan => {
+    if (noSlots || metrics === null) return 'skip';
+    if (!metrics.has('llamacpp:requests_processing')) return 'read';
+    const known = memory.prevRaw?.slots ?? null;
+    const before = memory.prevMetrics;
+    if (known === null || before === null) return 'read';
+    if (metricOf(metrics, 'requests_processing') > 0 || metricOf(metrics, 'requests_deferred') > 0) return 'read';
+    if (Arr.some(known, (slot) => slot.processing)) return 'read';
+    if (Arr.some(WORK_COUNTERS, (key) => metricOf(metrics, key) !== metricOf(before, key))) return 'read';
+    return 'keep';
+  },
+);
+
 /** Before the reads: a new pid resets every counter (no rate across two processes); counts the tick. */
 export const beginTick: {
   (pid: number | null, active: boolean): (memory: TickMemory) => TickMemory;
@@ -74,9 +118,11 @@ export const beginTick: {
 /** What a tick read. */
 export interface TickReading {
   readonly at: number;
-  /** A server is `starting`, `ready`, `stopping` or `external`. */
+  /** A server is `starting`, `ready`, `sleeping`, `stopping` or `external`. */
   readonly active: boolean;
   readonly pid: number | null;
+  /** `/slots` is barred: the server is asleep, waking up or stopping. */
+  readonly noSlots: boolean;
   /** llama-server's read; null while no server is active. */
   readonly raw: LlamaRaw | null;
   /** Every card, sorted by bus id, hidden and sleeping ones included. */
@@ -126,6 +172,12 @@ const pushMachine = (r: HistoryRecorder, reading: TickReading) => {
   };
 };
 
+/** `raw` with the slots the last read left, when this tick kept them instead of reading `/slots` (`slotsPlan`). */
+const withKnownSlots = (memory: TickMemory, noSlots: boolean, raw: LlamaRaw): LlamaRaw =>
+  raw.health === 'ok' && raw.slots === null && slotsPlan(memory, { noSlots, metrics: raw.metrics }) === 'keep'
+    ? { ...raw, slots: memory.prevRaw?.slots ?? null }
+    : raw;
+
 /** Pushes one point per series into `history` and builds the snapshot. */
 export const endTick: {
   (history: History, reading: TickReading): (memory: TickMemory) => { memory: TickMemory; snapshot: Snapshot };
@@ -154,7 +206,7 @@ export const endTick: {
     };
   }
 
-  const raw = reading.raw;
+  const raw = reading.raw === null ? null : withKnownSlots(memory, reading.noSlots, reading.raw);
   const rates = raw === null ? { genTps: 0, ppTps: 0 } : liveRates(memory.prevRaw, raw);
   let next: TickMemory = raw === null ? memory : { ...memory, prevRaw: raw };
   const metrics = raw?.metrics ?? null;

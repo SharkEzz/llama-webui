@@ -1,3 +1,4 @@
+import { servesRequests } from '@llama-webui/shared';
 import { Effect, Option, type Path } from 'effect';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { resolveProfilePaths } from '../supervisor/command.ts';
@@ -15,9 +16,9 @@ export interface ChatTarget {
 }
 
 /**
- * The llama-server that answers the chat: the managed one once it is `ready` (its `--host`, its port, its profile and
- * that profile's model, null when the profile is gone), an external one on loopback at its port (no profile, no
- * model), else none.
+ * The llama-server that answers the chat: the managed one once it is `ready`, `sleeping` (sending a request wakes
+ * llama-server automatically) or waking up (llama-server queues the request until its model is back), an external one
+ * on loopback at its port (no profile, no model), else none.
  */
 export const chatTarget: Effect.Effect<
   Option.Option<ChatTarget>,
@@ -29,7 +30,7 @@ export const chatTarget: Effect.Effect<
   if (state.kind === 'external') {
     return Option.some({ host: null, port: state.port, profileId: null, modelPath: null });
   }
-  if (state.kind !== 'ready') return Option.none();
+  if (!servesRequests(state)) return Option.none();
   const profiles = yield* ProfilesRepo;
   const modelPath = yield* profiles.get(state.profileId).pipe(
     Effect.flatMap((profile) => Effect.map(resolveProfilePaths(profile), (p) => p.model)),

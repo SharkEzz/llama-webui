@@ -4,4 +4,5 @@ export * from './client.ts';
 export * from './errors.ts';
 export * from './flags.ts';
 export * from './metrics.ts';
+export * from './models.ts';
 export * from './sse.ts';
