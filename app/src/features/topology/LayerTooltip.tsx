@@ -50,7 +50,8 @@ function LayerTooltipBody({ target, graph, live, tones }: LayerTooltipProps & { 
       />
       <span className="font-medium">{slice.label}</span>
       <span className="num opacity-85">
-        {formatBytes(slice.bytes)} ({formatPct(slice.pct)})
+        {formatBytes(slice.bytes)}
+        {slice.announcedBytes !== undefined && ` of ${formatBytes(slice.announcedBytes)}`} ({formatPct(slice.pct)})
       </span>
     </TooltipContent>
   );

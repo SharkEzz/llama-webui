@@ -775,8 +775,13 @@ test('layerSlice: handles unsplit VRAM, empty, full, scaled loading and missing 
   expect(layerSlice(full, 'used')).toEqual({ kind: 'used', label: 'Used VRAM', bytes: 16 * GIB, pct: 100 });
   expect(layerSlice(full, 'free')).toBeNull();
 
-  // Loading: scaled layers still leave the measured free VRAM
+  // Loading: scaled layers still leave the measured free VRAM, and say the size the logs announce (the details' one)
   const loading = nodeLive(graph, withGpu({ vramUsedBytes: 4 * GIB }), placement).get('pci:0000:01:00.0')!;
+  const shrunk = layerSlice(loading, 'model')!;
+  expect(shrunk.announcedBytes).toBe(12e9);
+  expect(shrunk.bytes).toBeCloseTo((12e9 * 4 * GIB) / 12.365e9, 0);
+  expect(shrunk.pct).toBeCloseTo((100 * shrunk.bytes) / (16 * GIB), 6);
+  expect(loading.facts).toContainEqual({ label: 'Model', value: '11.2 GiB' });
   expect(layerSlice(loading, 'other')).toBeNull();
   expect(layerSlice(loading, 'free')!.bytes).toBeCloseTo(12 * GIB, 0);
   expect(layerSlice(loading, 'free')!.pct).toBeCloseTo(75, 6);

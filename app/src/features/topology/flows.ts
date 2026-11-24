@@ -90,8 +90,10 @@ export interface TankLayer {
   kind: LayerKind;
   /** Share of the tank's capacity (0..100). */
   pct: number;
-  /** Measured or allocated bytes for this layer. */
+  /** Bytes of the tank this layer takes: measured, or the size the logs announce, shrunk with the others to the measurement. */
   bytes: number;
+  /** The size the logs announce for it, when the layer is shrunk below it (see `gpuLayers`). */
+  announcedBytes?: number;
 }
 
 export interface LayerSlice {
@@ -99,6 +101,8 @@ export interface LayerSlice {
   label: string;
   bytes: number;
   pct: number;
+  /** The size the logs announce, when the slice is shrunk below it: the one the block's details list. */
+  announcedBytes?: number;
 }
 
 export const LAYER_LABEL = {
@@ -267,18 +271,24 @@ function gpuLayers(g: GpuSample, buf: PlacementBuffer | undefined): { layers: Ta
   const scale = known > used ? used / known : 1;
   const other = Math.max(0, used - known);
   const layer = (kind: LayerKind, bytes: number): TankLayer => ({ kind, pct: (100 * bytes) / total, bytes });
+  /** A layer of the announced size, shrunk when the three exceed the measurement. */
+  const announced = (kind: LayerKind, bytes: number): TankLayer =>
+    scale < 1 ? { ...layer(kind, bytes * scale), announcedBytes: bytes } : layer(kind, bytes);
   return {
     layers: [
-      layer('model', buf.modelBytes * scale),
-      layer('kv', buf.kvBytes * scale),
-      layer('compute', buf.computeBytes * scale),
+      announced('model', buf.modelBytes),
+      announced('kv', buf.kvBytes),
+      announced('compute', buf.computeBytes),
       layer('other', other),
     ],
     otherBytes: other,
   };
 }
 
-/** Data for one slice of a GPU's VRAM bar tooltip; null if capacity is unknown or the slice is empty. */
+/**
+ * Data for one slice of a GPU's VRAM bar tooltip; null if capacity is unknown or the slice is empty. A slice shrunk to
+ * the measurement also gives the size the logs announce, so the tooltip agrees with the block's details.
+ */
 export function layerSlice(live: NodeLive | undefined, kind: LayerSegmentKind): LayerSlice | null {
   if (!live || live.capacityBytes === null || !(live.capacityBytes > 0)) return null;
   if (kind === 'free') {
@@ -289,7 +299,13 @@ export function layerSlice(live: NodeLive | undefined, kind: LayerSegmentKind): 
   }
   const layer = live.layers.find((l) => l.kind === kind);
   if (!layer || !(layer.bytes > 0)) return null;
-  return { kind, label: LAYER_LABEL[kind], bytes: layer.bytes, pct: layer.pct };
+  return {
+    kind,
+    label: LAYER_LABEL[kind],
+    bytes: layer.bytes,
+    pct: layer.pct,
+    ...(layer.announcedBytes === undefined ? {} : { announcedBytes: layer.announcedBytes }),
+  };
 }
 
 export function nodeLive(
