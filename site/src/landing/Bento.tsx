@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { TONE_VAR, type Tone } from './dashboard/tones';
 import { GlassCard } from './GlassCard';
 
-export const TONE_TEXT: Record<Tone, string> = {
+const TONE_TEXT: Record<Tone, string> = {
   blue: 'text-tone-blue',
   teal: 'text-tone-teal',
   amber: 'text-tone-amber',

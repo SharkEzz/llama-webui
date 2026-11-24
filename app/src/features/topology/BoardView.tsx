@@ -2,7 +2,8 @@ import type { TopologyNode } from '@llama-webui/shared';
 import { useId, useMemo } from 'react';
 import { plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { Block, factOf, FillPct, Layers, Threads, toneOfNode } from './blocks';
+import { Block, FillPct, Layers, Threads } from './blocks';
+import { factOf, toneOfNode } from './constants';
 import type { NodeLive } from './flows';
 import type { Rect } from './geometry';
 import { type BoardLayout, layoutBoard, litContacts } from './layoutBoard';
@@ -49,7 +50,7 @@ export function BoardView({ graph, live, peers, tones, ...stage }: ViewProps) {
             <Block
               key={node.id}
               {...block}
-              className="flex flex-col items-center justify-between gap-1.5 rounded-xl p-[11px] text-center"
+              className="flex flex-col items-center justify-between gap-1.5 rounded-xl p-2.75 text-center"
             >
               <Socket node={node} live={l} />
             </Block>
@@ -69,12 +70,12 @@ export function BoardView({ graph, live, peers, tones, ...stage }: ViewProps) {
           );
         if (rect.h <= STICK_MAX_H)
           return (
-            <Block key={node.id} {...block} className="flex items-center gap-[9px] rounded-[7px] px-[11px]">
+            <Block key={node.id} {...block} className="flex items-center gap-2.25 rounded-[7px] px-2.75">
               <Stick node={node} live={l} />
             </Block>
           );
         return (
-          <Block key={node.id} {...block} className="flex flex-col justify-between rounded-[9px] px-3 pt-[9px] pb-2.5">
+          <Block key={node.id} {...block} className="flex flex-col justify-between rounded-[9px] px-3 pt-2.25 pb-2.5">
             <Slot node={node} live={l} />
             {node.kind === 'gpu' && <Connector width={rect.w} lanes={l.lanes} />}
           </Block>
@@ -194,7 +195,7 @@ function Memory({ live, rect, layout }: { live: NodeLive; rect: Rect; layout: Bo
         <span className={NAME}>Memory</span>
         <FillPct live={live} className="text-[12.5px] font-medium" />
       </span>
-      <span className={cn(SUB, FIGURE, 'absolute inset-x-0 top-[18px] truncate')}>{live.headline}</span>
+      <span className={cn(SUB, FIGURE, 'absolute inset-x-0 top-4.5 truncate')}>{live.headline}</span>
       {layout.dimms.map((dimm) => {
         const style = {
           left: dimm.rect.x - rect.x,
@@ -205,7 +206,7 @@ function Memory({ live, rect, layout }: { live: NodeLive; rect: Rect; layout: Bo
         return dimm.filled ? (
           <span
             key={dimm.rect.x}
-            className="absolute rounded-md bg-card p-[3px] shadow-surface ring-1 ring-surface-border"
+            className="absolute rounded-md bg-card p-0.75 shadow-surface ring-1 ring-surface-border"
             style={style}
           >
             <Layers live={live} vertical className="size-full rounded-sm" />
@@ -235,7 +236,7 @@ function Slot({ node, live }: { node: TopologyNode; live: NodeLive }) {
   return (
     <>
       <span className="flex items-baseline gap-3">
-        <span className="flex min-w-0 items-center gap-[7px]">
+        <span className="flex min-w-0 items-center gap-1.75">
           <span aria-hidden="true" className="size-2 shrink-0 rounded-xs bg-(--tone)" />
           <span className={NAME}>{node.label}</span>
         </span>

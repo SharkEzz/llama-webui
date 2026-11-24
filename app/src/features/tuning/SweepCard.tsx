@@ -1,4 +1,4 @@
-import { presetOf, type SweepStatus } from '@llama-webui/shared';
+import { presetOf } from '@llama-webui/shared';
 import { CheckCheck, ListOrdered, Play, Square, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -12,15 +12,9 @@ import { PHASE_LABEL } from '@/lib/bench';
 import { formatDuration, plural } from '@/lib/format';
 import { useTuning } from '@/lib/tuning';
 import { useNow } from '@/lib/useNow';
+import { SWEEP_STATUS } from './constants';
 import { RankingTable } from './RankingTable';
 import { StopServerDialog } from './StopServerDialog';
-
-export const SWEEP_STATUS: Record<SweepStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
-  running: { label: 'running', variant: 'secondary' },
-  done: { label: 'done', variant: 'outline' },
-  cancelled: { label: 'cancelled', variant: 'secondary' },
-  interrupted: { label: 'interrupted', variant: 'destructive' },
-};
 
 const VALIDATE_ITEMS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `Top ${n}` }));
 

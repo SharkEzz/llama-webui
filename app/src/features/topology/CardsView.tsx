@@ -1,6 +1,7 @@
 import type { TopologyNode } from '@llama-webui/shared';
 import { useMemo } from 'react';
-import { Block, factOf, FillPct, KIND_LABEL, Layers, LoadBar, Row, Threads, toneOfNode } from './blocks';
+import { Block, FillPct, Layers, LoadBar, Row, Threads } from './blocks';
+import { factOf, KIND_LABEL, toneOfNode } from './constants';
 import type { NodeLive } from './flows';
 import { layoutCards, TALL_THREADS } from './layoutCards';
 import { Stage, type ViewProps } from './Stage';
@@ -21,7 +22,7 @@ export function CardsView({ graph, live, peers, tones, ...stage }: ViewProps) {
             live={l}
             rect={rect}
             tone={toneOfNode(node, tones)}
-            className="flex flex-col gap-[7px] px-[13px] py-[11px]"
+            className="flex flex-col gap-1.75 px-3.25 py-2.75"
           >
             <Head node={node} />
             <Body node={node} live={l} compact={rect.h < 150} />
@@ -35,7 +36,7 @@ export function CardsView({ graph, live, peers, tones, ...stage }: ViewProps) {
 function Head({ node }: { node: TopologyNode }) {
   const kind = KIND_LABEL[node.kind];
   return (
-    <span className="flex items-center gap-[7px] text-[13px]">
+    <span className="flex items-center gap-1.75 text-[13px]">
       {node.kind !== 'nvme' && node.kind !== 'chipset' && (
         <span aria-hidden="true" className="size-2 shrink-0 rounded-xs bg-(--tone)" />
       )}
@@ -59,10 +60,10 @@ function Body({ node, live, compact }: { node: TopologyNode; live: NodeLive; com
       </>
     ) : (
       <>
-        <span className="flex items-end gap-[7px]">
+        <span className="flex items-end gap-1.75">
           <span className={BIG}>{live.headline}</span>
           <span className="text-xs leading-none text-muted-foreground">utilization</span>
-          <span className="ml-auto flex flex-col items-end num text-[11px] leading-[13px] text-foreground">
+          <span className="ml-auto flex flex-col items-end num text-[11px] leading-3.25 text-foreground">
             <span>{factOf(live, 'Temperature') ?? '—'}</span>
             <span>{factOf(live, 'Power') ?? '—'}</span>
           </span>
@@ -78,7 +79,7 @@ function Body({ node, live, compact }: { node: TopologyNode; live: NodeLive; com
     const rows = threads > 64 ? 4 : threads > TALL_THREADS ? 2 : 1;
     return (
       <>
-        <span className="flex items-baseline gap-[7px]">
+        <span className="flex items-baseline gap-1.75">
           <span className={BIG}>{live.headline}</span>
           <span className="text-xs text-muted-foreground">load</span>
         </span>
@@ -87,7 +88,7 @@ function Body({ node, live, compact }: { node: TopologyNode; live: NodeLive; com
             cores={live.cores}
             count={threads}
             columns={Math.ceil(threads / rows)}
-            className={rows > 1 ? 'h-[47px]' : 'h-[22px]'}
+            className={rows > 1 ? 'h-11.75' : 'h-5.5'}
           />
         )}
         <span className="mt-auto flex justify-between gap-2.5 text-xs text-muted-foreground">
@@ -104,7 +105,7 @@ function Body({ node, live, compact }: { node: TopologyNode; live: NodeLive; com
   if (node.kind === 'ram')
     return (
       <>
-        <span className="flex items-baseline gap-[7px]">
+        <span className="flex items-baseline gap-1.75">
           <span className={BIG}>{live.fillPct === null ? '—' : <FillPct live={live} />}</span>
           <span className="text-xs text-muted-foreground">in use</span>
         </span>

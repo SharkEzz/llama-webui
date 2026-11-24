@@ -1,7 +1,7 @@
 // The server (Effect): the base and the Vitest rules.
 import { defineConfig } from 'oxlint';
-import { tests } from '../../configs/oxlint.tests.ts';
 import { base, vendored } from '../../oxlint.config.ts';
+import { tests } from '../../scripts/oxlint/oxlint.tests.ts';
 
 // The other `node:*` imports are the business of the Effect diagnostics (`nodeBuiltinImport`, in `tsc`)
 const sql = 'SQLite goes through `SqlClient` (`app/server/db/Db.ts`)';

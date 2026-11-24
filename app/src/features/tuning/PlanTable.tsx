@@ -14,7 +14,7 @@ import { StopServerDialog } from './StopServerDialog';
 const SHOWN = 100;
 const LONG_SECONDS = 3600;
 
-export const VERDICT: Record<FitVerdict, { label: string; className: string; icon: typeof CircleCheck }> = {
+const VERDICT: Record<FitVerdict, { label: string; className: string; icon: typeof CircleCheck }> = {
   fits: { label: 'fits', className: 'bg-success/15 text-success', icon: CircleCheck },
   tight: { label: 'tight', className: 'bg-warning/15 text-warning', icon: TriangleAlert },
   no: {

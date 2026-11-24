@@ -1,13 +1,6 @@
-import { type ProfilerOnRenderCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigation } from 'react-router';
-import { debugNavigation, debugRender } from '@/lib/debug/capture';
-
-/**
- * The `onRender` of the layout's `<Profiler>`s: `page` is counted under the page's path. React calls it in development
- * builds only; the capture drops it while the debug mode is off.
- */
-export const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration, baseDuration) =>
-  debugRender(id === 'page' ? `page ${location.pathname}` : id, phase, actualDuration, baseDuration);
+import { debugNavigation } from '@/lib/debug/capture';
 
 /**
  * Times each navigation, from its start to the commit of its page (its chunk and its loader included). A navigation

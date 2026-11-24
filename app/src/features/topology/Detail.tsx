@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import type { Tone } from '@/components/glass/tones';
 import { Button } from '@/components/ui/button';
 import { PopoverContent, PopoverTitle } from '@/components/ui/popover';
-import { KIND_LABEL, toneOfNode, toneVar } from './blocks';
+import { KIND_LABEL, toneOfNode, toneVar } from './constants';
 import { detailPopover } from './detailPopover';
 import { detailOf, type NodeLive } from './flows';
 

@@ -9,7 +9,7 @@ import { modelName } from '@/features/bench/format';
 import { formatRate, formatShortDate } from '@/lib/format';
 import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
-import { SWEEP_STATUS } from './SweepCard';
+import { SWEEP_STATUS } from './constants';
 
 /** Every sweep; clicking a row opens it (?sweep=<id>). */
 export function SweepHistory() {

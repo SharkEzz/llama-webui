@@ -1,11 +1,11 @@
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip';
-import type { TopologyNode, TopologyNodeKind } from '@llama-webui/shared';
+import type { TopologyNode } from '@llama-webui/shared';
 import React, { useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { GLASS } from '@/components/glass/glass';
-import type { Tone } from '@/components/glass/tones';
 import { PopoverTrigger } from '@/components/ui/popover';
 import { formatPct } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { NEUTRAL, toneVar, type BlockTone } from './constants';
 import { detailPopover } from './detailPopover';
 import type { LayerKind, Level, NodeLive } from './flows';
 import type { Rect } from './geometry';
@@ -18,43 +18,11 @@ import { LAYER_TINT, tint } from './themeColors';
  * never by script.
  */
 
-/** A block's color: a GPU's data tone, or the one of its kind. */
-export type BlockTone = Tone | 'indigo' | 'primary' | 'neutral';
-
-/** A block's kind, in words. */
-export const KIND_LABEL = {
-  cpu: 'Processor',
-  ram: 'Memory',
-  gpu: 'GPU',
-  nvme: 'NVMe drive',
-  chipset: 'Chipset',
-} as const satisfies Record<TopologyNodeKind, string>;
-
-const TONE_CSS = {
-  blue: 'var(--tone-blue)',
-  teal: 'var(--tone-teal)',
-  amber: 'var(--tone-amber)',
-  rose: 'var(--tone-rose)',
-  indigo: 'var(--tone-indigo)',
-  primary: 'var(--primary-ink)',
-  neutral: 'var(--muted-foreground)',
-} as const satisfies Record<BlockTone, string>;
-
-export const toneVar = (tone: BlockTone) => TONE_CSS[tone];
-
-export function toneOfNode(node: TopologyNode, tones: Map<string, Tone>): BlockTone {
-  if (node.kind === 'gpu') return tones.get(node.id) ?? 'neutral';
-  return node.kind === 'cpu' ? 'primary' : node.kind === 'ram' ? 'indigo' : 'neutral';
-}
-
 /** A change of value takes half a second in five steps: a few repaints, not an animation. */
 const STEPPED = 'transition-transform duration-500 ease-[steps(5,end)] motion-reduce:transition-none';
 
 const LEVEL_TEXT: Record<Level, string> = { ok: '', warn: 'text-warning', crit: 'text-destructive' };
 const LEVEL_RING: Record<Level, string> = { ok: '', warn: 'ring-2 ring-warning', crit: 'ring-2 ring-destructive' };
-
-/** A fact of the block by its label (the temperature, the power…); null when the sample does not have it. */
-export const factOf = (live: NodeLive, label: string) => live.facts.find((f) => f.label === label)?.value ?? null;
 
 interface BlockProps {
   node: TopologyNode;
@@ -103,7 +71,6 @@ export function Block({ node, live, rect, tone, bare = false, className, childre
   );
 }
 
-const NEUTRAL = 'var(--muted-foreground)';
 const LAYER_COLOR: Record<LayerKind, string> = {
   model: 'var(--tone)',
   kv: tint('var(--tone)', LAYER_TINT.kv),
@@ -114,15 +81,6 @@ const LAYER_COLOR: Record<LayerKind, string> = {
 
 /** The four layers a GPU can hold, always in the DOM so that one appearing eases in like the others. */
 const GPU_LAYERS: readonly LayerKind[] = ['model', 'kv', 'compute', 'other'];
-
-/** Color of a memory layer for use outside a block (tooltips, swatches), matching `Layers`. */
-export function layerSwatchColor(kind: LayerKind, tone: BlockTone, neutral = false): string {
-  if (kind === 'other' || (neutral && kind === 'used')) return NEUTRAL;
-  const base = toneVar(tone);
-  if (kind === 'kv') return tint(base, LAYER_TINT.kv);
-  if (kind === 'compute') return tint(base, LAYER_TINT.compute);
-  return base;
-}
 
 /**
  * The memory a block holds, as stacked layers: each one is a full-size bar moved and scaled by a transform, so a
