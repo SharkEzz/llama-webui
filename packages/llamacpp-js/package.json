@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "rolldown": "1.3.3",
+    "rolldown": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {
