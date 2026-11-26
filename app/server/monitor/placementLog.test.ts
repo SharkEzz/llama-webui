@@ -269,6 +269,29 @@ layer(NodeServices.layer)((it) => {
       }),
   );
 
+  it.effect(
+    'parsePlacement: with -sm tensor, a draft model that lists the same devices does not count them twice',
+    () =>
+      Effect.gen(function* () {
+        // Without -ts every listed device weighs the same: one listed twice would get its part twice.
+        const split = yield* readTestdata('llama-server-load-tensor.txt');
+        const tensor = Str.replace(' -ts 51,58', '')(split);
+        const bare = parsePlacement(lines(tensor))!;
+        // The draft (-md) creates its own Meta device over the same cards, before its “offloaded” line ends the reading.
+        const draft = [
+          'llama_prepare_model_devices: creating a Meta device with 2 devices',
+          'llama_prepare_model_devices: - device 0: CUDA0',
+          'llama_prepare_model_devices: - device 1: CUDA1',
+          'llama_prepare_model_devices: using device Meta() (Meta()) (unknown id) - 10105 MiB free',
+          'load_tensors: offloaded 66/66 layers to GPU',
+          'load_tensors:       Meta() model buffer size =   401.48 MiB',
+        ];
+        const p = parsePlacement(lines(join([tensor, ...draft])))!;
+        expect(p.buffers).toEqual(bare.buffers);
+        expect(byDevice(p.buffers).get('CUDA1')!.modelBytes).toBe(5931.79 * MiB);
+      }),
+  );
+
   it.effect('parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device', () =>
     Effect.gen(function* () {
       const text = yield* readTestdata('llama-server-load-tensor.txt');

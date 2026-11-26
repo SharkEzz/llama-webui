@@ -138,7 +138,9 @@ const placementAt = (lines: ReadonlyArray<LogLine>, start: number, launch: LogLi
     }
     const member = META_MEMBER.exec(body);
     if (member !== null) {
-      metaMembers.push(group(member, 1));
+      // A draft or an MTP lists the same devices again for its own Meta device: each one is a member once.
+      const device = group(member, 1);
+      if (!Arr.contains(metaMembers, device)) metaMembers.push(device);
       continue;
     }
     const using = USING.exec(body);

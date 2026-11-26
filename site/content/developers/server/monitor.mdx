@@ -343,7 +343,9 @@ profile without a verbosity of its own.
 With `-sm tensor`, the buffers are logged on one `Meta()` device, at the size of its largest per-device part
 (`ggml-backend-meta.cpp` reports the maximum). `spreadMeta()` replaces them with one buffer per member, read from the
 `llama_prepare_model_devices: - device N: <name>` lines: model and cache scaled by `ts[i] / max(ts)` (`-ts` from the
-launch line, equal parts without it), the whole compute buffer on each, and `estimated: true`.
+launch line, equal parts without it), the whole compute buffer on each, and `estimated: true`. A draft or an MTP
+model lists the same devices again for its own `Meta()` device, before the second “offloaded” line ends the reading:
+a device is a member once.
 
 Two things come from lines that are not `llama-server`'s own, read over the whole launch (NCCL starts with the
 context, after the lines of a draft model):
