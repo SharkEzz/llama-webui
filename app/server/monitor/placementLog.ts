@@ -206,8 +206,12 @@ const ncclBusIds = (lines: ReadonlyArray<LogLine>): Map<string, string> => {
   return out;
 };
 
-/** NCCL (with `NCCL_DEBUG=INFO`): transport of a channel between two GPUs, “P2P/CUMEM”, “SHM/direct”… */
-const NCCL_CHANNEL = /NCCL INFO Channel \d+ : \d+\[\d+\] -> \d+\[\d+\] via (\S+)/;
+/**
+ * NCCL (with `NCCL_DEBUG=INFO`): transport of a channel between two GPUs, “P2P/CUMEM”, “P2P/direct pointer”,
+ * “SHM/direct”… NCCL 2.32 numbers a peer-to-peer channel with its connection index (“Channel 00/0 : 0[0] -> 1[1] via
+ * P2P/direct pointer”), where it and the versions before write “Channel 00 : …” for the others.
+ */
+const NCCL_CHANNEL = /NCCL INFO Channel \d+(?:\/\d+)? : \d+\[\d+\] -> \d+\[\d+\] via (\S+)/;
 const NCCL_NO_P2P = 'NCCL INFO P2P is disabled between connected GPUs';
 
 /**

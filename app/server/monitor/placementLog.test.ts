@@ -240,6 +240,35 @@ layer(NodeServices.layer)((it) => {
     }),
   );
 
+  it.effect(
+    'parsePlacement: NCCL 2.32 numbers a peer-to-peer channel “00/0”, and its other lines are not channels',
+    () =>
+      Effect.gen(function* () {
+        const text = yield* fixture();
+        const [launch, ...rest] = Str.split(text, '\n');
+        const nccl = (...extra: string[]) => parsePlacement(lines(join([launch, ...rest, ...extra])))!.p2p;
+        // Lines of a real start (NCCL 2.32.6, two cards, -sm tensor), the host name replaced.
+        const around = [
+          'host:5640:5762 [0] NCCL INFO Channel 00/02 : 0 1',
+          'host:5640:5762 [0] NCCL INFO Channel 01/02 : 0 1',
+          'host:5640:5762 [0] NCCL INFO P2P Chunksize set to 131072',
+          'host:5640:5763 [1] NCCL INFO Check P2P Type isAllDirectP2p 1 directMode 1 isAllCudaP2p 1',
+          'host:5640:5763 [1] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer',
+        ];
+        const direct = [
+          'host:5640:5778 [1] NCCL INFO Channel 00/0 : 1[1] -> 0[0] via P2P/direct pointer',
+          'host:5640:5779 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/direct pointer',
+          'host:5640:5778 [1] NCCL INFO Channel 01/0 : 1[1] -> 0[0] via P2P/direct pointer',
+          'host:5640:5779 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/direct pointer',
+        ];
+        expect(nccl(P2P_LOG_LINE, ...around, ...direct)).toBe('active');
+        expect(nccl(P2P_LOG_LINE, direct[0]!)).toBe('active');
+        // What NCCL says about its channels without naming a transport decides nothing.
+        expect(nccl(P2P_LOG_LINE, ...around)).toBe('requested');
+        expect(nccl(...around)).toBeUndefined();
+      }),
+  );
+
   it.effect('parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device', () =>
     Effect.gen(function* () {
       const text = yield* readTestdata('llama-server-load-tensor.txt');

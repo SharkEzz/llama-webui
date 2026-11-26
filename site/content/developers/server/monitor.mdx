@@ -352,7 +352,9 @@ context, after the lines of a draft model):
   nothing, so the supervisor writes `P2P_LOG_LINE` after the launch line when the variable is in the server's
   environment. NCCL, built in and run with `NCCL_DEBUG=INFO`, says what really happens, which depends on the same
   driver capability: a `Channel … via P2P/…` line gives `active`; with the variable set, `P2P is disabled between
-connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`.
+connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`. A channel is
+  numbered `Channel 00 :` or, for the peer-to-peer ones of NCCL 2.32, `Channel 00/0 :` (`Channel 00/0 : 0[0] -> 1[1]
+via P2P/direct pointer`); the lines that name no transport (`Channel 00/02 : 0 1`) decide nothing.
 - **PCI addresses of CUDA devices** (`ncclBusIds()`). NCCL's `ncclCommInitAll … cudaDev N nvmlDev N busId X` lines
   give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
   with `-sm tensor`, which only logs the `Meta()` device, this is the only one.
