@@ -1,6 +1,5 @@
 # Quality gate for the whole repo (app + website): oxfmt and oxlint, type check, tests, builds. Parallel jobs: the run
-# lasts as long as its longest one (a test shard), and a lint or type error shows within a minute. Nothing here needs
-# the vendored repositories (repos/, submodules): no job checks them out.
+# lasts as long as its longest one (a test shard), and a lint or type error shows within a minute.
 name: CI
 
 on:

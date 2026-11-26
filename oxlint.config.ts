@@ -10,15 +10,9 @@ import { tests } from './scripts/oxlint/oxlint.tests.ts';
 // (`../../server/x.ts`), with or without the `@/` alias in front. The rule reports `import`, `import type`,
 // `export … from`, `import x = require('…')` and `import('…')` of a string alike. It does not see an `import()` of a
 // template literal or of a computed string, a `require`, nor a path given to `vi.mock`; nor a type written
-// `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the path. A
-// project config that sets the rule replaces the options of the base: its bans list `vendored` again. A `node:*` ban
-// is for source files only: each project lists its bans again, without it, for its tests.
-
-// Everyone: the vendored repositories (`repos/`)
-export const vendored = {
-  regex: '^(@/)?(\\.{1,2}/)*repos(/|$)',
-  message: 'the vendored repositories are reference material, import the package',
-};
+// `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the path. Each
+// project config sets the rule with its own bans; the patterns shared by several projects are exported here. A
+// `node:*` ban is for source files only: each project lists its bans again, without it, for its tests.
 
 // Node's built-in modules (`unicorn/prefer-node-protocol` leaves `node:` as their only spelling)
 export const nodeBuiltins = { regex: '^node:' };
@@ -45,9 +39,6 @@ export const base = defineConfig({
     // Typecheck mode of the Vitest rules: some skip their checks on `describe` blocks that hold type tests
     vitest: { typecheck: true },
   },
-  // The vendored repositories are reference material, not linted (`.eslintignore` keeps oxlint from loading their
-  // configs)
-  ignorePatterns: ['repos/**'],
   categories: { correctness: 'error', suspicious: 'error', perf: 'error' },
   rules: {
     // A suppression names its rule and states its reason
@@ -231,8 +222,7 @@ export const base = defineConfig({
     'typescript/require-array-sort-compare': 'error',
     'unicorn/no-useless-spread': 'error',
 
-    // The architecture (spec, "The selection" › L7): the import bans above, and no import cycle
-    'no-restricted-imports': ['error', { patterns: [vendored] }],
+    // The architecture (spec, "The selection" › L7): no import cycle (each project config sets its import bans)
     'import/no-cycle': 'error',
   },
   overrides: [
@@ -252,8 +242,6 @@ export default defineConfig({
   // What `.gitignore` lists is skipped by oxlint itself. A pattern without a slash matches at any depth: `/docs/`
   // is the design documents, not `site/src/docs`.
   ignorePatterns: [
-    // Vendored reference repositories (read-only, never imported); also in `.eslintignore`
-    '/repos/',
     '/docs/',
     // shadcn components keep their default code
     '**/src/components/ui',

@@ -94,7 +94,7 @@ oxfmt formats, sorts imports, sorts the keys of every `package.json` and sorts T
 
 oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML, HTML, every `.md` file (the root `docs/` included) and the
 site's `.mdx` pages. In Markdown and MDX, the code of fenced blocks stays as written (`embeddedLanguageFormatting`
-off). It skips what `.gitignore` lists, `repos/`, `testdata`, `pnpm-lock.yaml`, the generated
+off). It skips what `.gitignore` lists, `testdata`, `pnpm-lock.yaml`, the generated
 `app/server/contract/golden.json` and the generated shadcn components.
 
 oxfmt sorts the Tailwind classes of `className`, `cn(…)` and `cva(…)` (`sortTailwindcss`), with one override per
@@ -128,14 +128,14 @@ export default defineConfig({
     'no-console': 'error',
     'no-restricted-imports': [
       'error',
-      { patterns: [vendored, server, llamacppNode, { ...nodeBuiltins, message: web }] },
+      { patterns: [server, llamacppNode, { ...nodeBuiltins, message: web }] },
     ],
   },
   overrides: [
     {
       // A test may use Node (its modules, `llamacpp-js/node`)
       files: ['**/*.test.ts', '**/*.test.tsx'],
-      rules: { 'no-restricted-imports': ['error', { patterns: [vendored, server] }] },
+      rules: { 'no-restricted-imports': ['error', { patterns: [server] }] },
     },
   ],
   // shadcn components keep their default code
@@ -144,13 +144,9 @@ export default defineConfig({
 ```
 
 `ignorePatterns` do not travel through `extends`, and they are relative to the config that declares them: each
-project config repeats those under its directory. Besides what `.gitignore` lists, oxlint skips `repos/`, the root
+project config repeats those under its directory. Besides what `.gitignore` lists, oxlint skips the root
 `docs/`, `testdata`, the generated `app/server/contract/golden.json`, the generated shadcn components and the build
-outputs. `.eslintignore` holds `/repos/`: oxlint reads it before it looks for nested configs, and only it keeps
-oxlint from loading `repos/effect/.oxlintrc.json`, whose plugin is not installed here. Given a path under `repos/`
-explicitly, oxlint still loads that config and fails with a configuration error; `pnpm lint`, which walks the
-repository, does not. The VS Code extension does not read `.eslintignore`: `pnpm install` leaves `repos/effect/.oxlintrc.json` out of
-the submodule's checkout (`scripts/vendored.ts`).
+outputs.
 
 The Effect diagnostics are not oxlint's: `tsc` reports them in `pnpm check`
 ([Effect diagnostics](/developers/contributing/testing/#effect-diagnostics)).
@@ -191,18 +187,18 @@ Before a commit, a pull request or the end of a milestone, `pnpm lint` must repo
 
 Each file of the lint configuration holds a part of the rules; `--print-config` shows what one project gets:
 
-| File                                     | Lints, or holds                                                                                                                                                                                                                                                                                                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `oxlint.config.ts`                       | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness`, `suspicious` and `perf` categories, the rules by name, `import/no-cycle` and the ban of `repos/` (`vendored`). Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/` and the root files |
-| `app/server/oxlint.config.ts`            | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield) and `no-console` on (a log goes through `Effect.log*`), and its import bans                                                                                                                                       |
-| `app/src/oxlint.config.ts`               | The web app: `base`, the React, Vitest and Tailwind rules (its stylesheet: `index.css`), with `no-console` on and its import bans                                                                                                                                                                                                                      |
-| `site/oxlint.config.ts`                  | The website: `base`, the React, Vitest and Tailwind rules (its stylesheet: `src/styles/app.css`), with its import bans                                                                                                                                                                                                                                 |
-| `packages/llamacpp-js/oxlint.config.ts`  | `llamacpp-js`: `base` alone, since its tests run on `node:test`, with its import bans                                                                                                                                                                                                                                                                  |
-| `packages/webui-shared/oxlint.config.ts` | `@llama-webui/shared`: `base` and the Vitest rules, with its import bans                                                                                                                                                                                                                                                                               |
-| `oxlint.react.ts`                        | The React fragment: the `react` and `jsx-a11y` plugins, and the `react-doctor` JS plugin with nine of its rules (the site config adds the tenth). Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                                                      |
-| `oxlint.tests.ts`                        | The Vitest fragment: an override for `**/*.test.ts` and `**/*.test.tsx` with the `vitest` plugin                                                                                                                                                                                                                                                       |
-| `oxlint.tailwind.ts`                     | The Tailwind fragment: the `oxlint-tailwindcss` JS plugin with its recommended rules (see [Tailwind classes](#tailwind-classes)); each project that extends it sets its stylesheet in `settings.tailwindcss.entryPoint`, relative to its config                                                                                                        |
-| `scripts/oxlint/directives.ts`           | The local plugin of `directives/require-reason` (see [Never disable a rule](#never-disable-a-rule)), tested by `scripts/oxlint/directives.test.ts`                                                                                                                                                                                                     |
+| File                                     | Lints, or holds                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `oxlint.config.ts`                       | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness`, `suspicious` and `perf` categories, the rules by name, and `import/no-cycle`. Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/` and the root files |
+| `app/server/oxlint.config.ts`            | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield) and `no-console` on (a log goes through `Effect.log*`), and its import bans                                                                                                      |
+| `app/src/oxlint.config.ts`               | The web app: `base`, the React, Vitest and Tailwind rules (its stylesheet: `index.css`), with `no-console` on and its import bans                                                                                                                                                                                     |
+| `site/oxlint.config.ts`                  | The website: `base`, the React, Vitest and Tailwind rules (its stylesheet: `src/styles/app.css`), with its import bans                                                                                                                                                                                                |
+| `packages/llamacpp-js/oxlint.config.ts`  | `llamacpp-js`: `base` alone, since its tests run on `node:test`, with its import bans                                                                                                                                                                                                                                 |
+| `packages/webui-shared/oxlint.config.ts` | `@llama-webui/shared`: `base` and the Vitest rules, with its import bans                                                                                                                                                                                                                                              |
+| `oxlint.react.ts`                        | The React fragment: the `react` and `jsx-a11y` plugins, and the `react-doctor` JS plugin with nine of its rules (the site config adds the tenth). Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                     |
+| `oxlint.tests.ts`                        | The Vitest fragment: an override for `**/*.test.ts` and `**/*.test.tsx` with the `vitest` plugin                                                                                                                                                                                                                      |
+| `oxlint.tailwind.ts`                     | The Tailwind fragment: the `oxlint-tailwindcss` JS plugin with its recommended rules (see [Tailwind classes](#tailwind-classes)); each project that extends it sets its stylesheet in `settings.tailwindcss.entryPoint`, relative to its config                                                                       |
+| `scripts/oxlint/directives.ts`           | The local plugin of `directives/require-reason` (see [Never disable a rule](#never-disable-a-rule)), tested by `scripts/oxlint/directives.test.ts`                                                                                                                                                                    |
 
 Six families of the rules picked by name shape how the code is written:
 
@@ -227,7 +223,6 @@ path.
 
 | Config                                              | Refused                                                                                                                                      | Message                                                                    |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `oxlint.config.ts` (`vendored`, everyone)           | `repos/…` and any relative path into `repos/`                                                                                                | the vendored repositories are reference material, import the package       |
 | `app/src/oxlint.config.ts`                          | `app/server/` (`@llama-webui/app/server/…`, `../server/…`, `../../app/server/…`); `node:*`                                                   | the web talks to the server through `@llama-webui/shared` and `lib/api.ts` |
 | `site/oxlint.config.ts`                             | Anything of `app/` (`@llama-webui/app`, `../../app/…`); `@llama-webui/shared` (`../../packages/webui-shared/…`), which the site does not use | the site copies what it reuses; tokens come from `@llama-webui/theme`      |
 | `packages/llamacpp-js/oxlint.config.ts`             | `@llama-webui/*` and the relative paths into the other packages and `app/`; `effect`, `@effect/*`; `node:*` outside `src/node.ts`            | the package has no dependency; Node APIs live behind `llamacpp-js/node`    |
@@ -235,7 +230,7 @@ path.
 | `llamacppNode` (`app/src`, `packages/webui-shared`) | `llamacpp-js/node` and the relative paths to `packages/llamacpp-js/src/node.ts`                                                              | browser code: llamacpp-js/node needs Node                                  |
 | `app/server/oxlint.config.ts`                       | `better-sqlite3`, `bun:*`; `node:sqlite` outside `db/`                                                                                       | SQLite goes through `SqlClient` (`app/server/db/Db.ts`)                    |
 
-A config that sets the rule replaces the options of `base`, so each project lists `vendored` again. `llamacppNode` is
+`base` sets no ban: each project config sets the rule with its own. `llamacppNode` is
 in `oxlint.config.ts`, for the two projects whose code runs in the browser. A ban of `node:*` or of `llamacpp-js/node`
 is for source files: the tests (`**/*.test.ts`, `**/*.test.tsx`, `packages/llamacpp-js/tests/`) are exempt, and so are
 `app/server/testing/` and the server's tests from the `node:sqlite` ban (`lifecycle.test.ts` reads the database of the

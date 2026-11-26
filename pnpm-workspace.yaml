@@ -16,7 +16,7 @@ catalog:
   "@types/react-dom": ^19.3.0
   # The profiling tool (root scripts/profiling) and the site's screenshots drive the same Chromium
   puppeteer-core: ^25.19.0
-  # Effect: same version as the vendored reference (repos/effect), every @effect/* package moves with it
+  # Effect: one exact version, every @effect/* package moves with it
   effect: 4.1.6
   "@effect/platform-node": 4.1.6
   "@effect/sql-sqlite-node": 4.1.6

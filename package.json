@@ -22,7 +22,7 @@
     "profiling": "node scripts/profiling/cli.ts",
     "profiling:report": "node scripts/profiling/cli.ts report",
     "prepack": "node scripts/prepack.ts",
-    "prepare": "effect-tsgo patch --typescript --no-oxlint && node scripts/vendored.ts",
+    "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "release": "node scripts/release.ts",
     "site:build": "pnpm --filter llama-webui-site build",
     "site:dev": "pnpm --filter llama-webui-site dev",

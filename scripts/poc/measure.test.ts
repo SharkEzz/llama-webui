@@ -21,7 +21,6 @@ test('classify sorts paths by pattern, not by folder names of the Nitro server',
 
 test('classify never counts the reference folders', () => {
   expect(classify('app/server-legacy/lib/boot.ts')).toBeNull();
-  expect(classify('repos/effect/packages/effect/src/Effect.ts')).toBeNull();
   expect(classify('app/server/lib/contract/golden.json')).toBeNull();
   expect(classify('site/src/root.tsx')).toBeNull();
 });

@@ -1,6 +1,6 @@
 // The public site (React, prerendered): the base, the React rules, the Vitest rules and the Tailwind rules.
 import { defineConfig } from 'oxlint';
-import { base, vendored } from '../oxlint.config.ts';
+import { base } from '../oxlint.config.ts';
 import { react } from '../scripts/oxlint/oxlint.react.ts';
 import { tailwind } from '../scripts/oxlint/oxlint.tailwind.ts';
 import { tests } from '../scripts/oxlint/oxlint.tests.ts';
@@ -18,7 +18,7 @@ export default defineConfig({
   rules: {
     // The site prerenders: a browser global read during render or in a hook's initial state breaks the build
     'react-doctor/no-unguarded-browser-global-in-render-or-hook-init': 'error',
-    'no-restricted-imports': ['error', { patterns: [vendored, app, shared] }],
+    'no-restricted-imports': ['error', { patterns: [app, shared] }],
   },
   ignorePatterns: [
     // shadcn components keep their default code
