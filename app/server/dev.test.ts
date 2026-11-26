@@ -96,8 +96,8 @@ async function startDev(env: Record<string, string | undefined> = {}, port?: num
   if (dataDir !== undefined) await seedWatchPort(dataDir, await freePort());
   let output = '';
   const chunks: Array<{ at: number; text: string }> = [];
-  // Vite itself, not `pnpm dev`: a signal goes to the process that handles it.
-  const proc = spawn(process.execPath, [join(APP, 'node_modules/vite/bin/vite.js'), 'dev'], {
+  // Vite itself, as `pnpm dev` starts it, not `pnpm dev`: a signal goes to the process that handles it.
+  const proc = spawn(process.execPath, [join(APP, 'node_modules/vite/bin/vite.js'), 'dev', '--bypass-lock'], {
     cwd: APP,
     env: full,
     stdio: ['ignore', 'pipe', 'pipe'],

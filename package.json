@@ -39,7 +39,7 @@
     "oxlint": "^1.95.0",
     "oxlint-plugin-react-doctor": "catalog:",
     "oxlint-tailwindcss": "catalog:",
-    "oxlint-tsgolint": "^7.0.2008",
+    "oxlint-tsgolint": "^7.0.2009",
     "puppeteer-core": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

@@ -54,7 +54,7 @@ stays clean). oxlint's VS Code extension would load that config, whose plugin is
 pnpm dev
 ```
 
-`pnpm dev` runs `vite dev` in `app/`. Vite keeps the public address (7860 by default, `strictPort`) and serves the UI
+`pnpm dev` runs `vite dev --bypass-lock` in `app/`. Vite keeps the public address (7860 by default, `strictPort`) and serves the UI
 with hot module replacement. Its plugin, `app/build/devServer.ts`, starts the Effect server from the sources
 (`node --watch server/main.ts`, with `LLAMA_WEBUI_DEV=1`) on a free loopback port, in its own process group, and
 proxies `/api` and `/ws` to it. A save of a file the server imports (`app/server/`, `packages/`) restarts it, which
@@ -67,7 +67,8 @@ and its own address:
 ```
 
 Stopping Vite (`Ctrl+C`, `SIGTERM`, `SIGHUP`) sends `SIGTERM` to the server and waits for its shutdown; a second signal
-kills it.
+kills it. Hence `--bypass-lock`: without it, Vite's process lock releases itself on `SIGINT` by sending `SIGINT` again,
+which would count as the second signal, so the plugin refuses to start without it.
 
   </Tab>
   <Tab title="Production">
@@ -129,7 +130,7 @@ The root `package.json` defines the app's scripts; the website has its own, in `
 
 | Script              | Runs                                                                         | What it does                                                                                                                                                                                                                                                                               |
 | ------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm dev`          | `pnpm --filter @llama-webui/app dev`                                         | `vite dev` in `app/`: the UI with HMR, the server from the sources under `node --watch`, restarted by a save of a file it imports.                                                                                                                                                         |
+| `pnpm dev`          | `pnpm --filter @llama-webui/app dev`                                         | `vite dev --bypass-lock` in `app/`: the UI with HMR, the server from the sources under `node --watch`, restarted by a save of a file it imports.                                                                                                                                           |
 | `pnpm build`        | `pnpm --filter @llama-webui/app build`                                       | `vite build && node build/server.ts` in `app/`: the UI in `app/.output/public/`, the server in `app/.output/server/index.mjs` (with the NVML sampler, `nvml-worker.mjs`, and `THIRD-PARTY-LICENSES.md`), the launcher `app/.output/llama-webui.mjs`.                                       |
 | `pnpm start`        | `pnpm build && node app/.output/llama-webui.mjs`                             | Builds, then runs the production server.                                                                                                                                                                                                                                                   |
 | `pnpm test`         | `pnpm test:unit && pnpm --filter llamacpp-js test`                           | Every Vitest project (`server` with `app/build/` and `scripts/`, which starts with one production build, then `shared`, `web`, `site`), then the `llamacpp-js` tests on `node --test`.                                                                                                     |
