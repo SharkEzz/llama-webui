@@ -10,7 +10,7 @@ import { Stage, type ViewProps } from './Stage';
 export function CardsView({ graph, live, peers, tones, ...stage }: ViewProps) {
   const layout = useMemo(() => layoutCards(graph, peers), [graph, peers]);
   return (
-    <Stage graph={graph} layout={layout} tones={tones} {...stage}>
+    <Stage graph={graph} peers={peers} layout={layout} tones={tones} {...stage}>
       {graph.nodes.map((node) => {
         const rect = layout.rects.get(node.id);
         const l = live.get(node.id);

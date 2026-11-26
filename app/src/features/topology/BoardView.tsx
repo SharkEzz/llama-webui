@@ -29,6 +29,7 @@ export function BoardView({ graph, live, peers, tones, ...stage }: ViewProps) {
   return (
     <Stage
       graph={graph}
+      peers={peers}
       layout={layout}
       tones={tones}
       {...stage}

@@ -228,9 +228,12 @@ sample. The first sample reads them all, and so does the first sample of a card 
 NVML refuses is reported unknown (`null`) and asked again on the next sample, never replaced by the one before; an
 answer that the card does not support it is kept for the period. A clock that goes back reads them again. What does
 not change is read on the first sample that needs it, then kept: per card its UUID, name, bus ID, maximum graphics clock, maximum
-PCIe link and default power limit, and the driver and CUDA driver versions. Such a value is kept once NVML gives it, or
+PCIe link and default power limit, what the driver allows from it to each other card in peer-to-peer
+(`nvmlDeviceGetP2PStatus` for the read and the write capability: `ok`, or the first status that stands in the way), and
+the driver and CUDA driver versions. Such a value is kept once NVML gives it, or
 says the card does not support it; any other failure is asked again on the next sample, and a card whose UUID fails is
-left out of that sample. A hidden card is only identified, so after its first sample it costs no call. Device handles
+left out of that sample. A hidden card is only identified, so after its first sample it costs no call, and nothing is
+asked about peer-to-peer with it. Device handles
 are pointers, kept as `bigint`, read once when NVML starts; out-parameters are buffers, allocated once per reader and
 reused by every sample. The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
 
@@ -343,7 +346,9 @@ profile without a verbosity of its own.
 With `-sm tensor`, the buffers are logged on one `Meta()` device, at the size of its largest per-device part
 (`ggml-backend-meta.cpp` reports the maximum). `spreadMeta()` replaces them with one buffer per member, read from the
 `llama_prepare_model_devices: - device N: <name>` lines: model and cache scaled by `ts[i] / max(ts)` (`-ts` from the
-launch line, equal parts without it), the whole compute buffer on each, and `estimated: true`.
+launch line, equal parts without it), the whole compute buffer on each, and `estimated: true`. A draft or an MTP
+model lists the same devices again for its own `Meta()` device, before the second “offloaded” line ends the reading:
+a device is a member once.
 
 Two things come from lines that are not `llama-server`'s own, read over the whole launch (NCCL starts with the
 context, after the lines of a draft model):
@@ -352,7 +357,9 @@ context, after the lines of a draft model):
   nothing, so the supervisor writes `P2P_LOG_LINE` after the launch line when the variable is in the server's
   environment. NCCL, built in and run with `NCCL_DEBUG=INFO`, says what really happens, which depends on the same
   driver capability: a `Channel … via P2P/…` line gives `active`; with the variable set, `P2P is disabled between
-connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`.
+connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`. A channel is
+  numbered `Channel 00 :` or, for the peer-to-peer ones of NCCL 2.32, `Channel 00/0 :` (`Channel 00/0 : 0[0] -> 1[1]
+via P2P/direct pointer`); the lines that name no transport (`Channel 00/02 : 0 1`) decide nothing.
 - **PCI addresses of CUDA devices** (`ncclBusIds()`). NCCL's `ncclCommInitAll … cudaDev N nvmlDev N busId X` lines
   give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
   with `-sm tensor`, which only logs the `Meta()` device, this is the only one.

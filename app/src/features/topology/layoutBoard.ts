@@ -244,9 +244,9 @@ export function layoutBoard(graph: TopologyGraph, peers: readonly PeerLink[]): B
     const down = a.y <= b.y;
     const from = { x, y: down ? bottom(a) : a.y };
     const to = { x, y: down ? b.y : bottom(b) };
-    return [
-      { id: p.id, confirmed: p.confirmed, route: straight(from, to), tag: { x: x + 44, y: (from.y + to.y) / 2 } },
-    ];
+    // The tag on one line beside the link, in the gap between the two slots
+    const tag = { x: x + 14, y: (from.y + to.y) / 2 };
+    return [{ id: p.id, confirmed: p.confirmed, route: straight(from, to), tag, anchor: 'left' }];
   });
 
   return {

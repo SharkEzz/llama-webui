@@ -30,6 +30,7 @@ export interface NvmlSymbols {
   nvmlDeviceGetMaxPcieLinkGeneration: (h: bigint, out: Buffer) => number;
   nvmlDeviceGetMaxPcieLinkWidth: (h: bigint, out: Buffer) => number;
   nvmlDeviceGetComputeRunningProcesses_v3: (h: bigint, count: Buffer, infos: Buffer) => number;
+  nvmlDeviceGetP2PStatus: (from: bigint, to: bigint, capability: number, out: Buffer) => number;
 }
 
 const ret = 'int32';
@@ -67,4 +68,5 @@ export const openNvml = (path = 'libnvidia-ml.so.1'): NvmlSymbols =>
     nvmlDeviceGetMaxPcieLinkGeneration: outFn,
     nvmlDeviceGetMaxPcieLinkWidth: outFn,
     nvmlDeviceGetComputeRunningProcesses_v3: { arguments: ['pointer', 'buffer', 'buffer'], return: ret },
+    nvmlDeviceGetP2PStatus: { arguments: ['pointer', 'pointer', 'uint32', 'buffer'], return: ret },
   }).functions;

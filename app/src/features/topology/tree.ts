@@ -57,8 +57,10 @@ export interface LinkGeo {
 export interface PeerGeo {
   id: string;
   route: Route;
-  /** Center of its tag. */
+  /** Where its tag hangs from, clear of the route and of the dots that run along it. */
   tag: Point;
+  /** The side of the tag that point is the middle of: `top`, the tag stacks its lines under it; `left`, on one line. */
+  anchor: 'top' | 'left';
   confirmed: boolean;
 }
 

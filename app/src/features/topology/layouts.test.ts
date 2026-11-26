@@ -110,6 +110,10 @@ describe.each(PLACEMENTS)('%s placement', (view, layout) => {
         expect(onEdge(geo.route.points[0]!, placed.rects.get(peer.from)!), `${geo.id} start`).toBe(true);
         expect(onEdge(geo.route.points.at(-1)!, placed.rects.get(peer.to)!), `${geo.id} end`).toBe(true);
         expect(rects.filter(([, r]) => inside(geo.tag, r))).toEqual([]);
+        // The label is anchored beside the link, clear of its dots.
+        const nearest = Math.min(...geo.route.points.map((p) => Math.hypot(p.x - geo.tag.x, p.y - geo.tag.y)));
+        expect(nearest, `${geo.id} label`).toBeGreaterThanOrEqual(10);
+        expect(view === 'cards' || geo.anchor === 'left', `${geo.id} anchor`).toBe(true);
         expect(geo.confirmed).toBe(true);
       }
     });

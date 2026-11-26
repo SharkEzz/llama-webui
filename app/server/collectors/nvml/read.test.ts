@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest';
-import type { GpuReading } from '@llama-webui/shared';
+import type { GpuPeer, GpuReading } from '@llama-webui/shared';
 import { Array as Arr, Record } from 'effect';
 import { type GpuNeeds, identityReading } from '../gpu.ts';
 import type { NvmlSnapshot } from './protocol.ts';
@@ -24,8 +24,9 @@ interface FakeCard {
 const CARD_A: FakeCard = { handle: 0x10n, uuid: 'GPU-a', busId: '00000000:01:00.0', pids: [4242] };
 const CARD_B: FakeCard = { handle: 0x20n, uuid: 'GPU-b', busId: '00000000:0D:00.0' };
 
-/** The reading of a fake card in full, as `fakeNvml` answers it. */
-const fullReading = (key: string, busId: string): GpuReading => ({
+/** The reading of a fake card in full, as `fakeNvml` answers it; `peers`: peer-to-peer to the other cards read. */
+const fullReading = (key: string, busId: string, peers?: ReadonlyArray<GpuPeer>): GpuReading => ({
+  ...(peers === undefined ? {} : { p2p: peers }),
   key,
   vendor: 'nvidia',
   name: 'NVIDIA GeForce RTX 5070 Ti',
@@ -61,15 +62,27 @@ interface LiveValues {
   powerLimit: number;
   persistence: number;
   fan: number;
+  /** nvmlGpuP2PStatus_t of the read and of the write capability, between any two cards. */
+  p2pRead: number;
+  p2pWrite: number;
 }
 
 /**
  * A fake libnvidia-ml over `cards`. Every call is counted by name and card (`<symbol>@<uuid>`, the system's calls by
- * name alone, the PCIe throughput as `PcieRx` and `PcieTx`); `rcs` scripts the return codes of a call, one per call
+ * name alone, the PCIe throughput as `PcieRx` and `PcieTx`, peer-to-peer as `P2pRead` and `P2pWrite` on the card it
+ * starts from); `rcs` scripts the return codes of a call, one per call
  * in order, then success. `live` holds what the slow calls and the fan answer, the same for every card.
  */
 const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<number>> = {}) => {
-  const live: LiveValues = { pcieRx: 100, pcieTx: 50, powerLimit: 300_000, persistence: 1, fan: 30 };
+  const live: LiveValues = {
+    pcieRx: 100,
+    pcieTx: 50,
+    powerLimit: 300_000,
+    persistence: 1,
+    fan: 30,
+    p2pRead: 0,
+    p2pWrite: 0,
+  };
   const calls = new Map<string, number>();
   const byHandle = new Map(Arr.map(cards, (c) => [c.handle, c] as const));
   const count = (key: string): number => {
@@ -181,6 +194,13 @@ const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<numb
       });
       return SUCCESS;
     },
+    nvmlDeviceGetP2PStatus: (from, to, capability, out) =>
+      byHandle.has(to)
+        ? on(
+            capability === 0 ? 'P2pRead' : 'P2pWrite',
+            u32(() => (capability === 0 ? live.p2pRead : live.p2pWrite)),
+          )(from, out)
+        : 2,
   };
   const of = (call: string, card?: FakeCard): number =>
     calls.get(card === undefined ? call : `${call}@${card.uuid}`) ?? 0;
@@ -216,6 +236,13 @@ const PCIE_CALLS = ['PcieRx', 'PcieTx'];
 /** The calls of a card made again once 10 s have passed since their last read. */
 const LIMIT_CALLS = ['PowerManagementLimit', 'PersistenceMode'];
 
+/** The calls of a card made once for each other card. */
+const P2P_CALLS = ['P2pRead', 'P2pWrite'];
+
+/** Peer-to-peer the driver allows, to each of the two fake cards. */
+const TO_A: GpuPeer = { busId: '0000:01:00.0', status: 'ok' };
+const TO_B: GpuPeer = { busId: '0000:0d:00.0', status: 'ok' };
+
 const ALL: GpuNeeds = { skipGpus: [] };
 
 /** One sample at each time of `at` (ms), in order. */
@@ -249,7 +276,10 @@ describe('the NVML reader', () => {
     assert.strictEqual(nvml.of('CudaDriverVersion'), 1);
     for (const snapshot of samples)
       assert.deepStrictEqual(snapshot, {
-        gpus: [fullReading('nvidia:GPU-a', '0000:01:00.0'), fullReading('nvidia:GPU-b', '0000:0d:00.0')],
+        gpus: [
+          fullReading('nvidia:GPU-a', '0000:01:00.0', [TO_B]),
+          fullReading('nvidia:GPU-b', '0000:0d:00.0', [TO_A]),
+        ],
         procs: [{ pid: 4242, key: 'nvidia:GPU-a', usedBytes: GiB }],
         system: { driver: '580.95.05', cudaDriver: 13000 },
       });
@@ -350,8 +380,57 @@ describe('the NVML reader', () => {
     ])
       assert.strictEqual(nvml.of(call, CARD_B), 0, call);
     const shown = read(ALL, 2000);
-    assert.deepStrictEqual(shown.gpus[1], fullReading('nvidia:GPU-b', '0000:0d:00.0'));
+    assert.deepStrictEqual(shown.gpus[1], fullReading('nvidia:GPU-b', '0000:0d:00.0', [TO_A]));
     assert.strictEqual(nvml.of('MaxClockInfo', CARD_B), 1);
+  });
+
+  it('reads once what the driver allows from each card to the others, read and write', () => {
+    const nvml = fakeNvml([CARD_A, CARD_B]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]));
+    for (const snapshot of sampleAt(read, [0, 1000, 2000])) {
+      assert.deepStrictEqual(snapshot.gpus[0]?.p2p, [TO_B]);
+      assert.deepStrictEqual(snapshot.gpus[1]?.p2p, [TO_A]);
+    }
+    for (const card of [CARD_A, CARD_B])
+      assert.deepStrictEqual(countsOf(nvml, P2P_CALLS, card), [1, 1], `peer-to-peer of ${card.uuid}`);
+  });
+
+  it('reports no peer-to-peer for a card alone', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    assert.isFalse('p2p' in only(read(ALL, 0)));
+    assert.deepStrictEqual(countsOf(nvml, P2P_CALLS, CARD_A), [0, 0]);
+  });
+
+  it('names what stands in the way of peer-to-peer, the read before the write', () => {
+    const statusOf = (p2pRead: number, p2pWrite: number) => {
+      const nvml = fakeNvml([CARD_A, CARD_B]);
+      Object.assign(nvml.live, { p2pRead, p2pWrite });
+      return nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]))(ALL, 0).gpus[0]?.p2p?.[0]?.status;
+    };
+    assert.deepStrictEqual(
+      [statusOf(0, 1), statusOf(0, 2), statusOf(3, 2), statusOf(4, 0), statusOf(0, 5), statusOf(6, 0), statusOf(0, 42)],
+      ['chipset', 'gpu', 'topology', 'disabled', 'unsupported', 'unknown', 'unknown'],
+    );
+  });
+
+  it('leaves out a peer the driver does not answer for, and asks again on the next sample', () => {
+    const nvml = fakeNvml([CARD_A, CARD_B], { 'P2pWrite@GPU-a': [UNKNOWN] });
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]));
+    const [first, second] = sampleAt(read, [0, 1000, 2000]);
+    assert.isFalse('p2p' in (first?.gpus[0] ?? {}), 'a failure is not a refusal');
+    assert.deepStrictEqual(first?.gpus[1]?.p2p, [TO_A]);
+    assert.deepStrictEqual(second?.gpus[0]?.p2p, [TO_B]);
+    assert.deepStrictEqual(countsOf(nvml, P2P_CALLS, CARD_A), [2, 2]);
+  });
+
+  it('asks nothing about peer-to-peer with a hidden card, in either direction', () => {
+    const nvml = fakeNvml([CARD_A, CARD_B]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]));
+    const [first] = sampleAt(read, [0, 1000], { skipGpus: ['0000:0d:00.0'] });
+    assert.isFalse('p2p' in (first?.gpus[0] ?? {}));
+    for (const card of [CARD_A, CARD_B]) assert.deepStrictEqual(countsOf(nvml, P2P_CALLS, card), [0, 0]);
+    assert.deepStrictEqual(read(ALL, 2000).gpus[0]?.p2p, [TO_B]);
   });
 
   it('reads a card in full on the first sample it is shown again, within the periods', () => {

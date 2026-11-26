@@ -1,5 +1,5 @@
 import type { TopologyLink } from '@llama-webui/shared';
-import { CEIL_BPS, FLOOR_BPS, type Level, type LinkFlow, linkShown } from './flows';
+import { CEIL_BPS, FLOOR_BPS, type Level, type LinkFlow, linkShown, type PeerFlow } from './flows';
 import { type Point, reversed, type Route } from './geometry';
 import type { LinkGeo } from './tree';
 
@@ -7,6 +7,8 @@ import type { LinkGeo } from './tree';
  * The streaks that run along a link while it carries traffic: a pure model (where a throughput sits on the scale, what
  * a lane shows at a given time) and the loop that draws it on the view's one canvas. The loop is the only script of
  * the drawing that runs between two samples; it stops, canvas cleared, as soon as no link has streaks to show.
+ * A peer-to-peer link between two cards carries dots instead of streaks: its traffic is an estimate, and the dots of
+ * a direction take the color of the card that sends them.
  */
 
 export const STREAK_FPS = 20;
@@ -20,6 +22,11 @@ const MAX_SLOTS = 8;
 const FADE = 0.1;
 /** Distance between a link's two lanes and its middle (px): one direction on each side. */
 const LANE_SIDE = 2.4;
+/** The same for the dots of a peer-to-peer link, which are wider than a streak, and the radius of a dot and its halo. */
+const DOT_SIDE = 4;
+const DOT_RADIUS = 2.4;
+const DOT_HALO = 5;
+const DOT_HALO_ALPHA = 0.22;
 /** Longest step of the animation (s): a tab coming back from the background does not make the streaks jump. */
 const MAX_DT = 0.1;
 const RANGE = Math.log10(CEIL_BPS / FLOOR_BPS);
@@ -111,6 +118,8 @@ export interface LaneState {
   fwd: number | null;
   back: number | null;
   level: Level;
+  /** A peer-to-peer link: dots in place of streaks. */
+  dots?: true;
 }
 
 /**
@@ -131,6 +140,26 @@ export function laneStates(
     const fwd = intensity(flow.fwdBps);
     const back = intensity(flow.backBps);
     if (fwd !== null || back !== null) out.set(l.id, { fwd, back, level: flow.level });
+  }
+  return out;
+}
+
+/**
+ * The peer-to-peer links that have dots to draw, by link id, from their estimated traffic (`peerFlows`): shown by
+ * the rule of the other links, and never under reduced motion.
+ */
+export function peerLaneStates(
+  flows: Map<string, PeerFlow>,
+  busy: boolean,
+  reducedMotion: boolean,
+): Map<string, LaneState> {
+  const out = new Map<string, LaneState>();
+  if (reducedMotion) return out;
+  for (const [id, flow] of flows) {
+    if (!linkShown(flow, busy)) continue;
+    const fwd = intensity(flow.fwdBps);
+    const back = intensity(flow.backBps);
+    if (fwd !== null || back !== null) out.set(id, { fwd, back, level: 'ok', dots: true });
   }
   return out;
 }
@@ -164,20 +193,27 @@ export function trackLook(
 }
 
 export interface StreakLoop {
-  /** The links of the drawing: their lanes replace the previous ones, and carry on with what flowed. */
-  setLinks: (links: readonly LinkGeo[]) => void;
-  /** What flows now; `colorOf` gives a link's stroke, as a color a canvas reads. Starts the timer when needed. */
-  setStates: (states: Map<string, LaneState>, colorOf: (id: string, level: Level) => string) => void;
+  /** The links of the drawing, peer-to-peer ones included: their lanes replace the previous ones, and carry on. */
+  setLinks: (links: readonly Pick<LinkGeo, 'id' | 'route'>[]) => void;
+  /**
+   * What flows now; `colorOf` gives the color of a link's direction (`fwd`: along its route), as a color a canvas
+   * reads. Starts the timer when needed.
+   */
+  setStates: (states: Map<string, LaneState>, colorOf: ColorOf) => void;
   /** Size of the drawing (px of its natural size) and the ratio of canvas pixels to them (scale × pixel ratio). */
   resize: (width: number, height: number, ratio: number) => void;
   stop: () => void;
   readonly running: boolean;
 }
 
+type Direction = 'fwd' | 'back';
+type ColorOf = (id: string, level: Level, direction: Direction) => string;
+
 interface Running {
   lane: Lane;
   x: number;
   color: string;
+  dots: boolean;
   /** Progress of a traverse (0..1), kept from one frame to the next. */
   t: number;
 }
@@ -185,7 +221,9 @@ interface Running {
 /** Draws the streaks on `canvas`, with one timer that only runs while a link has streaks. */
 export function createStreakLoop(canvas: HTMLCanvasElement): StreakLoop {
   const ctx = canvas.getContext('2d');
-  let lanes = new Map<string, { fwd: Lane; back: Lane }>();
+  let routes = new Map<string, Route>();
+  /** The two lanes of a link, by `<link id>:<side>`: made when its traffic first shows, kept until the links change. */
+  const lanes = new Map<string, { fwd: Lane; back: Lane }>();
   /** Progress of each lane, by `<link id>:<direction>`: kept across samples so a streak never jumps. */
   const progress = new Map<string, number>();
   let active: (Running & { key: string })[] = [];
@@ -209,7 +247,20 @@ export function createStreakLoop(canvas: HTMLCanvasElement): StreakLoop {
       lane.t = (lane.t + (dt * speedOf(lane.x)) / Math.max(1, lane.lane.length)) % 1;
       progress.set(lane.key, lane.t);
       ctx.strokeStyle = lane.color;
+      ctx.fillStyle = lane.color;
       for (const s of streaksAt(lane.lane, lane.x, lane.t)) {
+        if (lane.dots) {
+          for (const [radius, alpha] of [
+            [DOT_HALO, DOT_HALO_ALPHA],
+            [DOT_RADIUS, 1],
+          ] as const) {
+            ctx.globalAlpha = s.alpha * alpha;
+            ctx.beginPath();
+            ctx.arc(s.head.x, s.head.y, radius, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          continue;
+        }
         ctx.globalAlpha = s.alpha;
         ctx.beginPath();
         ctx.moveTo(s.tail.x, s.tail.y);
@@ -229,21 +280,30 @@ export function createStreakLoop(canvas: HTMLCanvasElement): StreakLoop {
   };
 
   let states = new Map<string, LaneState>();
-  let colorOf: (id: string, level: Level) => string = () => '';
+  let colorOf: ColorOf = () => '';
+  /** The two lanes of a link of the drawing: those that carry dots sit further from its middle. */
+  const lanesOf = (id: string, side: number) => {
+    const route = routes.get(id);
+    if (!route) return undefined;
+    const key = `${id}:${side}`;
+    const made = lanes.get(key) ?? { fwd: makeLane(route, side), back: makeLane(reversed(route), side) };
+    lanes.set(key, made);
+    return made;
+  };
   /** The lanes that have streaks now, from the last states and the current links; starts the timer when needed. */
   const apply = () => {
     active = [];
     for (const [id, state] of states) {
-      const pair = lanes.get(id);
+      const pair = lanesOf(id, state.dots ? DOT_SIDE : LANE_SIDE);
       if (!pair) continue;
-      const color = colorOf(id, state.level);
       for (const dir of ['fwd', 'back'] as const) {
         const x = state[dir];
         if (x === null) continue;
         const key = `${id}:${dir}`;
         // A lane that starts takes a place of its own, so the lanes of a drawing do not pulse together
         const t = progress.get(key) ?? (active.length * 0.37) % 1;
-        active.push({ key, lane: pair[dir], x, color, t });
+        const color = colorOf(id, state.level, dir);
+        active.push({ key, lane: pair[dir], x, color, dots: state.dots === true, t });
       }
     }
     if (ctx && timer === null && (active.length > 0 || dirty)) {
@@ -254,9 +314,8 @@ export function createStreakLoop(canvas: HTMLCanvasElement): StreakLoop {
 
   return {
     setLinks(links) {
-      lanes = new Map(
-        links.map((l) => [l.id, { fwd: makeLane(l.route, LANE_SIDE), back: makeLane(reversed(l.route), LANE_SIDE) }]),
-      );
+      routes = new Map(links.map((l) => [l.id, l.route]));
+      lanes.clear();
       apply();
     },
     setStates(next, color) {

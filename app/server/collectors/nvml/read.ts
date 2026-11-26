@@ -1,4 +1,4 @@
-import type { GpuReading } from '@llama-webui/shared';
+import type { GpuP2pStatus, GpuPeer, GpuReading } from '@llama-webui/shared';
 import { Array as Arr, Record } from 'effect';
 import { dual } from 'effect/Function';
 import { type GpuNeeds, gpuSkipped, identityReading, normalizeBusId } from '../gpu.ts';
@@ -27,6 +27,18 @@ const CLOCK_GRAPHICS = 0;
 const CLOCK_MEM = 2;
 const PCIE_TX = 0;
 const PCIE_RX = 1;
+/** nvmlGpuP2PCapsIndex_t: the read and the write capability, what `nvidia-smi topo -p2p rw` asks. */
+const P2P_CAPABILITIES = [0, 1] as const;
+/** nvmlGpuP2PStatus_t, by value. */
+const P2P_STATUS: ReadonlyArray<GpuP2pStatus> = [
+  'ok',
+  'chipset',
+  'gpu',
+  'topology',
+  'disabled',
+  'unsupported',
+  'unknown',
+];
 
 /**
  * How long the PCIe throughput read is kept. Each counter blocks about 20 ms per card in the driver (rx and tx: about
@@ -121,7 +133,9 @@ const every = <A>(periodMs: number, ask: () => Answer<A>): Periodic<A> => {
  * card, and the processes on it; cards `needs` skips are only identified (UUID, name, bus id). What does not change is
  * read on the first sample that needs it, then kept (`once`); the PCIe throughput, the power limit and the persistence
  * mode are read again once their period has passed (`every`), and a card's first sample after it was hidden reads them
- * all. The buffers NVML fills are the reader's, reused by every sample.
+ * all. Peer-to-peer is what the driver allows from a card to each other card read, asked once per pair and direction:
+ * it is the same with or without a program on the cards. The buffers NVML fills are the reader's, reused by every
+ * sample.
  */
 export const nvmlReader: {
   (handles: ReadonlyArray<bigint>): (lib: NvmlSymbols) => NvmlSample;
@@ -175,6 +189,34 @@ export const nvmlReader: {
     },
   }));
 
+  /**
+   * Peer-to-peer from the card `from` to the card `to`: `ok` when the driver allows it to read and to write there, else
+   * the first status that stands in the way; null when the driver does not answer.
+   */
+  const p2pStatus = (from: bigint, to: bigint): Answer<GpuP2pStatus | null> => {
+    for (const capability of P2P_CAPABILITIES) {
+      const rc = lib.nvmlDeviceGetP2PStatus(from, to, capability, u32);
+      if (rc !== SUCCESS) return { rc, value: null };
+      const status = P2P_STATUS[u32.readUInt32LE(0)] ?? 'unknown';
+      if (status !== 'ok') return { rc, value: status };
+    }
+    return { rc: SUCCESS, value: 'ok' };
+  };
+  /** By card, in the order of `cards`: each other card, and peer-to-peer to it. */
+  const peers = Arr.map(cards, (card) =>
+    Arr.flatMap(cards, (other) => (other === card ? [] : [{ other, status: once(() => p2pStatus(card.h, other.h)) }])),
+  );
+  /** Peer-to-peer from the card at `index` to the cards `needs` reads; a card the driver does not answer for is left out. */
+  const readPeers = (index: number, needs: GpuNeeds): Array<GpuPeer> =>
+    Arr.flatMap(peers[index] ?? [], ({ other, status }) => {
+      if (other.uuid() === null) return [];
+      const busId = other.busId();
+      // A hidden card is listed, not read: nothing is asked about it either.
+      if (gpuSkipped(needs, busId)) return [];
+      const answer = status();
+      return answer === null ? [] : [{ busId, status: answer }];
+    });
+
   /** The compute processes on a card; none when NVML refuses. */
   const readProcs = (h: bigint, key: string, into: Array<NvmlProc>): void => {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -202,7 +244,7 @@ export const nvmlReader: {
   return (needs, nowMs) => {
     const gpus: Array<GpuReading> = [];
     const procs: Array<NvmlProc> = [];
-    for (const card of cards) {
+    for (const [index, card] of cards.entries()) {
       const { h } = card;
       const uuid = card.uuid();
       if (uuid === null) continue;
@@ -221,6 +263,7 @@ export const nvmlReader: {
       const memOk = lib.nvmlDeviceGetMemoryInfo_v2(h, mem) === SUCCESS; // unknown VRAM reads as 0, the GPU stays listed
       const utilOk = lib.nvmlDeviceGetUtilizationRates(h, util) === SUCCESS;
       const persistence = slow.persistence.at(nowMs);
+      const p2p = readPeers(index, needs);
 
       gpus.push({
         key,
@@ -246,6 +289,7 @@ export const nvmlReader: {
         pcieWidthMax: card.pcieWidthMax(),
         pcieRxBps: slow.pcieRxBps.at(nowMs),
         pcieTxBps: slow.pcieTxBps.at(nowMs),
+        ...(Arr.isArrayNonEmpty(p2p) ? { p2p } : {}),
       });
       readProcs(h, key, procs);
     }
