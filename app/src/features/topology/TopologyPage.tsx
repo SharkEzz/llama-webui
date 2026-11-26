@@ -10,7 +10,7 @@ import { BoardView } from './BoardView';
 import { CardsView } from './CardsView';
 import { DetailPopover } from './Detail';
 import { detailPopover } from './detailPopover';
-import { gpuTones, linkFlows, linkSpecs, nodeLive, peerLinks } from './flows';
+import { gpuTones, linkFlows, linkSpecs, nodeLive, type PeerFlow, peerFlows, peerLinks } from './flows';
 import { Hud, Legend } from './Hud';
 import { LayerTooltip } from './LayerTooltip';
 import { layerTooltip } from './layerTooltip';
@@ -49,6 +49,10 @@ export function TopologyPage() {
   const specs = useMemo(() => (graph ? linkSpecs(graph, snapshot) : new Map<string, string>()), [graph, snapshot]);
   const tones = useMemo(() => (graph ? gpuTones(graph) : new Map<string, Tone>()), [graph]);
   const peers = useMemo(() => (graph ? peerLinks(graph, placement) : []), [graph, placement]);
+  const peerTraffic = useMemo(
+    () => (graph && flows ? peerFlows(graph, peers, flows) : new Map<string, PeerFlow>()),
+    [graph, peers, flows],
+  );
   const phase = phaseOf(state, snapshot);
   const busy = phase === 'loading' || phase === 'prompt' || phase === 'generating';
   const View = view === 'board' ? BoardView : CardsView;
@@ -95,6 +99,7 @@ export function TopologyPage() {
               flows={flows}
               specs={specs}
               peers={peers}
+              peerFlows={peerTraffic}
               tones={tones}
               busy={busy}
               reducedMotion={reducedMotion}

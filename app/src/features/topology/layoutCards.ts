@@ -1,6 +1,6 @@
 import type { TopologyGraph, TopologyNode } from '@llama-webui/shared';
 import type { PeerLink } from './flows';
-import { curve, elbow, join, type Point, type Rect, type Route, straight } from './geometry';
+import { curve, elbow, join, type Rect, straight } from './geometry';
 import { type PeerGeo, placedLinks, treeOf, type ViewLayout } from './tree';
 
 /*
@@ -28,6 +28,16 @@ const TOP = SIDE.w + SIDE_GAP + CPU.w + SIDE_GAP + SIDE.w;
 export const TALL_THREADS = 16;
 /** How far a peer link drops under its two cards, and where its tag sits. */
 const PEER_DROP = 26;
+/** Under the lowest point of a peer link, where its tag starts: clear of the dots that run along the link. */
+const PEER_TAG_GAP = 12;
+/** Height of a peer link's tag with its figures (three lines): the room the drawing keeps under it. */
+const PEER_TAG_H = 56;
+/** How far a tag on one line stands above or below the middle of a link that crosses it sideways. */
+const PEER_TAG_RISE = 20;
+/** Half the height of a tag on one line. */
+const PEER_TAG_HALF = 11;
+/** The sideways run from which a link between two rows crosses its middle too flat for a tag at the same height. */
+const PEER_FLAT = 10;
 
 const isGpu = (n: TopologyNode) => n.kind === 'gpu';
 const fixedWidth = (n: TopologyNode) => (n.kind === 'nvme' ? WIDTH.nvme : n.kind === 'chipset' ? WIDTH.chipset : 0);
@@ -132,12 +142,15 @@ export function layoutCards(graph: TopologyGraph, peers: readonly PeerLink[]): V
     if (!a || !b) return [];
     return [{ id: p.id, confirmed: p.confirmed, ...peerRoute(a, b) }];
   });
-  const bottom = Math.max(...[...rects.values()].map((r) => r.y + r.h), ...peerGeos.map((p) => p.tag.y + 12));
+  const bottom = Math.max(
+    ...[...rects.values()].map((r) => r.y + r.h),
+    ...peerGeos.map((p) => p.tag.y + (p.anchor === 'top' ? PEER_TAG_H : 0)),
+  );
   return { width, height: bottom + 24, rects, links, peers: peerGeos };
 }
 
 /** Two cards of a row are joined under them; two cards of different rows, from the bottom of one to the top of the other. */
-function peerRoute(a: Rect, b: Rect): { route: Route; tag: Point } {
+function peerRoute(a: Rect, b: Rect): Pick<PeerGeo, 'route' | 'tag' | 'anchor'> {
   if (a.y === b.y) {
     const [left, right] = a.x <= b.x ? [a, b] : [b, a];
     const from = { x: left.x + left.w * 0.75, y: left.y + left.h };
@@ -145,7 +158,8 @@ function peerRoute(a: Rect, b: Rect): { route: Route; tag: Point } {
     const low = from.y + PEER_DROP;
     const route = curve(from, { x: from.x, y: low + 8 }, { x: to.x, y: low + 8 }, to);
     const oriented = a === left ? route : curve(to, { x: to.x, y: low + 8 }, { x: from.x, y: low + 8 }, from);
-    return { route: oriented, tag: { x: (from.x + to.x) / 2, y: low + 10 } };
+    // The curve hangs three quarters of the way down to its control points; the tag starts under it
+    return { route: oriented, tag: { x: (from.x + to.x) / 2, y: low + PEER_TAG_GAP }, anchor: 'top' };
   }
   const [up, down] = a.y < b.y ? [a, b] : [b, a];
   const from = { x: up.x + up.w * 0.3, y: up.y + up.h };
@@ -153,5 +167,15 @@ function peerRoute(a: Rect, b: Rect): { route: Route; tag: Point } {
   const c1 = { x: from.x, y: to.y - 30 };
   const c2 = { x: to.x, y: from.y + 30 };
   const route = a === up ? curve(from, c1, c2, to) : curve(to, c2, c1, from);
-  return { route, tag: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } };
+  // Between two rows the tag stands beside the middle of the link, on one line. The link passes there leaning toward
+  // the lower card: the tag, which runs to the right, takes the side the link leaves, above it when the link goes
+  // down to the right, below it when it goes down to the left.
+  const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  // One card right under the other leaves no room above or below the link: the tag stands past its two ends.
+  if (to.y - from.y < 2 * (PEER_TAG_RISE + PEER_TAG_HALF)) {
+    return { route, tag: { x: Math.max(from.x, to.x) + PEER_TAG_GAP, y: middle.y }, anchor: 'left' };
+  }
+  const run = to.x - from.x;
+  const side = Math.abs(run) < PEER_FLAT ? 0 : run > 0 ? -1 : 1;
+  return { route, tag: { x: middle.x + PEER_TAG_GAP, y: middle.y + side * PEER_TAG_RISE }, anchor: 'left' };
 }

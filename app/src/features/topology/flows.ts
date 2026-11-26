@@ -373,11 +373,25 @@ export function nodeLive(
       }
       if (flow?.fwdBps != null) add('Host → GPU', formatBps(flow.fwdBps));
       if (flow?.backBps != null) add('GPU → host', formatBps(flow.backBps));
-      const others = peers.find((group) => group.includes(n))?.filter((x) => x !== n);
-      if (others) {
-        const names = others.map((x) => x.label).join(', ');
-        const p2p = placement?.p2p;
-        add('Peer-to-peer', p2p === 'active' ? `active with ${names}` : P2P_SHORT[p2p ?? 'requested']);
+      const group = peers.find((members) => members.includes(n));
+      const others = group?.filter((x) => x !== n);
+      if (group && others) {
+        if (placement?.p2p === 'active') {
+          add('Peer-to-peer', `active with ${others.map((x) => x.label).join(', ')}`);
+          const short = shortNames(group);
+          for (const other of others) {
+            const name = short.get(other.id) ?? other.label;
+            const theirs = flows.get(uplink(other.id)?.id ?? '');
+            const sent = lesser(flow?.backBps, theirs?.fwdBps);
+            const back = lesser(theirs?.backBps, flow?.fwdBps);
+            if (sent !== null) add(`P2P → ${name}`, approx(sent));
+            if (back !== null) add(`P2P ← ${name}`, approx(back));
+            const capacity = pathMaxBps(graph, flows, n.id, other.id);
+            if (capacity !== null) add(others.length > 1 ? `P2P path (${name})` : 'P2P path', upTo(capacity));
+          }
+        } else {
+          add('Peer-to-peer', P2P_SHORT[placement?.p2p ?? 'requested']);
+        }
       }
       out.set(n.id, {
         loadPct: g?.utilPct ?? null,
@@ -506,7 +520,7 @@ export function detailOf(graph: TopologyGraph, live: Map<string, NodeLive>, id: 
   return node && figures ? { node, live: figures } : null;
 }
 
-/** A direct GPU-to-GPU connection (peer-to-peer): not a PCIe link of the graph, and not measured apart. */
+/** A direct GPU-to-GPU connection (peer-to-peer): not a PCIe link of the graph; its traffic is estimated (see PeerFlow). */
 export interface PeerLink {
   id: string;
   from: string;
@@ -552,6 +566,106 @@ export function peerLinks(graph: TopologyGraph, placement: ModelPlacement | null
       return { id: `p2p:${from.id}:${to.id}`, from: from.id, to: to.id, confirmed };
     }),
   );
+}
+
+/**
+ * What two cards in peer-to-peer exchange, and how much they could. No counter is per pair of cards (NVML counts what
+ * each card receives and sends over its link, whoever is at the other end): a direction is at most what one card sends
+ * and the other receives, the traffic of each with the host included.
+ */
+export interface PeerFlow {
+  /** Estimated bytes/s from the link's `from` card to its `to` card; null without both cards' counters. */
+  fwdBps: number | null;
+  /** Estimated bytes/s from the `to` card to the `from` card. */
+  backBps: number | null;
+  /**
+   * Capacity per direction of the path between the two cards (bytes/s): its slowest PCIe link, at the most that link
+   * trains at. Not its current state: a link at rest drops to Gen1 and comes back with the traffic. Null = unknown.
+   */
+  capacityBps: number | null;
+}
+
+const lesser = (a: number | null | undefined, b: number | null | undefined) =>
+  a == null || b == null ? null : Math.min(a, b);
+const approx = (bps: number) => `≈ ${formatBps(bps)}`;
+const upTo = (bps: number) => `up to ${formatBps(bps)}`;
+
+/** The links from a block up to the root of the graph, nearest first. */
+function uplinks(graph: TopologyGraph, id: string): TopologyLink[] {
+  const chain: TopologyLink[] = [];
+  let at = id;
+  for (;;) {
+    const link = graph.links.find((l) => l.to === at);
+    if (!link || chain.includes(link)) return chain;
+    chain.push(link);
+    at = link.from;
+  }
+}
+
+/** The most the path between two blocks carries per direction: the slowest of the links only one of them is behind. */
+function pathMaxBps(graph: TopologyGraph, flows: Map<string, LinkFlow>, a: string, b: string): number | null {
+  const [up, other] = [uplinks(graph, a), uplinks(graph, b)];
+  const path = [...up.filter((l) => !other.includes(l)), ...other.filter((l) => !up.includes(l))];
+  const known = path.flatMap((l) => flows.get(l.id)?.maxBps ?? []);
+  return known.length === 0 ? null : Math.min(...known);
+}
+
+/**
+ * The estimated traffic and the capacity of each peer-to-peer link in use, by link id. None for a link that is only
+ * requested: nothing says its cards do not exchange through the host.
+ */
+export function peerFlows(
+  graph: TopologyGraph,
+  peers: readonly PeerLink[],
+  flows: Map<string, LinkFlow>,
+): Map<string, PeerFlow> {
+  const out = new Map<string, PeerFlow>();
+  const flowOf = (id: string) => flows.get(graph.links.find((l) => l.to === id)?.id ?? '');
+  for (const peer of peers) {
+    if (!peer.confirmed) continue;
+    const [from, to] = [flowOf(peer.from), flowOf(peer.to)];
+    out.set(peer.id, {
+      // On a card's link, “back” is what the card sends and “forward” what it receives
+      fwdBps: lesser(from?.backBps, to?.fwdBps),
+      backBps: lesser(to?.backBps, from?.fwdBps),
+      capacityBps: pathMaxBps(graph, flows, peer.from, peer.to),
+    });
+  }
+  return out;
+}
+
+/**
+ * Names short enough for a label, by block id: the words the cards' names start with in common are left out
+ * (“GeForce RTX 5070 Ti” and “GeForce RTX 5060 Ti” are “5070 Ti” and “5060 Ti”). Cards that this does not tell apart
+ * go by their bus address.
+ */
+function shortNames(nodes: readonly TopologyNode[]): Map<string, string> {
+  const words = nodes.map((n) => n.label.split(/\s+/));
+  let common = 0;
+  while (words.every((w) => w.length > common && w[common] === words[0]![common])) common++;
+  const names = words.map((w) => w.slice(common).join(' '));
+  const distinct = names.every((name, i) => name !== '' && names.indexOf(name) === i);
+  return new Map(nodes.map((n, i) => [n.id, distinct ? names[i]! : (n.busId?.replace(/^0000:/, '') ?? n.label)]));
+}
+
+export interface PeerBadge {
+  title: string;
+  /** The capacity of the path between the two cards, in words; null when unknown or not in use. */
+  capacity: string | null;
+  /** One line per estimated direction, named after the card it reaches; none while the traffic is not worth showing. */
+  lines: Fact[];
+}
+
+/** What the label of a peer-to-peer link says. `flow`: its entry of `peerFlows`, when it has one. */
+export function peerBadge(graph: TopologyGraph, peer: PeerLink, flow: PeerFlow | undefined, busy: boolean): PeerBadge {
+  if (!peer.confirmed) return { title: 'P2P requested', capacity: null, lines: [] };
+  const capacity = flow?.capacityBps == null ? null : upTo(flow.capacityBps);
+  if (!flow || !linkShown(flow, busy)) return { title: 'P2P', capacity, lines: [] };
+  const ends = graph.nodes.filter((n) => n.id === peer.from || n.id === peer.to);
+  const short = shortNames(ends);
+  const line = (to: string, bps: number | null): Fact[] =>
+    bps === null ? [] : [{ label: `→ ${short.get(to) ?? to}`, value: approx(bps) }];
+  return { title: 'P2P', capacity, lines: [...line(peer.to, flow.fwdBps), ...line(peer.from, flow.backBps)] };
 }
 
 /** Peer-to-peer of a GPU in its details, when it is not in use (one short line: the Model card says more). */

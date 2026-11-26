@@ -190,8 +190,10 @@ export function Legend({ snapshot, graph, tones, view, reducedMotion }: LegendPr
               : 'CPU ↔ memory: the link follows the CPU activity, without streaks, for lack of a DRAM measurement (perf).'}
           </li>
           <li>
-            Dotted link between GPUs: peer-to-peer (direct transfers), fainter when only requested. Not measured apart:
-            its traffic is part of each card&apos;s figures.
+            Dotted link between GPUs: peer-to-peer (direct transfers), fainter when only requested. Its dots and figures
+            are an estimate: no counter is per pair of cards, so each direction is at most what one card sends and the
+            other receives, host traffic included (and still part of each card&apos;s own figures). “Up to” is the
+            slowest link on the way, at its fastest.
           </li>
           <li>Select a block for its details.</li>
           <li>The wheel zooms, a drag moves the drawing; the buttons at its lower right zoom and reset.</li>

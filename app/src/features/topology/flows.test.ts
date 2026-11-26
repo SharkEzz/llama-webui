@@ -9,6 +9,8 @@ import {
   linkShown,
   linkSpecs,
   nodeLive,
+  peerBadge,
+  peerFlows,
   peerLinks,
   placementSeries,
 } from './flows';
@@ -562,6 +564,110 @@ test('nodeLive: a GPU says what is known of its peer-to-peer, and with which car
   expect(p2p(undefined)).toBeUndefined();
   // The AMD card is alone on its backend.
   expect(p2p('active', 'pci:0000:08:00.0')).toBeUndefined();
+});
+
+/** The two NVIDIA cards each on a root port of the CPU, resting in Gen1, and the AMD card behind the chipset. */
+const wired: TopologyGraph = {
+  ...threeGpus,
+  links: [
+    ...threeGpus.links,
+    { id: 'f', from: 'cpu', to: 'pci:0000:03:00.0', kind: 'pcie', genMax: 5, widthMax: 8, genCur: 1, widthCur: 8 },
+  ],
+};
+const MIB = 1024 ** 2;
+/** What the two NVIDIA cards exchange, as each one counts it: `[rx, tx]` of 01:00.0 then of 03:00.0. */
+const exchanging = (a: [number, number] | null, b: [number, number] | null) =>
+  ({
+    ...snapshot,
+    allGpus: [
+      gpu({ busId: '0000:01:00.0', ...(a && { pcieRxBps: a[0], pcieTxBps: a[1] }) }),
+      gpu({ busId: '0000:03:00.0', ...(b && { pcieRxBps: b[0], pcieTxBps: b[1] }) }),
+    ],
+  }) as Snapshot;
+const busySnapshot = exchanging([800 * MIB, 950 * MIB], [900 * MIB, 1000 * MIB]);
+const PEER = 'p2p:pci:0000:01:00.0:pci:0000:03:00.0';
+const flowsOf = (g: TopologyGraph, s: Snapshot | null, p2p: ModelPlacement['p2p'] = 'active') =>
+  peerFlows(g, peerLinks(g, split(p2p)), linkFlows(g, s));
+
+test('peerFlows: each direction is at most what one card sends and the other receives', () => {
+  const flow = flowsOf(wired, busySnapshot).get(PEER)!;
+  // 01:00.0 sends 950 and 03:00.0 receives 900; back, 1000 sent and 800 received.
+  expect(flow.fwdBps).toBe(900 * MIB);
+  expect(flow.backBps).toBe(800 * MIB);
+  // A card without a sample, or a link without its card in the graph: nothing to estimate.
+  expect(flowsOf(wired, exchanging([800 * MIB, 950 * MIB], null)).get(PEER)).toMatchObject({
+    fwdBps: null,
+    backBps: null,
+  });
+  expect(flowsOf(wired, null).get(PEER)).toMatchObject({ fwdBps: null, backBps: null });
+});
+
+test('peerFlows: the capacity is the slowest link of the path at its most, whatever the links rest at', () => {
+  // Both links rest in Gen1 x8 and train up to Gen5 x8.
+  expect(flowsOf(wired, busySnapshot).get(PEER)!.capacityBps).toBe(8 * 3.938e9);
+  expect(flowsOf(wired, null).get(PEER)!.capacityBps).toBe(8 * 3.938e9);
+  // A card behind the chipset: its own link and the chipset's are on the way (Gen4 x4), not only the two cards'.
+  const behind = { id: 'x', from: 'pci:0000:01:00.0', to: 'pci:0000:08:00.0', confirmed: true };
+  expect(peerFlows(wired, [behind], linkFlows(wired, null)).get('x')!.capacityBps).toBe(4 * 1.969e9);
+  // A card no link reaches (threeGpus leaves 03:00.0 unwired): the one link that is known.
+  expect(flowsOf(threeGpus, null).get(PEER)!.capacityBps).toBe(8 * 3.938e9);
+  const loose = { id: 'y', from: 'pci:0000:03:00.0', to: 'pci:0000:0d:00.0', confirmed: true };
+  expect(peerFlows(threeGpus, [loose], linkFlows(threeGpus, null)).get('y')!.capacityBps).toBeNull();
+});
+
+test('peerFlows: nothing for a link that is only requested, its traffic may go through the host', () => {
+  expect(flowsOf(wired, busySnapshot, 'requested').size).toBe(0);
+  expect(flowsOf(wired, busySnapshot, 'unavailable').size).toBe(0);
+});
+
+test('peerBadge: the capacity of the path, and each direction named after the card it reaches', () => {
+  const [peer] = peerLinks(wired, split('active'));
+  const flow = flowsOf(wired, busySnapshot).get(PEER);
+  expect(peerBadge(wired, peer!, flow, true)).toEqual({
+    title: 'P2P',
+    capacity: 'up to 29.3 GiB/s',
+    lines: [
+      { label: '→ 5060 Ti', value: '≈ 900.0 MiB/s' },
+      { label: '→ 5070 Ti', value: '≈ 800.0 MiB/s' },
+    ],
+  });
+  // At rest the traffic under 8 MiB/s is not shown, like on the other links; the capacity stays.
+  const idle = flowsOf(wired, exchanging([2 * MIB, 3 * MIB], [MIB, 2 * MIB])).get(PEER);
+  expect(peerBadge(wired, peer!, idle, false)).toEqual({ title: 'P2P', capacity: 'up to 29.3 GiB/s', lines: [] });
+  expect(peerBadge(wired, peer!, idle, true).lines).toHaveLength(2);
+  expect(peerBadge(wired, peer!, undefined, true)).toEqual({ title: 'P2P', capacity: null, lines: [] });
+  // Only requested: said as before, without figures.
+  const [asked] = peerLinks(wired, split('requested'));
+  expect(peerBadge(wired, asked!, undefined, true)).toEqual({ title: 'P2P requested', capacity: null, lines: [] });
+});
+
+test('peerBadge: two cards of the same name are told apart by their bus address', () => {
+  const twins: TopologyGraph = {
+    ...wired,
+    nodes: wired.nodes.map((n) => (n.kind === 'gpu' && n.vendor === 'nvidia' ? { ...n, label: 'RTX 5090' } : n)),
+  };
+  const [peer] = peerLinks(twins, split('active'));
+  const flow = flowsOf(twins, busySnapshot).get(PEER);
+  expect(peerBadge(twins, peer!, flow, true).lines.map((l) => l.label)).toEqual(['→ 03:00.0', '→ 01:00.0']);
+});
+
+test('nodeLive: a card in active peer-to-peer lists what it exchanges with the other, and the path between them', () => {
+  const facts = (status: ModelPlacement['p2p'], id = 'pci:0000:01:00.0') =>
+    nodeLive(wired, busySnapshot, split(status))
+      .get(id)!
+      .facts.filter((f) => f.label.startsWith('P2P'));
+  expect(facts('active')).toEqual([
+    { label: 'P2P → 5060 Ti', value: '≈ 900.0 MiB/s' },
+    { label: 'P2P ← 5060 Ti', value: '≈ 800.0 MiB/s' },
+    { label: 'P2P path', value: 'up to 29.3 GiB/s' },
+  ]);
+  expect(facts('active', 'pci:0000:03:00.0')).toEqual([
+    { label: 'P2P → 5070 Ti', value: '≈ 800.0 MiB/s' },
+    { label: 'P2P ← 5070 Ti', value: '≈ 900.0 MiB/s' },
+    { label: 'P2P path', value: 'up to 29.3 GiB/s' },
+  ]);
+  expect(facts('requested')).toEqual([]);
+  expect(facts('active', 'pci:0000:08:00.0')).toEqual([]);
 });
 
 test('linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/s while llama-server works', () => {

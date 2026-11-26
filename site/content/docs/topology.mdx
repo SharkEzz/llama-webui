@@ -201,8 +201,20 @@ The state is also written under the model split and in each card's details. Only
 apart, and it only writes these lines with `NCCL_DEBUG=INFO` in the profile's environment, on a `llama-server` built
 with NCCL: add that variable to a profile to know whether your cards really use peer-to-peer.
 
-The link is dotted and carries no streaks: nothing measures that traffic apart. It is part of the figures of each
-card's own PCIe link.
+Once peer-to-peer is active, the link says how much the two cards exchange and how much they could:
+
+- **Up to 29.3 GiB/s**, next to **P2P**: the capacity of the path between the two cards, in each direction. It is the
+  slowest PCIe link on the way, at the fastest that link trains at, not its state of the moment: a link at rest drops
+  to Gen1 and comes back with the traffic. The current state of each link stays on its own label.
+- **→ 5060 Ti ≈ 730 MiB/s**, one line per direction, named after the card it reaches (the words the two names start
+  with in common are left out; two cards of the same name go by their bus address). Dots travel along the link the
+  same way, in the color of the card that sends them, more of them and faster with more traffic.
+
+These throughputs are an estimate, which is why the link carries dots and not streaks. No counter is per pair of
+cards: NVML counts what each card receives and sends over its own PCIe link, whoever is at the other end. A direction
+is therefore at most what one card sends and the other receives, the traffic of each card with the host included; it
+is read every 5 seconds like the cards' own figures, which still count it. The dots and the two lines follow the
+rule of the other links: at rest, only from 8 MiB/s. The details of each card list the same figures.
 
 ## The side column
 
