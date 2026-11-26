@@ -107,13 +107,13 @@ The block stays outlined while its details are open, and they keep following the
 block to move them there. Select the block again, press <Kbd>Esc</Kbd>, click elsewhere or use **Close the
 details** to close them.
 
-| Block      | Details                                                                                                                                                                                                                                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GPU        | **Utilization**, **VRAM**, the **Model**, **KV cache** and **Compute buffers** sizes it holds, **Other VRAM**, **llama-server (VRAM)**, **Temperature**, **Power**, **Memory controller**, **Fan**, **Power limit**, **Graphics clock**, **Memory clock**, **PCIe link**, **Host → GPU** and **GPU → host** traffic, **Peer-to-peer** |
-| CPU        | **Load**, **llama-server** CPU use (one full core is 100%: it can exceed 100%), **Frequency**, **Temperature**, **Load average** (1, 5 and 15 minutes), **Cores**, **NUMA**                                                                                                                                                           |
-| Memory     | **Used**, **Cached**, DRAM **Read** and **Write** (or **Bandwidth** not measured), **llama-server (DRAM)**, **llama-server (RSS)**, **Model in RAM**, **Swap**, **DIMMs** with their temperature                                                                                                                                      |
-| NVMe drive | **Read**, **Write**, **Capacity**, **PCIe link**, and **Role** when it holds the running model                                                                                                                                                                                                                                        |
-| Chipset    | **CPU link** (current and maximum), number of **Devices** behind it                                                                                                                                                                                                                                                                   |
+| Block      | Details                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GPU        | **Utilization**, **VRAM**, the **Model**, **KV cache** and **Compute buffers** sizes it holds, **Other VRAM**, **llama-server (VRAM)**, **Temperature**, **Power**, **Memory controller**, **Fan**, **Power limit**, **Graphics clock**, **Memory clock**, **PCIe link**, **Host → GPU** and **GPU → host** traffic, **Peer-to-peer** (or **No peer-to-peer with** a card the driver refuses it to) |
+| CPU        | **Load**, **llama-server** CPU use (one full core is 100%: it can exceed 100%), **Frequency**, **Temperature**, **Load average** (1, 5 and 15 minutes), **Cores**, **NUMA**                                                                                                                                                                                                                         |
+| Memory     | **Used**, **Cached**, DRAM **Read** and **Write** (or **Bandwidth** not measured), **llama-server (DRAM)**, **llama-server (RSS)**, **Model in RAM**, **Swap**, **DIMMs** with their temperature                                                                                                                                                                                                    |
+| NVMe drive | **Read**, **Write**, **Capacity**, **PCIe link**, and **Role** when it holds the running model                                                                                                                                                                                                                                                                                                      |
+| Chipset    | **CPU link** (current and maximum), number of **Devices** behind it                                                                                                                                                                                                                                                                                                                                 |
 
 A detail appears only when it is known: what a GPU reports depends on its driver (see
 [What each source reports](/docs/system/#what-each-source-reports)). **Power limit** adds the factory value when the limit was lowered.
@@ -187,19 +187,27 @@ machine's CPU load otherwise: it has no streaks, since nothing says which way th
 
 With several GPUs on one backend, `llama-server` can let them exchange directly instead of through system memory
 (CUDA peer-to-peer). It is requested by setting the `GGML_CUDA_P2P` variable in the profile's environment, and it
-only works when the driver allows it, which is usually limited to workstation and datacenter cards.
+only works between two cards the driver allows it to, which is usually limited to workstation and datacenter cards.
+
+The driver says so for every pair of NVIDIA cards, with or without a server running: the details of a card read
+**Peer-to-peer: allowed by the driver with** the other card, or **No peer-to-peer with** it and the reason (the
+chipset, the card, the PCI topology between them, a driver setting). It is what `nvidia-smi topo -p2p rw` prints,
+read through NVML: it is missing when the cards are read through `nvidia-smi`, and for a card hidden in Settings.
 
 The page shows what is known of it for the cards that hold the model:
 
-| State                     | How it is known                                                                                       | On the page                                     |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **Active**                | NCCL reports its channels going from GPU to GPU (`via P2P/…`)                                         | A dotted link between the cards, tagged **P2P** |
-| **Requested**             | `GGML_CUDA_P2P` is set and nothing says whether the driver allows it                                  | A fainter dotted link, tagged **P2P requested** |
-| **Refused by the driver** | `GGML_CUDA_P2P` is set and NCCL reports peer-to-peer disabled, its channels going through host memory | No link: the cards do not exchange directly     |
+| State                     | How it is known                                                                                                                                        | On the page                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| **Active**                | NCCL reports its channels going from GPU to GPU (`via P2P/…`), or `GGML_CUDA_P2P` is set and the driver allows peer-to-peer between the two cards      | A dotted link between the cards, tagged **P2P** |
+| **Requested**             | `GGML_CUDA_P2P` is set and nothing says whether the driver allows it                                                                                   | A fainter dotted link, tagged **P2P requested** |
+| **Refused by the driver** | `GGML_CUDA_P2P` is set, and NCCL reports peer-to-peer disabled, its channels going through host memory, or the driver refuses it between the two cards | No link: the cards do not exchange directly     |
 
-The state is also written under the model split and in each card's details. Only NCCL tells the first and the last
-apart, and it only writes these lines with `NCCL_DEBUG=INFO` in the profile's environment, on a `llama-server` built
-with NCCL: add that variable to a profile to know whether your cards really use peer-to-peer.
+The state is also written under the model split and in each card's details. What NCCL logs comes first: it saw the
+transfers happen, where the driver only says what it allows. It writes these lines with `NCCL_DEBUG=INFO` in the
+profile's environment, on a `llama-server` built with NCCL. Without them, a launch that requested peer-to-peer stands
+on the driver's answer: `llama-server` enables it between every pair of cards the driver allows, so the model split
+then reads **active (requested, and the driver allows it)**. The state stays **Requested** only when neither answers,
+with the cards read through `nvidia-smi` for instance.
 
 Once peer-to-peer is active, the link says how much the two cards exchange and how much they could:
 

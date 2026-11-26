@@ -1,7 +1,8 @@
-import type { GpuSample, ModelPlacement, Snapshot, TopologyGraph } from '@llama-webui/shared';
+import type { GpuP2pStatus, GpuSample, ModelPlacement, Snapshot, TopologyGraph } from '@llama-webui/shared';
 import { expect, test } from 'vitest';
 import {
   detailOf,
+  driverP2p,
   layerSlice,
   levelOf,
   linkBadge,
@@ -11,6 +12,7 @@ import {
   nodeLive,
   peerBadge,
   peerFlows,
+  p2pSummary,
   peerLinks,
   placementSeries,
 } from './flows';
@@ -668,6 +670,76 @@ test('nodeLive: a card in active peer-to-peer lists what it exchanges with the o
   ]);
   expect(facts('requested')).toEqual([]);
   expect(facts('active', 'pci:0000:08:00.0')).toEqual([]);
+});
+
+/** The two NVIDIA cards with the driver's answer for peer-to-peer from each one to the other. */
+const allowing = (there: GpuP2pStatus | null, back: GpuP2pStatus | null = there): Snapshot => ({
+  ...busySnapshot,
+  allGpus: [
+    gpu({ busId: '0000:01:00.0', ...(there && { p2p: [{ busId: '0000:03:00.0', status: there }] }) }),
+    gpu({ busId: '0000:03:00.0', ...(back && { p2p: [{ busId: '0000:01:00.0', status: back }] }) }),
+  ],
+});
+const NVIDIA = split('requested', [
+  ['CUDA0', '0000:01:00.0'],
+  ['CUDA1', '0000:03:00.0'],
+]);
+
+test('peerLinks: the driver confirms or refuses a link the launch only requested', () => {
+  const linksOf = (s: Snapshot, launch = NVIDIA) => peerLinks(wired, launch, driverP2p(s));
+  expect(linksOf(allowing('ok'))).toEqual([
+    { id: PEER, from: 'pci:0000:01:00.0', to: 'pci:0000:03:00.0', confirmed: true },
+  ]);
+  // Refused in one direction is refused: the cards exchange through host memory, no link.
+  expect(linksOf(allowing('ok', 'gpu'))).toEqual([]);
+  expect(linksOf(allowing('chipset'))).toEqual([]);
+  // One answer of two, or none (nvidia-smi, a hidden card): still only requested.
+  expect(linksOf(allowing('ok', null))).toMatchObject([{ confirmed: false }]);
+  expect(linksOf(allowing(null))).toMatchObject([{ confirmed: false }]);
+  // What NCCL logged comes first, and the driver alone draws nothing.
+  expect(linksOf(allowing('gpu'), { ...NVIDIA, p2p: 'active' })).toMatchObject([{ confirmed: true }]);
+  expect(linksOf(allowing('ok'), { ...NVIDIA, p2p: 'unavailable' })).toEqual([]);
+  const { p2p: _, ...unasked } = NVIDIA;
+  expect(linksOf(allowing('ok'), unasked)).toEqual([]);
+});
+
+test('p2pSummary: says where the word comes from, the logs or the driver', () => {
+  const summary = (s: Snapshot, launch: ModelPlacement | null = NVIDIA) => p2pSummary(launch, wired, driverP2p(s));
+  expect(summary(allowing('ok'))).toBe('active (requested, and the driver allows it)');
+  expect(summary(allowing('gpu'))).toBe('requested, refused by the driver (card not supported; through host memory)');
+  expect(summary(allowing(null))).toBe('requested, not confirmed');
+  expect(summary(allowing('gpu'), { ...NVIDIA, p2p: 'active' })).toBe('active');
+  expect(summary(allowing('ok'), { ...NVIDIA, p2p: 'unavailable' })).toBe(
+    'requested, refused by the driver (through host memory)',
+  );
+  expect(summary(allowing('ok'), null)).toBeNull();
+  expect(p2pSummary(NVIDIA)).toBe('requested, not confirmed');
+});
+
+test('nodeLive: a launch that requested peer-to-peer takes the word of the driver, and its figures with it', () => {
+  const facts = (s: Snapshot) =>
+    nodeLive(wired, s, NVIDIA)
+      .get('pci:0000:01:00.0')!
+      .facts.filter((f) => /P2P|[Pp]eer-to-peer/.test(f.label));
+  expect(facts(allowing('ok'))).toEqual([
+    { label: 'Peer-to-peer', value: 'active with RTX 5060 Ti' },
+    { label: 'P2P path', value: 'up to 29.3 GiB/s' },
+  ]);
+  expect(facts(allowing('disabled'))).toEqual([{ label: 'Peer-to-peer', value: 'refused by the driver' }]);
+  expect(facts(allowing(null))).toEqual([{ label: 'Peer-to-peer', value: 'requested, not confirmed' }]);
+});
+
+test('nodeLive: without a launch that concerns it, a card says what the driver would allow', () => {
+  const facts = (s: Snapshot, id = 'pci:0000:01:00.0') =>
+    nodeLive(wired, s, null)
+      .get(id)!
+      .facts.filter((f) => /[Pp]eer-to-peer/.test(f.label));
+  expect(facts(allowing('ok'))).toEqual([{ label: 'Peer-to-peer', value: 'allowed by the driver with RTX 5060 Ti' }]);
+  expect(facts(allowing('ok', 'topology'))).toEqual([
+    { label: 'No peer-to-peer with RTX 5060 Ti', value: 'PCI topology not supported' },
+  ]);
+  expect(facts(allowing(null))).toEqual([]);
+  expect(facts(allowing('ok'), 'pci:0000:08:00.0')).toEqual([]);
 });
 
 test('linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/s while llama-server works', () => {

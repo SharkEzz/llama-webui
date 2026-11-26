@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { fmt, formatBytes, formatPct, formatRate } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { FILL_CRIT_PCT, FILL_WARN_PCT, LINK_CRIT, LINK_WARN, p2pSummary, placementSeries } from './flows';
+import { FILL_CRIT_PCT, FILL_WARN_PCT, LINK_CRIT, LINK_WARN, driverP2p, p2pSummary, placementSeries } from './flows';
 import { LAYER_TINT, tint } from './themeColors';
 import type { TopologyView } from './viewPrefs';
 
@@ -65,7 +65,7 @@ export function Hud({ phase, loadProgress = null, snapshot, graph, placement, to
   const ui = PHASE_UI[phase];
   const series = graph ? placementSeries(graph, placement) : [];
   const total = series.reduce((s, x) => s + x.bytes, 0);
-  const p2p = p2pSummary(placement);
+  const p2p = p2pSummary(placement, graph, driverP2p(snapshot));
   const loadPct = phase === 'loading' && loadProgress ? loadProgressPct(loadProgress) : null;
 
   return (
@@ -190,10 +190,10 @@ export function Legend({ snapshot, graph, tones, view, reducedMotion }: LegendPr
               : 'CPU ↔ memory: the link follows the CPU activity, without streaks, for lack of a DRAM measurement (perf).'}
           </li>
           <li>
-            Dotted link between GPUs: peer-to-peer (direct transfers), fainter when only requested. Its dots and figures
-            are an estimate: no counter is per pair of cards, so each direction is at most what one card sends and the
-            other receives, host traffic included (and still part of each card&apos;s own figures). “Up to” is the
-            slowest link on the way, at its fastest.
+            Dotted link between GPUs: peer-to-peer (direct transfers), fainter when it is requested and neither the logs
+            nor the driver say whether it is allowed. Its dots and figures are an estimate: no counter is per pair of
+            cards, so each direction is at most what one card sends and the other receives, host traffic included (and
+            still part of each card&apos;s own figures). “Up to” is the slowest link on the way, at its fastest.
           </li>
           <li>Select a block for its details.</li>
           <li>The wheel zooms, a drag moves the drawing; the buttons at its lower right zoom and reset.</li>

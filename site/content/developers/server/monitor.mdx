@@ -228,9 +228,12 @@ sample. The first sample reads them all, and so does the first sample of a card 
 NVML refuses is reported unknown (`null`) and asked again on the next sample, never replaced by the one before; an
 answer that the card does not support it is kept for the period. A clock that goes back reads them again. What does
 not change is read on the first sample that needs it, then kept: per card its UUID, name, bus ID, maximum graphics clock, maximum
-PCIe link and default power limit, and the driver and CUDA driver versions. Such a value is kept once NVML gives it, or
+PCIe link and default power limit, what the driver allows from it to each other card in peer-to-peer
+(`nvmlDeviceGetP2PStatus` for the read and the write capability: `ok`, or the first status that stands in the way), and
+the driver and CUDA driver versions. Such a value is kept once NVML gives it, or
 says the card does not support it; any other failure is asked again on the next sample, and a card whose UUID fails is
-left out of that sample. A hidden card is only identified, so after its first sample it costs no call. Device handles
+left out of that sample. A hidden card is only identified, so after its first sample it costs no call, and nothing is
+asked about peer-to-peer with it. Device handles
 are pointers, kept as `bigint`, read once when NVML starts; out-parameters are buffers, allocated once per reader and
 reused by every sample. The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
 

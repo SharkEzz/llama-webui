@@ -1,5 +1,6 @@
 import { phaseOf, stateLoadProgress } from '@llama-webui/shared';
 import { useEffect, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { Tone } from '@/components/glass/tones';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMonitor } from '@/lib/monitor';
@@ -10,7 +11,7 @@ import { BoardView } from './BoardView';
 import { CardsView } from './CardsView';
 import { DetailPopover } from './Detail';
 import { detailPopover } from './detailPopover';
-import { gpuTones, linkFlows, linkSpecs, nodeLive, type PeerFlow, peerFlows, peerLinks } from './flows';
+import { driverP2p, gpuTones, linkFlows, linkSpecs, nodeLive, type PeerFlow, peerFlows, peerLinks } from './flows';
 import { Hud, Legend } from './Hud';
 import { LayerTooltip } from './LayerTooltip';
 import { layerTooltip } from './layerTooltip';
@@ -48,7 +49,10 @@ export function TopologyPage() {
   );
   const specs = useMemo(() => (graph ? linkSpecs(graph, snapshot) : new Map<string, string>()), [graph, snapshot]);
   const tones = useMemo(() => (graph ? gpuTones(graph) : new Map<string, Tone>()), [graph]);
-  const peers = useMemo(() => (graph ? peerLinks(graph, placement) : []), [graph, placement]);
+  // What the driver allows between the cards is the same on every snapshot: compared entry by entry, it only changes
+  // the links when an answer does.
+  const driver = useMonitor(useShallow((s) => driverP2p(s.snapshot)));
+  const peers = useMemo(() => (graph ? peerLinks(graph, placement, driver) : []), [graph, placement, driver]);
   const peerTraffic = useMemo(
     () => (graph && flows ? peerFlows(graph, peers, flows) : new Map<string, PeerFlow>()),
     [graph, peers, flows],

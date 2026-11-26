@@ -226,34 +226,41 @@ approximation: with several busy slots, it aggregates their requests.
 One GPU, NVIDIA (NVML or `nvidia-smi`) or AMD (`amdgpu` sysfs). The optional fields are missing or null when the
 vendor or the card does not provide them.
 
-| Field                | Type                  | Description                                                                                |
-| -------------------- | --------------------- | ------------------------------------------------------------------------------------------ |
-| `key`                | string                | `nvidia:<uuid>` or `amd:<pci device>`: the stable id used in series keys.                  |
-| `vendor`             | `"nvidia"` \| `"amd"` |                                                                                            |
-| `name`               | string                | Card name.                                                                                 |
-| `busId`              | string                | PCI address, `0000:01:00.0`.                                                               |
-| `utilPct`            | number \| null        | GPU utilization, %.                                                                        |
-| `vramUsedBytes`      | number                | VRAM used on the card.                                                                     |
-| `vramTotalBytes`     | number                | VRAM of the card.                                                                          |
-| `tempC`              | number \| null        | Temperature, °C.                                                                           |
-| `powerW`             | number \| null        | Power draw, W.                                                                             |
-| `procVramBytes`      | number                | VRAM held by the `llama-server` process on this card (0 without a server).                 |
-| `memUtilPct`         | number \| null        | Memory controller utilization, %.                                                          |
-| `fanPct`             | number \| null        | Fan speed, %.                                                                              |
-| `powerLimitW`        | number \| null        | Current power limit, W. Through NVML, read every 10 s.                                     |
-| `powerDefaultLimitW` | number \| null        | Factory power limit (NVIDIA); differs from `powerLimitW` if it was lowered.                |
-| `persistence`        | boolean \| null       | NVIDIA persistence mode, read every 10 s.                                                  |
-| `clockGrMhz`         | number \| null        | Graphics clock, MHz.                                                                       |
-| `clockGrMaxMhz`      | number \| null        | Maximum graphics clock, MHz.                                                               |
-| `clockMemMhz`        | number \| null        | Memory clock, MHz.                                                                         |
-| `pcieGen`            | number \| null        | Current PCIe generation.                                                                   |
-| `pcieWidth`          | number \| null        | Current PCIe width.                                                                        |
-| `pcieGenMax`         | number \| null        | Maximum PCIe generation.                                                                   |
-| `pcieWidthMax`       | number \| null        | Maximum PCIe width.                                                                        |
-| `pcieRxBps`          | number \| null        | PCIe receive throughput, bytes/s, read every 5 s (the value holds in between).             |
-| `pcieTxBps`          | number \| null        | PCIe transmit throughput, bytes/s, read every 5 s (the value holds in between).            |
-| `suspended`          | boolean               | Sleeping card (runtime-suspended): deliberately not read, since any read would wake it up. |
-| `hidden`             | boolean               | Card listed in the `hiddenGpus` setting: listed but not read.                              |
+| Field                | Type                  | Description                                                                                                  |
+| -------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `key`                | string                | `nvidia:<uuid>` or `amd:<pci device>`: the stable id used in series keys.                                    |
+| `vendor`             | `"nvidia"` \| `"amd"` |                                                                                                              |
+| `name`               | string                | Card name.                                                                                                   |
+| `busId`              | string                | PCI address, `0000:01:00.0`.                                                                                 |
+| `utilPct`            | number \| null        | GPU utilization, %.                                                                                          |
+| `vramUsedBytes`      | number                | VRAM used on the card.                                                                                       |
+| `vramTotalBytes`     | number                | VRAM of the card.                                                                                            |
+| `tempC`              | number \| null        | Temperature, °C.                                                                                             |
+| `powerW`             | number \| null        | Power draw, W.                                                                                               |
+| `procVramBytes`      | number                | VRAM held by the `llama-server` process on this card (0 without a server).                                   |
+| `memUtilPct`         | number \| null        | Memory controller utilization, %.                                                                            |
+| `fanPct`             | number \| null        | Fan speed, %.                                                                                                |
+| `powerLimitW`        | number \| null        | Current power limit, W. Through NVML, read every 10 s.                                                       |
+| `powerDefaultLimitW` | number \| null        | Factory power limit (NVIDIA); differs from `powerLimitW` if it was lowered.                                  |
+| `persistence`        | boolean \| null       | NVIDIA persistence mode, read every 10 s.                                                                    |
+| `clockGrMhz`         | number \| null        | Graphics clock, MHz.                                                                                         |
+| `clockGrMaxMhz`      | number \| null        | Maximum graphics clock, MHz.                                                                                 |
+| `clockMemMhz`        | number \| null        | Memory clock, MHz.                                                                                           |
+| `pcieGen`            | number \| null        | Current PCIe generation.                                                                                     |
+| `pcieWidth`          | number \| null        | Current PCIe width.                                                                                          |
+| `pcieGenMax`         | number \| null        | Maximum PCIe generation.                                                                                     |
+| `pcieWidthMax`       | number \| null        | Maximum PCIe width.                                                                                          |
+| `pcieRxBps`          | number \| null        | PCIe receive throughput, bytes/s, read every 5 s (the value holds in between).                               |
+| `pcieTxBps`          | number \| null        | PCIe transmit throughput, bytes/s, read every 5 s (the value holds in between).                              |
+| `p2p`                | `GpuPeer[]`, optional | Peer-to-peer from this card to each other NVIDIA card read, see below. NVML only; absent with a single card. |
+| `suspended`          | boolean               | Sleeping card (runtime-suspended): deliberately not read, since any read would wake it up.                   |
+| `hidden`             | boolean               | Card listed in the `hiddenGpus` setting: listed but not read.                                                |
+
+`GpuPeer` is `{ busId, status }`: what the driver allows from the card to the card at `busId`, to read and to write
+there, whether or not a program uses it (`nvmlDeviceGetP2PStatus`, what `nvidia-smi topo -p2p rw` prints). Each card
+lists the other way itself. `status` is `ok`, or what stands in the way: `chipset`, `gpu`, `topology` (the PCI
+topology between the two cards), `disabled` (a driver setting), `unsupported` or `unknown`. A pair the driver does not
+answer for is left out, as are the pairs of a hidden card.
 
 ### `proc`
 
