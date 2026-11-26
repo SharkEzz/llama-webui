@@ -165,7 +165,9 @@ unambiguous. After ring eviction or sleep, the cached log placement can still be
 | `computeBytes` | number           | Compute buffers, summed over the contexts (an MTP's adds to the model's); a context reserved again keeps only its last size.                                             |
 | `estimated`    | `true`, optional | Spread from the `Meta()` buffers of `-sm tensor`, which only give the largest part: by `-ts`, equal parts without it. Absent otherwise.                                  |
 
-`p2p` says what the logs tell about direct transfers between GPUs:
+`p2p` says what the logs tell about direct transfers between GPUs. What the driver allows between two cards is not
+part of it: it comes with each card of the [snapshot](/developers/api/monitor/) (`p2p` of a GPU), and the Topology page
+uses it to settle a `requested`.
 
 | Value         | Read from                                                                                                                                                                                     |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

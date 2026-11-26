@@ -7,6 +7,7 @@ import {
   intensity,
   laneStates,
   makeLane,
+  peerLaneStates,
   STREAK_FPS,
   STREAK_LENGTH,
   speedOf,
@@ -148,6 +149,28 @@ describe('laneStates', () => {
   });
 });
 
+describe('peerLaneStates', () => {
+  const peer = (fwdBps: number | null, backBps: number | null) =>
+    new Map([['p2p', { fwdBps, backBps, capacityBps: null }]]);
+
+  test('a peer-to-peer link carries dots, one lane per estimated direction', () => {
+    expect(peerLaneStates(peer(CEIL_BPS, null), true, false).get('p2p')).toEqual({
+      fwd: 1,
+      back: null,
+      level: 'ok',
+      dots: true,
+    });
+    expect(peerLaneStates(peer(FLOOR_BPS, CEIL_BPS), true, false).get('p2p')).toMatchObject({ fwd: 0, back: 1 });
+  });
+
+  test('nothing at rest under 8 MiB/s, under reduced motion or without an estimate', () => {
+    expect(peerLaneStates(peer(REST_FLOOR_BPS / 2, null), false, false).size).toBe(0);
+    expect(peerLaneStates(peer(REST_FLOOR_BPS, null), false, false).size).toBe(1);
+    expect(peerLaneStates(peer(CEIL_BPS, CEIL_BPS), true, true).size).toBe(0);
+    expect(peerLaneStates(peer(null, null), true, false).size).toBe(0);
+  });
+});
+
 describe('trackIntensity', () => {
   test('a track takes the intensity of its busier direction once its traffic shows', () => {
     expect(trackIntensity(link('gpu'), flow({ fwdBps: 1e6, backBps: 2e9 }), false)).toBe(intensity(2e9));
@@ -206,8 +229,11 @@ describe('the streak loop', () => {
     moveTo: () => {},
     lineTo: () => {},
     stroke: () => calls.push('stroke'),
+    arc: () => {},
+    fill: () => calls.push('fill'),
     setTransform: () => {},
     strokeStyle: '',
+    fillStyle: '',
     globalAlpha: 1,
     lineWidth: 0,
     lineCap: 'butt',
@@ -264,7 +290,7 @@ describe('the streak loop', () => {
     loop.setStates(on, () => 'red');
     vi.advanceTimersByTime(frame * 2);
     calls.length = 0;
-    loop.setLinks([{ id: 'gpu', route: straight(p(0, 0), p(60, 0)), badge: null }]);
+    loop.setLinks([{ id: 'gpu', route: straight(p(0, 0), p(60, 0)) }]);
     vi.advanceTimersByTime(frame);
     expect(calls.filter((c) => c === 'stroke')).toHaveLength(2);
     // A link that came with the new drawing starts as soon as it is there
@@ -275,6 +301,23 @@ describe('the streak loop', () => {
     expect(late.running).toBe(true);
     loop.stop();
     late.stop();
+  });
+
+  test('a peer-to-peer link draws dots, each direction in its own color, and no stroke', () => {
+    const loop = createStreakLoop(canvas);
+    loop.setLinks(geo);
+    const colors: string[] = [];
+    loop.setStates(new Map([['gpu', { fwd: 1, back: 1, level: 'ok' as const, dots: true as const }]]), (_, __, dir) => {
+      colors.push(dir);
+      return dir === 'fwd' ? 'red' : 'blue';
+    });
+    expect(colors).toEqual(['fwd', 'back']);
+    vi.advanceTimersByTime(frame);
+    expect(calls.filter((c) => c === 'stroke')).toHaveLength(0);
+    // A halo and a core for each of the 8 dots of the two lanes.
+    expect(calls.filter((c) => c === 'fill')).toHaveLength(2 * 8 * 2);
+    expect(ctx.fillStyle).toBe('blue');
+    loop.stop();
   });
 
   test('never starts for a link the drawing does not have', () => {

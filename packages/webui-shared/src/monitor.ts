@@ -60,6 +60,21 @@ export { slotContextTokens } from 'llamacpp-js/metrics';
 /** A detailed reading: missing or null = unknown (not provided by this vendor or card). */
 const Detail = Schema.Finite.pipe(Schema.NullOr, Schema.optionalKey);
 
+/**
+ * What the driver answers about direct transfers from a card to another (NVML's `nvmlGpuP2PStatus_t`, as `nvidia-smi
+ * topo -p2p rw` shows it): `ok`, or what stands in the way, the chipset, the card, the PCI topology between them, a
+ * driver setting, or no reason given (`unsupported`, `unknown`).
+ */
+export const GpuP2pStatus = Schema.Literals(['ok', 'chipset', 'gpu', 'topology', 'disabled', 'unsupported', 'unknown']);
+export type GpuP2pStatus = typeof GpuP2pStatus.Type;
+
+/**
+ * Peer-to-peer from a card to the card at `busId`: what the driver allows, read and write, whether or not a program
+ * uses it.
+ */
+export const GpuPeer = Schema.Struct({ busId: Schema.String, status: GpuP2pStatus });
+export type GpuPeer = typeof GpuPeer.Type;
+
 /** One GPU on one tick. */
 export const GpuSample = Schema.Struct({
   /** `nvidia:<uuid>` | `amd:<pdev>`. */
@@ -90,6 +105,11 @@ export const GpuSample = Schema.Struct({
   pcieWidthMax: Detail,
   pcieRxBps: Detail,
   pcieTxBps: Detail,
+  /**
+   * Peer-to-peer from this card to each other NVIDIA card that is read (NVML only); absent with a single card or
+   * another collector.
+   */
+  p2p: GpuPeer.pipe(Schema.Array, Schema.optionalKey),
   /** Sleeping card (runtime-suspended), deliberately not read: any read would wake it up. */
   suspended: Schema.optionalKey(Schema.Boolean),
   /** Hidden card (hiddenGpus setting): listed but not read. */

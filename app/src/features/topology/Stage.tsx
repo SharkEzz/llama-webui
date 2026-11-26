@@ -16,16 +16,25 @@ import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { type Camera, fitCamera, panBy, resolveCamera, reveal, ZOOM_MAX, ZOOM_STEP, zoomAt } from './camera';
 import { detailPopover } from './detailPopover';
-import { type Level, type LinkFlow, linkBadge, type NodeLive, type PeerLink } from './flows';
+import {
+  type Level,
+  type LinkFlow,
+  linkBadge,
+  type NodeLive,
+  type PeerFlow,
+  type PeerLink,
+  linkShown,
+  peerBadge,
+} from './flows';
 import { layerTooltip } from './layerTooltip';
-import { createStreakLoop, laneStates, type StreakLoop, trackLook } from './streaks';
+import { createStreakLoop, laneStates, peerLaneStates, type StreakLoop, trackLook } from './streaks';
 import { resolveColor } from './themeColors';
 import type { ViewLayout } from './tree';
 
 /*
  * The frame both views draw in: the drawing at its natural size, whole in the room it has until someone zooms or
  * moves it (the wheel, a drag, the three buttons), with the tracks of the links (SVG), their labels (text) and their
- * streaks (one canvas). The blocks are the view's own.
+ * streaks (one canvas), and the dots of a peer-to-peer link in use. The blocks are the view's own.
  */
 
 /** What the page hands a view. */
@@ -36,13 +45,18 @@ export interface ViewProps {
   /** Current state of each PCIe link (“Gen4 x8”), by link id. */
   specs: Map<string, string>;
   peers: readonly PeerLink[];
+  /** Estimated traffic and capacity of each peer-to-peer link in use, by link id. */
+  peerFlows: Map<string, PeerFlow>;
   tones: Map<string, Tone>;
   /** llama-server is loading, processing a prompt or generating: every link with traffic shows it. */
   busy: boolean;
   reducedMotion: boolean;
 }
 
-export interface StageProps extends Pick<ViewProps, 'graph' | 'flows' | 'specs' | 'tones' | 'busy' | 'reducedMotion'> {
+export interface StageProps extends Pick<
+  ViewProps,
+  'graph' | 'flows' | 'specs' | 'peers' | 'peerFlows' | 'tones' | 'busy' | 'reducedMotion'
+> {
   layout: ViewLayout;
   /** Drawn under everything else (the board's outline). */
   backdrop?: ReactNode;
@@ -69,8 +83,10 @@ const LEVEL_TEXT: Record<Level, string> = {
   crit: 'text-destructive',
 };
 
-const CHIP =
-  'pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-lg border border-surface-border bg-popover px-1.5 py-0.5 text-[11px] leading-snug whitespace-nowrap text-muted-foreground';
+const CHIP_BOX =
+  'pointer-events-none absolute rounded-lg border border-surface-border bg-popover px-1.5 py-0.5 text-[11px] leading-snug whitespace-nowrap text-muted-foreground';
+/** A label centered on its point. */
+const CHIP = cn(CHIP_BOX, '-translate-x-1/2 -translate-y-1/2');
 
 function trackWidth(link: TopologyLink, flow: LinkFlow | undefined): number {
   if (link.kind === 'memory') return 9;
@@ -85,7 +101,19 @@ function toneOfLink(link: TopologyLink, to: TopologyNode | undefined, tones: Map
   return tone ? TONE_VAR[tone] : 'var(--tone-teal)';
 }
 
-export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion, backdrop, children }: StageProps) {
+export function Stage({
+  graph,
+  layout,
+  flows,
+  specs,
+  peers,
+  peerFlows,
+  tones,
+  busy,
+  reducedMotion,
+  backdrop,
+  children,
+}: StageProps) {
   const frame = useRef<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const loop = useRef<StreakLoop | null>(null);
@@ -194,9 +222,14 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
       return [{ geo, link, to, tone: toneOfLink(link, to, tones) }];
     });
   }, [graph, layout, tones]);
+  const peerById = useMemo(() => new Map(peers.map((p) => [p.id, p])), [peers]);
   const states = useMemo(
-    () => laneStates(graph.links, flows, busy, reducedMotion),
-    [graph, flows, busy, reducedMotion],
+    () =>
+      new Map([
+        ...laneStates(graph.links, flows, busy, reducedMotion),
+        ...peerLaneStates(peerFlows, busy, reducedMotion),
+      ]),
+    [graph, flows, peerFlows, busy, reducedMotion],
   );
 
   // The streak loop lives as long as the canvas; it only runs a timer while a link has streaks
@@ -213,14 +246,18 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
     loop.current?.resize(layout.width, layout.height, ratio);
   }, [layout.width, layout.height, ratio]);
   useEffect(() => {
-    loop.current?.setLinks(layout.links);
+    loop.current?.setLinks([...layout.links, ...layout.peers]);
   }, [layout]);
   useEffect(() => {
     const toneOf = new Map(links.map((l) => [l.geo.id, l.tone]));
-    loop.current?.setStates(states, (id, level) =>
-      resolveColor(level === 'ok' ? (toneOf.get(id) ?? 'var(--tone-teal)') : LEVEL_COLOR[level], theme),
-    );
-  }, [states, links, theme]);
+    loop.current?.setStates(states, (id, level, direction) => {
+      // The dots of a peer-to-peer link take the color of the card that sends them
+      const peer = peerById.get(id);
+      const sender = peer ? tones.get(direction === 'fwd' ? peer.from : peer.to) : undefined;
+      const tone = sender ? TONE_VAR[sender] : (toneOf.get(id) ?? 'var(--tone-teal)');
+      return resolveColor(level === 'ok' ? tone : LEVEL_COLOR[level], theme);
+    });
+  }, [states, links, peerById, tones, theme]);
 
   return (
     <div className="relative size-full">
@@ -288,16 +325,21 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
                 />
               );
             })}
-            {layout.peers.map((peer) => (
-              <path
-                key={peer.id}
-                d={peer.route.d}
-                stroke="var(--muted-foreground)"
-                strokeWidth={1.5}
-                strokeDasharray="2 7"
-                opacity={peer.confirmed ? 0.85 : 0.5}
-              />
-            ))}
+            {layout.peers.map((peer) => {
+              const flow = peerFlows.get(peer.id);
+              // Under reduced motion a link with traffic is drawn stronger, in place of its dots
+              const strong = reducedMotion && flow !== undefined && linkShown(flow, busy);
+              return (
+                <path
+                  key={peer.id}
+                  d={peer.route.d}
+                  stroke={strong ? 'var(--foreground)' : 'var(--muted-foreground)'}
+                  strokeWidth={strong ? 2.5 : 1.5}
+                  strokeDasharray="2 7"
+                  opacity={peer.confirmed ? 0.85 : 0.5}
+                />
+              );
+            })}
           </svg>
           {children}
           {/* Above the blocks, which it never covers: a block's glass does not blur again at each frame */}
@@ -335,15 +377,34 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
               </div>
             );
           })}
-          {layout.peers.map((peer) => (
-            <span
-              key={peer.id}
-              className={cn(CHIP, 'font-medium', peer.confirmed && 'text-foreground')}
-              style={{ left: peer.tag.x, top: peer.tag.y }}
-            >
-              {peer.confirmed ? 'P2P' : 'P2P requested'}
-            </span>
-          ))}
+          {layout.peers.map((geo) => {
+            const peer = peerById.get(geo.id);
+            if (!peer) return null;
+            const badge = peerBadge(graph, peer, peerFlows.get(geo.id), busy);
+            const row = geo.anchor === 'left';
+            return (
+              <div
+                key={geo.id}
+                className={cn(CHIP_BOX, row ? 'flex -translate-y-1/2 gap-x-3' : '-translate-x-1/2')}
+                style={{ left: geo.tag.x, top: geo.tag.y }}
+              >
+                <span className="block text-center">
+                  <span className={cn('font-medium', peer.confirmed && 'text-foreground')}>{badge.title}</span>
+                  {badge.capacity && <span className="num text-faint-foreground"> · {badge.capacity}</span>}
+                </span>
+                {badge.lines.length > 0 && (
+                  <span className={row ? 'flex gap-x-3' : 'grid grid-cols-[auto_auto] gap-x-2'}>
+                    {badge.lines.map((line) => (
+                      <span key={line.label} className={row ? 'flex gap-x-1.5' : 'contents'}>
+                        <span>{line.label}</span>
+                        <span className="text-right num text-foreground">{line.value}</span>
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       <div role="group" aria-label="Zoom" className="absolute right-3 bottom-3 flex flex-col gap-1">
