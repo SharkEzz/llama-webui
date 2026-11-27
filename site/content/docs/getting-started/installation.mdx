@@ -217,6 +217,15 @@ The `ExecStart` line then reads, for example,
 `ExecStart=/usr/bin/node /home/you/.local/bin/llama-webui`. If you later move to another Node.js version with a
 version manager, install llama-webui again with it and write the unit again.
 
+The missing `PATH` matters for `llama-server` too: if the **Binary** setting is a bare `llama-server` that your
+terminal finds through a `PATH` set in `~/.bashrc` or `~/.profile`, the service cannot start it. Give its absolute path
+on the **General** tab of [Settings](/docs/settings/), for example `~/llama.cpp/build/bin/llama-server`.
+
+`WorkingDirectory=%h` starts llama-webui in your home folder, and llama-webui loads the `.env` file of the folder it
+starts from ([Launch options](/docs/configuration/#precedence)): a `~/.env` written for another tool would feed its
+options too. If you keep one there, point `WorkingDirectory` at a folder without one, such as the data folder
+(`%h/.local/share/llama-webui`, created by the first start).
+
 From source, build once with `pnpm build`, point `WorkingDirectory` at the clone (`%h/llama-webui`) and start the
 built launcher: `ExecStart=/usr/bin/node %h/llama-webui/app/.output/llama-webui.mjs`, with the path of your `node`.
 
