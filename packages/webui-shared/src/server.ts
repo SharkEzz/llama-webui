@@ -1,4 +1,4 @@
-import { Array as Arr, Option, Record as Rec, Schema } from 'effect';
+import { Array as Arr, Effect, Option, Record as Rec, Schema } from 'effect';
 
 /** The fields of a server llama-webui launched: its profile, its process, and the `--host` and port it listens on. */
 const launched = {
@@ -70,6 +70,41 @@ export const ServerView = Schema.Struct({
   profileId: Schema.NullOr(Schema.Int),
 });
 export type ServerView = typeof ServerView.Type;
+
+/** An optional key whose value of another type is dropped, as if llama-server had not sent it. */
+const lenient = <S extends Schema.Top>(schema: S) =>
+  Schema.optionalKey(schema.pipe(Schema.catchDecoding(() => Effect.succeedNone)));
+
+/** Any other key of llama-server's JSON, kept as it is. */
+const rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
+
+/**
+ * llama-server's `/props`: the fields the app reads, each absent when the build does not send it or sends it with
+ * another type, and every other key as llama-server sent it. Not an object: a decoding error.
+ */
+export const ServerProps = Schema.StructWithRest(
+  Schema.Struct({
+    model_path: lenient(Schema.String),
+    model_alias: lenient(Schema.String),
+    model_ftype: lenient(Schema.String),
+    total_slots: lenient(Schema.Int),
+    build_info: lenient(Schema.String),
+    /** Each input besides text and whether the model takes it (`vision`, `video`, `audio`). */
+    modalities: lenient(Schema.Record(Schema.String, Schema.Boolean)),
+    default_generation_settings: lenient(
+      Schema.StructWithRest(
+        Schema.Struct({
+          n_ctx: lenient(Schema.Int),
+          /** The default sampling settings (`temperature`, `top_k`…). */
+          params: lenient(Schema.Record(Schema.String, Schema.Unknown)),
+        }),
+        rest,
+      ),
+    ),
+  }),
+  rest,
+);
+export type ServerProps = typeof ServerProps.Type;
 
 /** The `--host` of a state's server: null for an external one (reached on loopback) or no server. */
 export const stateHost = (s: ServerState): string | null => ('host' in s ? s.host : null);

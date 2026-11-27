@@ -36,12 +36,10 @@ import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatInt, formatPct } from '@/lib/format';
 import { startLogsSync, useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
-import { getServerProps, isExternalLoaded, isRecord, propsRetry } from '@/lib/props';
+import { getServerProps, isExternalLoaded, propsRetry, type ServerProps } from '@/lib/props';
 import { isRunning, restartServer, startProfile, stopServer, switchProfile, useServer } from '@/lib/server';
 import { useNow } from '@/lib/useNow';
 import { ServerStateBadge } from './ServerStateBadge';
-
-type Props = Record<string, unknown>;
 
 export function ServerPage() {
   const { view, busy } = useServer();
@@ -245,15 +243,11 @@ function StateDetails() {
   );
 }
 
-/** A scalar of llama-server's untyped /props as text; undefined for what is missing or not a scalar. */
-const scalar = (v: unknown): string | undefined =>
-  typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : undefined;
-
 function PropsCard() {
   const state = useServer((s) => s.view?.state);
   // One key for ready, sleeping and waking up with the same PID: /props is not reread on a sleep or a wake-up
   const key = servesRequests(state) ? `${state.kind === 'external' ? 'external' : 'managed'}-${state.pid}` : null;
-  const [props, setProps] = useState<Props | null>(null);
+  const [props, setProps] = useState<ServerProps | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Another server (or none): the previous one's /props go, in the render that sees it
   const [shownKey, setShownKey] = useState(key);
@@ -285,9 +279,9 @@ function PropsCard() {
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- retry.n is a trigger: /props is asked again when an external server ends the load it was found in
   }, [key, retry.n]);
 
-  const gen: Props = isRecord(props?.default_generation_settings) ? props.default_generation_settings : {};
-  const modalities = Object.entries(isRecord(props?.modalities) ? props.modalities : {})
-    .filter(([, on]) => on === true)
+  const nCtx = props?.default_generation_settings?.n_ctx;
+  const modalities = Object.entries(props?.modalities ?? {})
+    .filter(([, on]) => on)
     .map(([m]) => ({ vision: 'image', video: 'video', audio: 'audio' })[m] ?? m);
 
   return (
@@ -309,20 +303,20 @@ function PropsCard() {
       ) : (
         <dl className="divide-y divide-border">
           <Row label="Model">
-            <span className="font-mono text-xs" title={scalar(props.model_path) ?? ''}>
-              {scalar(props.model_alias ?? props.model_path) ?? '—'}
+            <span className="font-mono text-xs" title={props.model_path ?? ''}>
+              {props.model_alias ?? props.model_path ?? '—'}
             </span>
           </Row>
-          {props.model_ftype !== undefined && <Row label="Quantization">{scalar(props.model_ftype) ?? '—'}</Row>}
+          {props.model_ftype !== undefined && <Row label="Quantization">{props.model_ftype}</Row>}
           <Row label="Context">
-            <span className="num">{typeof gen.n_ctx === 'number' ? formatInt(gen.n_ctx) : '—'}</span> tokens
+            <span className="num">{nCtx !== undefined ? formatInt(nCtx) : '—'}</span> tokens
           </Row>
           <Row label="Slots">
-            <span className="num">{scalar(props.total_slots) ?? '—'}</span>
+            <span className="num">{props.total_slots ?? '—'}</span>
           </Row>
           <Row label="Inputs besides text">{modalities.length > 0 ? modalities.join(', ') : 'none'}</Row>
           <Row label="Build llama.cpp">
-            <span className="num">{scalar(props.build_info) ?? '—'}</span>
+            <span className="num">{props.build_info ?? '—'}</span>
           </Row>
         </dl>
       )}

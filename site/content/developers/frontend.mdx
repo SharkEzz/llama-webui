@@ -254,8 +254,9 @@ usage: (path) => call((api) => api.models.usage({ query: { path } })),
 The groups, the endpoints and their inputs are those of `Api`, so a misspelled endpoint or a missing option does not
 compile. `params` fills the path's `:id`, `query` the query string, `payload` the JSON body; the client encodes the
 payload with the endpoint's schema before sending it, and sets `content-type: application/json`, which the server's
-guard requires on a write with a body. `{ signal }`, the second argument, aborts the request. A reply that is raw
-JSON, like `/api/server/props`, is `unknown` and narrowed with guards (`app/src/lib/props.ts`), never with a cast. No
+guard requires on a write with a body. `{ signal }`, the second argument, aborts the request. Every reply is typed by
+its schema, llama-server's `/props` included (`ServerProps`: the fields the app reads, the others as they came); none is
+cast. No
 code of the web app calls `fetch('/api…')` by hand. A reply that streams, the chat's SSE, goes through
 `callStream(f, onEvent, { signal })`, which decodes each event with the endpoint's schema.
 

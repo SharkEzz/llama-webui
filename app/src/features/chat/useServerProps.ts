@@ -1,6 +1,6 @@
 import { servesRequests } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
-import { getServerProps, isExternalLoaded, propsRetry, type ServerProps, serverPropsOf } from '@/lib/props';
+import { getServerProps, isExternalLoaded, propsRetry, type ServerProps } from '@/lib/props';
 import { useServer } from '@/lib/server';
 
 export type { ServerProps };
@@ -26,7 +26,7 @@ export function useServerProps(): ServerProps | null {
     if (liveGroup === null) return;
     let live = true;
     getServerProps().then(
-      (p) => live && setProps(serverPropsOf(p)),
+      (p) => live && setProps(p),
       () => live && setProps(null),
     );
     return () => {

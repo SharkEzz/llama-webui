@@ -224,8 +224,9 @@ refuses is not sent: the call rejects with the same `RequestInvalid` the server 
 { signal })` reads an SSE endpoint, one decoded event at a time.
 
 Every type comes from the declaration: `params`, `payload` and `query` are typed by their schemas' encoded side, the
-reply by `success`, the errors by `error`. The web never casts a reply. The one endpoint whose reply is not described,
-`GET /api/server/props` (llama-server's own JSON, `Schema.Unknown`), is narrowed by guards (`app/src/lib/props.ts`).
+reply by `success`, the errors by `error`. The web never casts a reply. `GET /api/server/props`, llama-server's own
+JSON, is typed by `ServerProps` (`packages/webui-shared/src/server.ts`): the fields the app reads, each optional, and
+every other key as llama-server sent it.
 
 To add an endpoint, see [How-to guides](/developers/contributing/how-to/).
 

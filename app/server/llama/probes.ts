@@ -1,4 +1,4 @@
-import { PropsUnavailable } from '@llama-webui/shared';
+import { PropsUnavailable, ServerProps } from '@llama-webui/shared';
 import { Clock, Effect, Option, Schema } from 'effect';
 import type { HttpClientResponse } from 'effect/http';
 import { probeUrl } from 'llamacpp-js/client';
@@ -127,9 +127,12 @@ const unavailable = (failure: PropsFailed) =>
   });
 
 /**
- * llama-server's `/props` at `baseUrl`, its JSON as it is, within 2 s. An error status, a body that is not JSON and no
- * answer are each a `PropsUnavailable` with its own message (#37).
+ * llama-server's `/props` at `baseUrl` as `ServerProps`, within 2 s. An error status, a body that is not JSON (#37), a
+ * JSON that is not an object (#115) and no answer are each a `PropsUnavailable` with its own message.
  */
 export const props = Effect.fn('probes.props')(function* (baseUrl: string) {
-  return yield* readProps(baseUrl).pipe(Effect.mapError(unavailable));
+  const json = yield* readProps(baseUrl).pipe(Effect.mapError(unavailable));
+  return yield* Schema.decodeUnknownEffect(ServerProps)(json).pipe(
+    Effect.mapError(() => PropsUnavailable.make({ message: 'llama-server /props: the reply is not a JSON object' })),
+  );
 });
