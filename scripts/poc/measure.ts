@@ -39,7 +39,7 @@ export type Group = 'server' | 'serverTests' | 'shared' | 'sharedTests' | 'web' 
 /** The group a repo-relative path is counted in, or null when it is not counted. */
 export function classify(path: string): Group | null {
   const segments = path.split('/');
-  if (path.startsWith('repos/') || path.startsWith('app/server-legacy/')) return null;
+  if (path.startsWith('app/server-legacy/')) return null;
   if (segments.includes('node_modules') || segments.includes('.output')) return null;
   if (!/\.tsx?$/.test(path)) return null;
   if (path === 'app/server/api.gen.ts') return null;

@@ -1,7 +1,7 @@
 # Conventions of the Effect server
 
 The rules E2 to E8 follow, read from the code E1 left (`app/server/`, `packages/webui-shared/src/api/`). Read
-`repos/effect/LLMS.md` first; this page says how this repository applies it.
+`app/node_modules/effect/CLAUDE.md` first; this page says how this repository applies it.
 
 ## Where a domain goes
 

@@ -2,7 +2,8 @@
  * The server half of `vite dev`: the Effect server from source under `node --watch`, on a free loopback port, with
  * `/api` and `/ws` proxied to it. Vite keeps the public address and serves the UI with HMR; a save of a file the
  * server imports (`server/`, `packages/`) restarts the server (a new `bootId`). Stopping Vite (SIGINT, SIGTERM) stops
- * the server with SIGTERM and waits for it (SIGHUP too); a second signal kills it.
+ * the server with SIGTERM and waits for it (SIGHUP too); a second signal kills it. Vite runs with `--bypass-lock`
+ * (`pnpm dev`): its process lock releases itself on SIGINT by sending SIGINT again, which would count as the second.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -142,6 +143,13 @@ export function devServer(): Plugin {
           },
         },
       };
+    },
+
+    // Without `--bypass-lock`, Vite's process lock (`vite:command-lock`) handles SIGINT by releasing the lock and sending
+    // itself SIGINT again: one Ctrl+C would be two signals here, and kill the server instead of stopping it.
+    configResolved(config) {
+      if (config.plugins.some((plugin) => plugin.name === 'vite:command-lock'))
+        throw new Error('the dev server needs Vite started with --bypass-lock: run `pnpm dev`');
     },
 
     configureServer(server) {

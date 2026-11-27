@@ -263,7 +263,7 @@ run lasts as long as the longest one (a half of the tests), and a lint or type e
 
 Every job but the last installs through `.github/actions/setup` (pnpm, Node.js with the pnpm store cached,
 `pnpm install --frozen-lockfile`, site included). `--frozen-lockfile` fails when the lockfile is out of date: commit
-`pnpm-lock.yaml` with any dependency change. No job checks out `repos/` (submodules): nothing the gate runs reads it.
+`pnpm-lock.yaml` with any dependency change.
 Only the build job fetches the whole history, for the version `git describe` gives the build. A new push to a pull
 request cancels its run still going; the runs on `master` all go to their end.
 

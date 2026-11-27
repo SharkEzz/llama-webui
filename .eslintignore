@@ -1,3 +1,0 @@
-# Read by oxlint before it looks for nested configs: the ignorePatterns of oxlint.config.ts do not stop it from
-# loading repos/effect/.oxlintrc.json (whose plugin is not installed here), this file does.
-/repos/

@@ -102,11 +102,24 @@ test('a deep URL gets the shell', async () => {
   for (const ref of refs) expect([ref, (await fetch(`${server.base}${ref}`)).status]).toEqual([ref, 200]);
 });
 
+/** The version of an installed package, as its `package.json` gives it. */
+const installedVersion = (name: string): string => {
+  const pkg: unknown = JSON.parse(
+    readFileSync(join(import.meta.dirname, '../node_modules', name, 'package.json'), 'utf8'),
+  );
+  if (typeof pkg !== 'object' || pkg === null || !('version' in pkg) || typeof pkg.version !== 'string') {
+    throw new Error(`${name}: no version in its package.json`);
+  }
+  return pkg.version;
+};
+
 test('the licenses of the bundled code ship with the server', () => {
   const text = readFileSync(join(OUTPUT, 'server/THIRD-PARTY-LICENSES.md'), 'utf8');
-  // Each heading followed by the text of its license.
-  expect(text).toMatch(/^## effect - 4\.1\.5 .*\n\n\S/m);
-  expect(text).toMatch(/^## @effect\/platform-node - 4\.1\.5 .*\n\n\S/m);
+  // Each heading, with the version the build bundled, followed by the text of its license.
+  for (const name of ['effect', '@effect/platform-node']) {
+    const heading = `## ${name} - ${installedVersion(name)} `;
+    expect(text).toMatch(new RegExp(`^${RegExp.escape(heading)}.*\n\n\\S`, 'm'));
+  }
 });
 
 test('the server finds the NVML sampler: the module that names it sits next to it', () => {
