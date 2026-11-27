@@ -7,6 +7,10 @@
  *   node scripts/smoke.ts --tarball [file.tgz]    the package as a user installs it: `pnpm pack` (or the given
  *                                                 tarball), `npm install` into an empty prefix, then the same checks
  *                                                 through its `node_modules/.bin/llama-webui`
+ *   --expect-version <version>                    also fails unless the build reports exactly this version (the tag
+ *                                                 of a release: a `-dirty` build is not published)
+ *
+ * SIGINT or SIGTERM stops the server and removes the temporary directories before exiting (130, 143).
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -20,7 +24,7 @@ const ROOT = resolve(import.meta.dirname, '..');
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
-  options: { tarball: { type: 'boolean', default: false } },
+  options: { tarball: { type: 'boolean', default: false }, 'expect-version': { type: 'string' } },
 });
 
 /** A field of a parsed JSON object, read as it is written; undefined for another value. */
@@ -42,6 +46,19 @@ const temp = (prefix: string) => {
 process.on('exit', () => {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 });
+
+/** Stops the server once it runs (set when it is spawned). */
+let stopServer: () => Promise<unknown> = () => Promise.resolve();
+// A signal skips the `exit` handler unless it is caught: stop the server, then exit so the directories go. A second
+// signal of the same name kills at once (`once`).
+for (const [signal, code] of [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+] as const)
+  process.once(signal, () => {
+    console.error(`smoke: ${signal}, stopping`);
+    void stopServer().finally(() => process.exit(code));
+  });
 
 process.on('uncaughtException', (err) => {
   console.error(`smoke: ${err.message}`);
@@ -127,6 +144,10 @@ const proc = spawn(cmd, [...cmdArgs, '--data-dir', dataDir, '--port', String(por
   stdio: ['ignore', 'pipe', 'inherit'],
 });
 const exited = new Promise((done) => proc.once('exit', done));
+stopServer = () => {
+  proc.kill();
+  return exited;
+};
 const base = `http://127.0.0.1:${port}`;
 
 /** The first message of a WebSocket on `/ws`. */
@@ -156,6 +177,8 @@ try {
   if (!health?.ok) fail('/api/health did not answer');
   const version = field(await health.json(), 'version');
   if (typeof version !== 'string' || !version || version === 'dev') fail(`no build version (${String(version)})`);
+  const expected = values['expect-version'];
+  if (expected !== undefined && version !== expected) fail(`the build reports ${version}, expected ${expected}`);
   if (await fetch(`http://127.0.0.1:${decoy}/api/health`).catch(() => null)) fail(`listens on PORT=${decoy} too`);
 
   const page = await fetch(`${base}/chat/12`);
