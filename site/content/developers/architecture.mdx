@@ -218,7 +218,9 @@ installed nothing but the package, then runs the same checks through `node_modul
 builds: `pnpm pack` runs `scripts/prepack.ts` first, which refuses without `app/.output/llama-webui.mjs`,
 `app/.output/server/index.mjs` and `app/.output/server/nvml-worker.mjs`, so a package without its command cannot be
 written; run `pnpm build` before it. CI runs both on every pull request, and `release.yml` runs the tarball check on
-the tarball it publishes.
+the tarball it publishes, with `--expect-version <tag>`: the build must report the tag itself as its version, so a
+`-dirty` build is not published. Stopped by SIGINT or SIGTERM, the smoke test stops the server and removes its
+temporary directories before it exits.
 
 Up to v0.2.1, llama-webui ran on Bun and shipped as a standalone executable. It then moved to Node.js and Nitro, and
 from Nitro to Effect. Each move kept the API's answers or recorded each change: the contract suite replays every

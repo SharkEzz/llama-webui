@@ -28,8 +28,9 @@ jobs:
       - run: node scripts/release.ts --check "$GITHUB_REF_NAME"
       - run: pnpm build
       - run: pnpm pack --pack-destination release
-      # Installed with npm into an empty prefix, then started through its bin (scripts/smoke.ts).
-      - run: node scripts/smoke.ts --tarball release/llama-webui-*.tgz
+      # Installed with npm into an empty prefix, then started through its bin (scripts/smoke.ts), which must report the
+      # tag as its version (a `-dirty` build is not published).
+      - run: node scripts/smoke.ts --tarball --expect-version "$GITHUB_REF_NAME" release/llama-webui-*.tgz
       - run: cd release && sha256sum llama-webui-*.tgz > SHA256SUMS
       - name: Publish the release
         env:
