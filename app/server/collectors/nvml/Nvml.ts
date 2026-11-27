@@ -76,8 +76,12 @@ export const isFresh: {
  * The sampler next to the module that starts it: `worker.ts` next to a `.ts` module (development, tests),
  * `nvml-worker.mjs` next to the bundle (`.output/server/index.mjs`, `app/build/server.ts`).
  */
-export const workerPath = (moduleUrl: string): string =>
-  decodeURIComponent(new URL(Str.endsWith('.ts')(moduleUrl) ? './worker.ts' : './nvml-worker.mjs', moduleUrl).pathname);
+export const workerPath = (moduleUrl: string): string => {
+  const url = new URL(moduleUrl);
+  return decodeURIComponent(
+    new URL(Str.endsWith('.ts')(url.pathname) ? './worker.ts' : './nvml-worker.mjs', url).pathname,
+  );
+};
 
 /** The NVML reader: an NVIDIA reader that also tells the driver's versions, and when its sampler is gone. */
 export interface NvmlReader extends NvidiaReader {

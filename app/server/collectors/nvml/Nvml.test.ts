@@ -187,6 +187,13 @@ layer(NodeServices.layer, { excludeTestServices: true })('the NVML reader', (it)
       assert.isTrue(exists);
     }),
   );
+  it.effect('workerPath: chooses by the pathname, a query or a hash on the module URL aside (#111)', () =>
+    Effect.sync(() => {
+      assert.strictEqual(workerPath('file:///x/nvml/Nvml.ts?t=1'), '/x/nvml/worker.ts');
+      assert.strictEqual(workerPath('file:///x/nvml/Nvml.ts#h'), '/x/nvml/worker.ts');
+      assert.strictEqual(workerPath('file:///x/server/index.mjs?v=a.ts'), '/x/server/nvml-worker.mjs');
+    }),
+  );
 
   it.effect('a sampler that answers ready gives its readings', () =>
     withFakes((ws) =>
