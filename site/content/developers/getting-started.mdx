@@ -31,8 +31,9 @@ pnpm install
 
 `pnpm install` installs the whole pnpm workspace, declared in `pnpm-workspace.yaml`: `packages/*` (`webui-shared`,
 `webui-theme`, `llamacpp-js`), the app, `app/`, and the website, `site/`, all from one `pnpm-lock.yaml`. The same file holds the
-`catalog:` of the versions that move together (React, Vite, TypeScript, Effect…): change a version there, not in a
-`package.json`. A dependency change commits its `pnpm-lock.yaml`; CI installs with
+`catalog:` of the versions that move together (React, Vite, TypeScript, Effect…), which holds every dependency that
+more than one package names: change a version there, not in a `package.json`, and move a dependency there when a
+second package adds it. A dependency change commits its `pnpm-lock.yaml`; CI installs with
 `--frozen-lockfile`.
 
 `effect` and the `@effect/*` packages are pinned to one exact version. A version bump moves them all together, on its
