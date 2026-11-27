@@ -13,6 +13,7 @@ import { writeGguf } from './testing/gguf.ts';
 import { startHub } from './testing/hub.ts';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
 import { FAKE, FAKE_BENCH, startFakeThrough } from './testing/llama.ts';
+import { orAfter } from './testing/orAfter.ts';
 import { seedWatchPort } from './testing/seed.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { ofType, openWs } from './testing/ws.ts';
@@ -46,7 +47,7 @@ function run(args: string[], cwd: string, env: Record<string, string | undefined
 
 /** The exit code within 5 s, else the process is killed and the test fails. */
 async function exitCode(app: ReturnType<typeof run>) {
-  const code = await Promise.race([app.exited, sleep(5000, 'timeout' as const, { ref: false })]);
+  const code = await orAfter(app.exited, 5000, 'timeout');
   if (code === 'timeout') app.proc.kill('SIGKILL');
   return code;
 }
@@ -54,8 +55,10 @@ async function exitCode(app: ReturnType<typeof run>) {
 /** Whether `/api/health` answers on `port` before the process exits (5 s at most). */
 async function answers(app: ReturnType<typeof run>, port: number) {
   for (let i = 0; i < 50 && app.proc.exitCode === null; i++) {
-    const ok = (await fetch(`http://127.0.0.1:${port}/api/health`).catch(() => null))?.ok === true;
-    if (ok) return true;
+    const res = await fetch(`http://127.0.0.1:${port}/api/health`).catch(() => null);
+    // An unread body leaves its stream pending.
+    await res?.body?.cancel();
+    if (res?.ok === true) return true;
     await sleep(100);
   }
   return false;
@@ -262,6 +265,7 @@ test('SIGTERM during a benchmark ends it interrupted, tells the open page and ki
   // The model under the models folder: a run of a file elsewhere is refused.
   const settings = await call('PATCH', '/api/settings', { binary: join(bin, 'fake-llama-server'), modelsDir: data });
   expect(settings.status).toBe(200);
+  await settings.body?.cancel();
   const spec = {
     kind: 'bench',
     modelPath: model,
@@ -406,7 +410,7 @@ test('an exit without its finalizers leaves no llama-server', async () => {
     stderr += c;
   });
   const exited = new Promise<number | null>((done) => proc.once('exit', done));
-  const code = await Promise.race([exited, sleep(10_000, 'timeout' as const, { ref: false })]);
+  const code = await orAfter(exited, 10_000, 'timeout');
   if (code === 'timeout') proc.kill('SIGKILL');
   expect(code, stderr).toBe(1);
   const pid = Number(stdout.trim());

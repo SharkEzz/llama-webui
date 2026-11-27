@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, describe, it } from '@effect/vitest';
 import type { GpuSample, Snapshot } from '@llama-webui/shared';
 import { Array as Arr, ConfigProvider, Effect, FileSystem, Layer, Path, type Scope } from 'effect';

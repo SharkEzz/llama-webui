@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { Array as Arr, Effect, FileSystem, Layer, Option, Path, Record, String as Str } from 'effect';
 import { PciIds } from '../hardware/PciIds.ts';

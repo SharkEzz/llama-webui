@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { NodeHttpClient, NodeHttpServer } from '@effect/platform-node';
+import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
+import * as NodeHttpServer from '@effect/platform-node/NodeHttpServer';
 import { Layer } from 'effect';
 import { HttpServer } from 'effect/http';
 import { AppConfig } from '../config/AppConfig.ts';

@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { Array as Arr, Effect, Layer } from 'effect';
 import { BenchHardware } from '../bench/BenchHardware.ts';
 import { BenchRunner } from '../bench/BenchRunner.ts';

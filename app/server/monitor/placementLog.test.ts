@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { layer } from '@effect/vitest';
 import { type LogLine, P2P_LOG_LINE, type PlacementBuffer } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Option, Path, String as Str, Struct } from 'effect';

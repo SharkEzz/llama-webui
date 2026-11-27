@@ -104,8 +104,9 @@ export async function launch(opts: {
   const exited = new Promise<number | null>((done) => proc.once('exit', (code) => done(code)));
   const base = `http://127.0.0.1:${port}`;
   let up = false;
+  const healthAbortController = new AbortController();
   for (let i = 0; i < 100 && !up && proc.exitCode === null; i++) {
-    up = (await fetch(`${base}/api/health`).catch(() => null))?.ok === true;
+    up = (await fetch(`${base}/api/health`, { signal: healthAbortController.signal }).catch(() => null))?.ok === true;
     if (!up) await sleep(100);
   }
   if (!up) {
@@ -121,6 +122,7 @@ export async function launch(opts: {
     stdout: () => stdout,
     stderr: () => stderr,
     async [Symbol.asyncDispose]() {
+      if (!healthAbortController.signal.aborted) healthAbortController.abort('SIGTERM');
       if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGTERM');
       await exited;
     },

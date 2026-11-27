@@ -158,7 +158,6 @@ function body(chunks: string[], end: 'close' | 'open' | Error = 'close') {
       if (chunk !== undefined) controller.enqueue(new TextEncoder().encode(chunk));
       else if (end === 'close') controller.close();
       else if (end !== 'open') controller.error(end);
-      else return new Promise<void>(() => {});
     },
   });
 }

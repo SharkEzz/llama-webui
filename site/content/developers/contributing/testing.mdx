@@ -44,6 +44,10 @@ quickly after a change that does not touch the build.
 | `pnpm exec vitest run -t 'sweep'`                                            | Tests whose name matches the regular expression             |
 | `pnpm exec vitest run --changed`                                             | Test files that import a file changed since the last commit |
 | `pnpm exec vitest`                                                           | Watch mode: reruns the tests a change affects               |
+| `VITEST_ENABLE_CONSOLE_LOG=1 pnpm exec vitest run app/server/bench`          | The same files, with what their tests write on the console  |
+
+The report hides what a test writes on the console (`onConsoleLog` in `vitest.config.ts`), so that failures stay
+readable: `VITEST_ENABLE_CONSOLE_LOG=1` shows it. Each file is listed with the heap it used (`logHeapUsage`).
 
 <Callout type="warning">
 
@@ -147,6 +151,16 @@ describe('SettingsRepo', () => {
 - **Promises**, in a plain Vitest test, are awaited: `await expect(p).rejects.toThrow()`. The lint enforces it:
   `vitest/valid-expect` reports a `.resolves` or `.rejects` assertion left unawaited (Vitest fails the test too), and
   `typescript/no-floating-promises` any other promise neither awaited, returned, handled nor discarded with `void`.
+- **Nothing is left pending**: `detectAsyncLeaks` (`vitest.config.ts`) reports a promise never settled, a timer or a
+  handle that a test file leaves behind, and the `failOnAsyncLeaks` reporter next to it fails the run on one (Vitest
+  alone prints the leak and exits 0). A leak may show only when its test runs alone (`-t`): in a full file, a later
+  test can outlast the timer. Three habits keep a file clean:
+  - the body of a `fetch` reply is read (`json()`, `text()`) or cancelled (`await res.body?.cancel()`), even when
+    only the status matters: an unread body keeps its stream pending;
+  - a wait with a limit is `orAfter(promise, ms, late)` (`app/server/testing/orAfter.ts`), which cancels its timer,
+    not a bare `Promise.race([promise, sleep(ms)])`, whose timer stays pending when the promise wins;
+  - a retried assertion is `vi.waitFor(() => expect(…))`, not `expect.poll`: a poll that passes leaves Vitest's own
+    timeout promise pending.
 
 ### Build, shutdown and development loop
 

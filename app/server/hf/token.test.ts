@@ -1,4 +1,4 @@
-import { NodeFileSystem } from '@effect/platform-node';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import { assert, layer } from '@effect/vitest';
 import { ConfigProvider, Effect, FileSystem } from 'effect';
 import { hfEndpoint, hfToken, hfTokenPath, hubHeaders } from './token.ts';

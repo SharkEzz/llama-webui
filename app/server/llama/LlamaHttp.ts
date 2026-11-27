@@ -1,4 +1,4 @@
-import { NodeHttpClient } from '@effect/platform-node';
+import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
 import { Cause, Clock, Context, Duration, Effect, Exit, Layer, Metric, type Scope } from 'effect';
 import { HttpClient, type HttpClientError, type HttpClientResponse } from 'effect/http';
 import { LlamaHttpMetrics, statusClass } from '../runtime/Metrics.ts';

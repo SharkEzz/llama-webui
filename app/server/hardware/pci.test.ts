@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, describe, it, layer } from '@effect/vitest';
 import type { TopologyGraph } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Layer, Option, Order, Path, Record } from 'effect';

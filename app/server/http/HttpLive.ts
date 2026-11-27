@@ -1,6 +1,6 @@
 // @effect-diagnostics-next-line nodeBuiltinImport:off NodeHttpServer.layer takes the server factory of node:http itself
 import { createServer } from 'node:http';
-import { NodeHttpServer } from '@effect/platform-node';
+import * as NodeHttpServer from '@effect/platform-node/NodeHttpServer';
 import { Api, RouteNotFound } from '@llama-webui/shared';
 import { Array as Arr, Cause, Clock, Duration, Effect, ErrorReporter, Exit, Layer, Metric } from 'effect';
 import { HttpRouter, HttpServer, HttpServerError, HttpServerRequest, HttpServerResponse } from 'effect/http';

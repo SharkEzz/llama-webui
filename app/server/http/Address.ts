@@ -1,4 +1,4 @@
-import { NodeSocketServer } from '@effect/platform-node';
+import * as NodeSocketServer from '@effect/platform-node/NodeSocketServer';
 import { Effect, Predicate, Schema } from 'effect';
 import type { SocketServer } from 'effect/socket';
 import { AppConfig } from '../config/AppConfig.ts';

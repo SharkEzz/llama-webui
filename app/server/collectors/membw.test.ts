@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { Array as Arr, Duration, Effect, Exit, FileSystem, Option, Path, Schedule, Scope, String as Str } from 'effect';
 import { ChildProcessSpawner } from 'effect/process';

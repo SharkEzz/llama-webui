@@ -1,4 +1,4 @@
-import { NodeHttpClient } from '@effect/platform-node';
+import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
 import { assert, it } from '@effect/vitest';
 import {
   type Cause,

@@ -172,7 +172,11 @@ async function startOutside(options: {
   const exited = new Promise<void>((done) => child.once('exit', () => done()));
   for (;;) {
     const status = await fetch(`http://127.0.0.1:${options.port}/health`).then(
-      (r) => r.status,
+      // An unread body leaves its stream pending.
+      async (r) => {
+        await r.body?.cancel();
+        return r.status;
+      },
       () => null,
     );
     if (status === 200) return { child, exited };

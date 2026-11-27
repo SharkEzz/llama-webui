@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { DEFAULT_SETTINGS, type Profile, type ServerState } from '@llama-webui/shared';
 import { Context, Effect, Exit, Fiber, FileSystem, Layer, Ref, Schedule, Scope } from 'effect';

@@ -11,6 +11,7 @@ import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { devCopy } from './testing/devCopy.ts';
 import { freePort, userEnv } from './testing/launch.ts';
 import { startFakeThrough } from './testing/llama.ts';
+import { orAfter } from './testing/orAfter.ts';
 import { seedWatchPort } from './testing/seed.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { openWs } from './testing/ws.ts';
@@ -144,7 +145,7 @@ async function stopAll(): Promise<void> {
     if (dev.proc.exitCode === null && dev.proc.signalCode === null) {
       const pids = tree(dev.proc.pid ?? 0);
       dev.proc.kill('SIGINT');
-      await Promise.race([dev.exited, sleep(10_000, null, { ref: false })]);
+      await orAfter(dev.exited, 10_000, -1);
       for (const pid of pids) if (isAlive(pid)) process.kill(pid, 'SIGKILL');
     }
   }
@@ -263,7 +264,7 @@ test('one SIGINT with a page open (/ws) stops at once', async () => {
   await client.next();
   const t0 = performance.now();
   dev.proc.kill('SIGINT');
-  const closed = await Promise.race([client.closed, sleep(2000, null, { ref: false })]);
+  const closed = await orAfter(client.closed, 2000, null);
   // The server's own 1001, through Vite: it stopped (a server killed instead would leave the page a 1006).
   expect(closed?.code).toBe(1001);
   await stopped(dev, pids, 2000);

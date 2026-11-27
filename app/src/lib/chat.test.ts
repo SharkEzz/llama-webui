@@ -60,7 +60,6 @@ const sse = (events: ReadonlyArray<ChatEvent>, end: 'close' | 'open' | Error = '
       if (chunk !== undefined) controller.enqueue(new TextEncoder().encode(chunk));
       else if (end === 'close') controller.close();
       else if (end !== 'open') controller.error(end);
-      else return new Promise<void>(() => {});
     },
   });
   return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });

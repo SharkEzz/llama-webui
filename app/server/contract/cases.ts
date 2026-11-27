@@ -4,6 +4,7 @@
 import { Api } from '@llama-webui/shared';
 import { Predicate } from 'effect';
 import { HttpApi } from 'effect/http-api';
+import { orAfter } from '../testing/orAfter.ts';
 import { readSse, request, type WireRequest, type WireResponse } from './wire.ts';
 
 /**
@@ -610,16 +611,12 @@ function sseEvent(block: string, ctx: NormalizeCtx): { event: string | null; dat
   return { event: field('event') || null, data: normalize(data, ctx) };
 }
 
+const TIMED_OUT = Symbol('timed out');
+
 async function withTimeout<T>(what: string, p: Promise<T>, ms = 15_000): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const late = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`contract: ${what} timed out`)), ms);
-  });
-  try {
-    return await Promise.race([p, late]);
-  } finally {
-    clearTimeout(timer);
-  }
+  const out = await orAfter(p, ms, TIMED_OUT);
+  if (out === TIMED_OUT) throw new Error(`contract: ${what} timed out`);
+  return out;
 }
 
 /** The WebSocket's first frame (hello) and its answer to a ping. */

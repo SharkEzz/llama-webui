@@ -1,6 +1,6 @@
 import { createServer, type Server, type Socket } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { serverLink } from './devServer.ts';
 
 /** A port nothing listens on, on 127.0.0.1. */
@@ -60,40 +60,40 @@ test('the link is not up, after the wait, when nothing listens', async () => {
   expect(performance.now() - startedAt).toBeGreaterThanOrEqual(190);
 });
 
-test('the link waits for a server that starts, then answers at once on the one connection it keeps', async () => {
+test('the link waits for a server that starts, then answers at once on the one connection it keeps', async ({
+  signal,
+}) => {
   const port = await freePort();
   const server = link(port);
   const waiting = [Promise.resolve(server.up(5000)), Promise.resolve(server.up(5000))];
-  await sleep(150);
+  await sleep(150, undefined, { signal });
   const listener = await listen(port);
   expect(await Promise.all(waiting)).toEqual([true, true]);
   // Up without a wait, and without a connection per question.
   for (let i = 0; i < 20; i++) expect(server.up(5000)).toBe(true);
-  await sleep(100);
+  await sleep(100, undefined, { signal });
   expect(listener.accepted()).toBe(1);
 });
 
-test('the link drops when the server goes away, and waits for the next one', async () => {
+test('the link drops when the server goes away, and waits for the next one', async ({ signal }) => {
   const port = await freePort();
   const server = link(port);
   const first = await listen(port);
   expect(await server.up(5000)).toBe(true);
   await first.stop();
   // The close of the kept connection reaches the link: it waits again, here for nothing.
-  // Typed by its assertion: a declared type would be narrowed to `true`, the closure's assignments unseen
-  let asked = true as true | Promise<boolean>;
-  await expect
-    .poll(
-      () => {
-        asked = server.up(50);
-        return asked;
-      },
-      { timeout: 2000 },
-    )
-    .not.toBe(true);
-  expect(await asked).toBe(false);
+  // `vi.waitFor`, not `expect.poll`: a poll that passes leaves Vitest's own timeout promise pending (an async leak).
+  const asked = await vi.waitFor(
+    () => {
+      const up = server.up(50);
+      expect(up).not.toBe(true);
+      return up;
+    },
+    { timeout: 2000 },
+  );
+  expect(asked).toBe(false);
   const waiting = server.up(5000);
-  await sleep(100);
+  await sleep(100, undefined, { signal });
   const second = await listen(port);
   expect(await waiting).toBe(true);
   expect(server.up(5000)).toBe(true);

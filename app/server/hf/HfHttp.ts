@@ -1,4 +1,4 @@
-import { NodeHttpClient } from '@effect/platform-node';
+import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
 import { Array as Arr, Config, Context, Effect, Layer, Option, Record as Rec, type Scope } from 'effect';
 import { HttpClient, HttpClientError } from 'effect/http';
 

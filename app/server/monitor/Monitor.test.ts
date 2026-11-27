@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { DEFAULT_SETTINGS, type Settings, Snapshot, type WsMessage } from '@llama-webui/shared';
 import {
