@@ -54,7 +54,7 @@ of the repository: when a convention changes, update both.
 ## Write a docs page
 
 The website lives in `site/`, a package of the pnpm workspace (Vite, React Router with prerendering, Tailwind, MDX),
-installed by the root `pnpm install` and run on Node.js: its scripts are `node scripts/<name>.ts`. Every `.mdx` file under `site/content/docs/` or
+installed by the root `pnpm install` and run on Node.js: `dev`, `typecheck` and the first step of `build` are React Router commands (`react-router dev`, `react-router typegen`, `react-router build`), every other script is `node scripts/<name>.ts`. Every `.mdx` file under `site/content/docs/` or
 `site/content/developers/` becomes a prerendered page: `docs/getting-started/installation.mdx` is
 `/docs/getting-started/installation/`, and an `index.mdx` is the page of its folder.
 
