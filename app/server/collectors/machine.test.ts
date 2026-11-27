@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { Effect, FileSystem, Option, Path } from 'effect';
 import { TestClock } from 'effect/testing';

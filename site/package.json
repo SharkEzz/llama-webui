@@ -24,7 +24,7 @@
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
     "isbot": "^5.2.4",
-    "lucide-react": "^1.81.0",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-router": "catalog:"

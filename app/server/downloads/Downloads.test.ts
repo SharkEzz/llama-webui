@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { AlreadyQueued, DiskFull, type DownloadItem, NotFinished, type WsMessage } from '@llama-webui/shared';
 import {

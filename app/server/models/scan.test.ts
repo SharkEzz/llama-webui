@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Context, Effect, FileSystem, Layer, Metric, Option, Path, Ref, type Scope } from 'effect';
 import * as Db from '../db/Db.ts';

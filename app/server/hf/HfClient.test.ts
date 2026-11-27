@@ -1,4 +1,4 @@
-import { NodeFileSystem } from '@effect/platform-node';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import { assert, layer } from '@effect/vitest';
 import { HfRateLimited, type HfStatus, HfUnreachable, type HubErrors } from '@llama-webui/shared';
 import { Array as Arr, ConfigProvider, Context, Effect, Fiber, FileSystem, Layer, String as Str } from 'effect';

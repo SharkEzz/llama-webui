@@ -1,4 +1,4 @@
-import { NodeFileSystem } from '@effect/platform-node';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import { assert, layer } from '@effect/vitest';
 import { HF_REPO_RE, HfInvalidPath } from '@llama-webui/shared';
 import { Effect, FileSystem, Option, Path } from 'effect';

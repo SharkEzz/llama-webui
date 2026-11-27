@@ -426,6 +426,11 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
     (`seedWatchPort` of `app/server/testing/seed.ts`).
 - Black-box suites (`lifecycle.test.ts`, `contract/`, `build.test.ts`, `dev.test.ts`) are plain Node against the build
   (`launch()` of `app/server/testing/launch.ts`) and never pick port 7860 or 7861.
+- A test file leaves nothing pending: Vitest's `detectAsyncLeaks` reports it and the run fails (`failOnAsyncLeaks`
+  in `vitest.config.ts`). The body of a `fetch` reply is read or cancelled (`await res.body?.cancel()`), a wait with
+  a limit is `orAfter(promise, ms, late)` (`app/server/testing/orAfter.ts`), never a bare
+  `Promise.race([promise, sleep(ms)])`, and a retried assertion is `vi.waitFor`, never `expect.poll` (a poll that
+  passes leaks Vitest's own timeout promise). A leak may show only when its test runs alone (`-t`).
 
 ## Commands
 

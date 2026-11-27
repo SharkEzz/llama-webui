@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { SqliteClient } from '@effect/sql-sqlite-node';
 import { assert, describe, it, layer } from '@effect/vitest';
 import { BenchHardware, StoredBenchSpec } from '@llama-webui/shared';

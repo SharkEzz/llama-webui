@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, describe, it, layer } from '@effect/vitest';
 import { Array as Arr, Effect, FileSystem, Layer, Path } from 'effect';
 import { type FakeTensor, type KvValue, writeGguf } from '../testing/gguf.ts';

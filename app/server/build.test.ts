@@ -89,17 +89,23 @@ test('each page is a chunk of its own', () => {
   expect(code).not.toContain('of the Effect server rewrite');
 });
 
-test('a deep URL gets the shell', async () => {
+test('a deep URL gets the shell', async ({ signal }) => {
   const data = join(dir.path, 'deep');
   mkdirSync(data);
   await using server = await launch({ dataDir: data });
-  const res = await fetch(`${server.base}/settings`);
+  const res = await fetch(`${server.base}/settings`, { signal });
   expect(res.status).toBe(200);
   expect(res.headers.get('content-type')).toContain('text/html');
   const html = await res.text();
   const refs = Arr.map([...Str.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)(html)], (m) => m[1] as string);
   expect(Arr.some(refs, Str.endsWith('.js'))).toBe(true);
-  for (const ref of refs) expect([ref, (await fetch(`${server.base}${ref}`)).status]).toEqual([ref, 200]);
+
+  for (const ref of refs) {
+    const response = await fetch(`${server.base}${ref}`, { signal });
+    expect(response.status).toBe(200);
+    // An unread body leaves its stream pending.
+    await response.body?.cancel();
+  }
 });
 
 /** The version of an installed package, as its `package.json` gives it. */

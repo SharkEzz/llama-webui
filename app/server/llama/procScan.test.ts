@@ -1,4 +1,4 @@
-import { NodeServices } from '@effect/platform-node';
+import * as NodeServices from '@effect/platform-node/NodeServices';
 import { assert, layer } from '@effect/vitest';
 import { Array as Arr, Effect, FileSystem, Option, Path, Record } from 'effect';
 import { findLlamaServerPid, isAlive } from './procScan.ts';
