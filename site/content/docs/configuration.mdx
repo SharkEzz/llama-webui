@@ -124,7 +124,7 @@ and restarts the server when a server file changes (which stops `llama-server`).
 ### In a systemd service
 
 With the user service from [Installation](/docs/getting-started/installation/#run-it-as-a-service), add flags to
-`ExecStart`, or set variables with `Environment=` lines:
+`ExecStart`, or set variables with `Environment=` lines (a `.env` file in its `WorkingDirectory` is loaded too):
 
 ```ini title="~/.config/systemd/user/llama-webui.service"
 [Service]
