@@ -6,6 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 
+/** Whether `err` is Node's error for an import of `name` that is not installed (not one of its own imports). */
+const isMissing = (err: unknown, name: string): boolean =>
+  err instanceof Error &&
+  'code' in err &&
+  err.code === 'ERR_MODULE_NOT_FOUND' &&
+  err.message.startsWith(`Cannot find package '${name}' imported from ${import.meta.filename}`);
+
 const ROOT = join(import.meta.dirname, '..');
 const SRC = join(ROOT, 'src');
 const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')) as {
@@ -32,8 +39,12 @@ test('every module has its own export and the package has no side effects', () =
 });
 
 // The bundling checks use Rolldown (Vite's bundler, a devDependency): skipped where the package has no install, as
-// in the Node 24 CI job.
-const bundler = await import('rolldown').catch(() => null);
+// in the Node 24 CI job. Only a missing `rolldown` skips them: a Rolldown that is there but fails to load (its native
+// binding) fails the file.
+const bundler = await import('rolldown').catch((err: unknown) => {
+  if (isMissing(err, 'rolldown')) return null;
+  throw err;
+});
 const needsBundler = { skip: bundler ? false : 'needs rolldown (pnpm install)' };
 
 const tmp = await mkdtemp(join(tmpdir(), 'llamacpp-js-'));
