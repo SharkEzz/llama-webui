@@ -48,6 +48,21 @@ function redirect(res: ServerResponse, location: string) {
   res.writeHead(301, { location, 'content-length': '0' }).end();
 }
 
+/** The plain-text 404 of a path outside the base. */
+function notFound(req: IncomingMessage, res: ServerResponse) {
+  res.writeHead(404, { 'content-type': 'text/plain;charset=utf-8', 'content-length': '9' });
+  res.end(req.method === 'HEAD' ? undefined : 'Not found');
+}
+
+/** The percent-decoded path, or null when an escape is malformed. */
+function decodeOrNull(path: string): string | null {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+}
+
 const isFile = (path: string) =>
   stat(path).then(
     (s) => s.isFile(),
@@ -63,19 +78,29 @@ export function serveDist(dist: string): Server {
 /** The answer to one request; a failure is logged and answered with a 500. */
 async function answer(dist: string, req: IncomingMessage, res: ServerResponse) {
   try {
-    // Parsed as a URL: `..` and `%2e%2e` segments are resolved before the base is checked.
-    const url = new URL(req.url ?? '/', 'http://localhost');
+    // Parsed as a URL: `..` and `%2e%2e` segments are resolved before the base is checked. The path is appended to
+    // the origin, not resolved against it: `//x/llama-webui/` is a path, not the host `x`.
+    const url = URL.parse(`http://localhost${req.url ?? '/'}`);
+    if (!url) {
+      notFound(req, res);
+      return;
+    }
     if (url.pathname === '/' || url.pathname === BASE) {
       redirect(res, `${BASE}/`);
       return;
     }
     if (!url.pathname.startsWith(`${BASE}/`)) {
-      res.writeHead(404, { 'content-type': 'text/plain;charset=utf-8', 'content-length': '9' });
-      res.end(req.method === 'HEAD' ? undefined : 'Not found');
+      notFound(req, res);
       return;
     }
 
-    const rel = normalize(decodeURIComponent(url.pathname.slice(BASE.length))).replace(/^(\.\.(\/|$))+/, '');
+    // A malformed escape (`%E0`) names no file: the 404 page, as for an unknown file.
+    const decoded = decodeOrNull(url.pathname.slice(BASE.length));
+    if (decoded === null) {
+      await send(req, res, join(dist, '404.html'), 404);
+      return;
+    }
+    const rel = normalize(decoded).replace(/^(\.\.(\/|$))+/, '');
     const path = join(dist, rel);
     if (!url.pathname.endsWith('/')) {
       if (await isFile(path)) {
