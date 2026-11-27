@@ -18,12 +18,16 @@ const FILES: Record<string, string | Buffer> = {
   '404.html': '<h1>404</h1>',
 };
 
+let root: string;
 let dist: string;
 let base: string;
 let server: ReturnType<typeof serveDist>;
 
 beforeAll(async () => {
-  dist = mkdtempSync(join(tmpdir(), 'site-serve-'));
+  // dist/ inside a folder of its own, next to a file no path may reach
+  root = mkdtempSync(join(tmpdir(), 'site-serve-'));
+  dist = join(root, 'dist');
+  writeFileSync(join(root, 'secret.txt'), 'secret');
   for (const [path, content] of Object.entries(FILES)) {
     mkdirSync(dirname(join(dist, path)), { recursive: true });
     writeFileSync(join(dist, path), content);
@@ -35,7 +39,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   server.close();
-  rmSync(dist, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true });
 });
 
 /** A raw request: no automatic decompression, the path sent as is. */
@@ -110,6 +114,26 @@ describe('serve.ts', () => {
       expect(res.status, path).toBe(404);
       expect(res.headers['content-type']).toBe('text/plain;charset=utf-8');
       expect(res.body.toString()).toBe('Not found');
+    }
+  });
+
+  test('reads a path that starts with // as a path, not a host (#112)', async () => {
+    for (const path of ['//x/llama-webui/docs/', '//llama-webui/docs/']) {
+      const res = await get(path);
+      expect(res.status, path).toBe(404);
+      expect(res.body.toString(), path).toBe('Not found');
+    }
+  });
+
+  test('keeps an encoded-slash traversal inside dist, answers a malformed escape with the 404 page (#112)', async () => {
+    for (const path of [
+      '/llama-webui/..%2fsecret.txt',
+      '/llama-webui/..%2f..%2fdist/..%2fsecret.txt',
+      '/llama-webui/%E0',
+    ]) {
+      const res = await get(path);
+      expect(res.status, path).toBe(404);
+      expect(res.body.toString(), path).toBe('<h1>404</h1>');
     }
   });
 
