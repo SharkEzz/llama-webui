@@ -3,7 +3,26 @@ import { Array as Arr, Clock, Context, Effect, Layer, Option, Order, Schema } fr
 import { SqlClient, SqlSchema } from 'effect/sql';
 import type { NewDownload } from '../hf/repo.ts';
 
-const Files = DownloadFile.pipe(Schema.Array, Schema.fromJsonString);
+/**
+ * A file as the table stores it: `placed` when this item put it in place itself (renamed its `.part`), not when it
+ * found it there (another download placed it). Only those are its to delete on a cancel. Absent in a row written
+ * before (false), and never sent to the web.
+ */
+const StoredFile = Schema.Struct({
+  ...DownloadFile.fields,
+  placed: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+});
+type StoredFile = typeof StoredFile.Type;
+
+const Files = StoredFile.pipe(Schema.Array, Schema.fromJsonString);
+
+/** A stored file as the API tells it. */
+const publicFile = (file: StoredFile): DownloadFile => ({
+  path: file.path,
+  size: file.size,
+  sha256: file.sha256,
+  done: file.done,
+});
 
 /** A row of `downloads`, its files decoded. */
 const Row = Schema.Struct({
@@ -34,7 +53,7 @@ const fromRow = (row: typeof Row.Type): DownloadItem => ({
   quant: row.quant,
   kind: row.kind,
   dir: row.dir,
-  files: row.files_json,
+  files: Arr.map(row.files_json, publicFile),
   status: row.status,
   bytesDone: row.bytes_done,
   totalBytes: row.total_bytes,
@@ -74,11 +93,16 @@ export class DownloadsRepo extends Context.Service<
       status: DownloadStatus,
       details?: { readonly error?: string | null; readonly code?: string | null },
     ) => Effect.Effect<DownloadItem>;
-    /** Marks the file at `path` done (renamed into place); `bytesDone` is the size of the files done. */
+    /** Marks the file at `path` done (in place); `bytesDone` is the size of the files done. */
     readonly fileDone: (id: number, path: string) => Effect.Effect<DownloadItem>;
+    /** Records that the item put the file at `path` in place itself (renamed its `.part`), not found it there. */
+    readonly filePlaced: (id: number, path: string) => Effect.Effect<void>;
+    /** The paths (in the repository) of the files the item put in place itself: what a cancel may delete. */
+    readonly placedFiles: (id: number) => Effect.Effect<ReadonlyArray<string>>;
     /**
      * Back in the queue (a retry): no file is trusted done any more (a canceled item's were deleted, others may have
-     * been since), so the transfer checks each one on disk again.
+     * been since), so the transfer checks each one on disk again. A canceled item no longer owns any file: those it
+     * placed are gone, or kept for another item that names them.
      */
     readonly requeue: (id: number) => Effect.Effect<DownloadItem>;
     readonly remove: (id: number) => Effect.Effect<void>;
@@ -114,21 +138,24 @@ export class DownloadsRepo extends Context.Service<
               ORDER BY status = 'downloading' DESC, id LIMIT 1`,
       });
 
-      /** The item of `id`: a row the queue holds the id of (one missing is a defect). */
-      const byId = (id: number) =>
+      /** The row of `id`: one the queue holds the id of (one missing is a defect). */
+      const rowOf = (id: number) =>
         findById(id).pipe(
           Effect.flatMap(
             Option.match({
               onNone: () => Effect.die(`download ${id} is not in the table`),
-              onSome: (row) => Effect.succeed(fromRow(row)),
+              onSome: Effect.succeed,
             }),
           ),
         );
 
+      /** The item of `id`. */
+      const byId = (id: number) => Effect.map(rowOf(id), fromRow);
+
       /** Writes the files of `id` and the size of those done. */
       const writeFiles = Effect.fn('DownloadsRepo.writeFiles')(function* (
         id: number,
-        files: ReadonlyArray<DownloadFile>,
+        files: ReadonlyArray<StoredFile>,
       ) {
         const json = yield* encodeFiles(files);
         yield* sql`UPDATE downloads SET ${sql.update({ files_json: json, bytes_done: doneBytes(files) })} WHERE id = ${id}`;
@@ -136,7 +163,7 @@ export class DownloadsRepo extends Context.Service<
 
       const create = Effect.fn('DownloadsRepo.create')(
         function* (input: NewDownload) {
-          const files = Arr.map(input.files, (file): DownloadFile => ({ ...file, done: false }));
+          const files = Arr.map(input.files, (file): StoredFile => ({ ...file, done: false, placed: false }));
           const json = yield* encodeFiles(files);
           const now = yield* Clock.currentTimeMillis;
           const rows = yield* sql`INSERT INTO downloads ${sql.insert({
@@ -208,10 +235,10 @@ export class DownloadsRepo extends Context.Service<
 
       const fileDone = Effect.fn('DownloadsRepo.fileDone')(
         function* (id: number, path: string) {
-          const item = yield* byId(id);
+          const row = yield* rowOf(id);
           yield* writeFiles(
             id,
-            Arr.map(item.files, (file) => (file.path === path ? { ...file, done: true } : file)),
+            Arr.map(row.files_json, (file) => (file.path === path ? { ...file, done: true } : file)),
           );
           return yield* byId(id);
         },
@@ -219,12 +246,36 @@ export class DownloadsRepo extends Context.Service<
         Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
       );
 
-      const requeue = Effect.fn('DownloadsRepo.requeue')(
-        function* (id: number) {
-          const item = yield* byId(id);
+      const filePlaced = Effect.fn('DownloadsRepo.filePlaced')(
+        function* (id: number, path: string) {
+          const row = yield* rowOf(id);
           yield* writeFiles(
             id,
-            Arr.map(item.files, (file) => ({ ...file, done: false })),
+            Arr.map(row.files_json, (file) => (file.path === path ? { ...file, placed: true } : file)),
+          );
+        },
+        sql.withTransaction,
+        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
+      );
+
+      const placedFiles = Effect.fn('DownloadsRepo.placedFiles')(
+        function* (id: number) {
+          const row = yield* rowOf(id);
+          return Arr.map(
+            Arr.filter(row.files_json, (file) => file.placed),
+            (file) => file.path,
+          );
+        },
+        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
+      );
+
+      const requeue = Effect.fn('DownloadsRepo.requeue')(
+        function* (id: number) {
+          const row = yield* rowOf(id);
+          const canceled = row.status === 'canceled';
+          yield* writeFiles(
+            id,
+            Arr.map(row.files_json, (file) => ({ ...file, done: false, placed: file.placed && !canceled })),
           );
           return yield* setStatus(id, 'queued');
         },
@@ -257,6 +308,8 @@ export class DownloadsRepo extends Context.Service<
         next,
         setStatus,
         fileDone,
+        filePlaced,
+        placedFiles,
         requeue,
         remove,
         clearFinished,

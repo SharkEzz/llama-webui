@@ -108,8 +108,13 @@ reviewing this list, done in E11: `docs/superpowers/plans/2026-11-15-effect-e11-
   deleted the projector the first had finished with. `confirmed`, `fixed (review of the branch)`: a file another item
   of the list names too (queued, running, done or failed) is left, its `.part` included (`downloads/Downloads.test.ts`:
   cancel keeps a file another item of the list names too; cancel keeps the .part an item still queued will resume).
-  Once the other item's row is cleared from the list, nothing tells its files from the canceled item's: a cancel then
-  deletes the shared file, as before.
+  Once the other item's row was cleared from the list, nothing told its files from the canceled item's, and a cancel
+  deleted the shared file. `fixed (#109)`: each stored file records whether the item renamed it into place itself
+  (`placed`, written with the rename), and a cancel deletes only those, never one it found in place
+  (`downloads/Downloads.test.ts`: cancel keeps a file another download placed, once that item is cleared from the list
+  (#109); a canceled item retried owns none of the files it placed before (#109); `downloads/transfer.test.ts`: a file
+  it renames into place is recorded placed by the item, one it finds in place is not (#109)). A file renamed just
+  before a crash, its record not written, is found in place on the next start: a later cancel keeps it.
 - A file of zero bytes never gets a `.part` (nothing is requested for it), and the rename fails `ENOENT`: the item
   ends `error`. `confirmed`, `fixed (review of the branch)`: its empty `.part` is created, then checked and renamed
   like any other (`downloads/transfer.test.ts`: an empty file is put in place without a request).
