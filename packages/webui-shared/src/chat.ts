@@ -28,7 +28,12 @@ export const Sampling = Schema.Struct({
       Schema.isInt({ message: 'Expected an integer' }),
     ),
   ),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'Sampling',
+  description: 'Validated per-conversation sampling overrides. Omitted keys fall back to llama-server defaults.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type Sampling = typeof Sampling.Type;
 
 /**
@@ -44,6 +49,9 @@ export const StoredSampling = Schema.Struct({
   repeat_penalty: Schema.optionalKey(Schema.Finite),
   max_tokens: Schema.optionalKey(Schema.Int),
   seed: Schema.optionalKey(Schema.Int),
+}).annotate({
+  identifier: 'StoredSampling',
+  description: 'Stored sampling overrides of a conversation.',
 });
 export type StoredSampling = typeof StoredSampling.Type;
 
@@ -60,10 +68,18 @@ export const ConversationPatch = Schema.Struct({
   ),
   sampling: Schema.optionalKey(Sampling),
   thinking: Schema.optionalKey(Schema.Boolean),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'ConversationPatch',
+  description: 'Fields to update on a conversation. Providing sampling replaces the entire sampling object.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type ConversationPatch = typeof ConversationPatch.Type;
 
-export const MessageStatus = Schema.Literals(['streaming', 'done', 'stopped', 'error']);
+export const MessageStatus = Schema.Literals(['streaming', 'done', 'stopped', 'error']).annotate({
+  identifier: 'MessageStatus',
+  description: 'Terminal or in-flight state of a chat message.',
+});
 export type MessageStatus = typeof MessageStatus.Type;
 
 /** The measures of a reply, from llama-server's `timings` and the server's clock. */
@@ -78,6 +94,9 @@ export const MessageStats = Schema.Struct({
   draftN: Schema.NullOr(Schema.Finite),
   draftAccepted: Schema.NullOr(Schema.Finite),
   durationMs: Schema.Finite,
+}).annotate({
+  identifier: 'MessageStats',
+  description: 'Timing and token statistics captured from llama-server for an assistant reply.',
 });
 export type MessageStats = typeof MessageStats.Type;
 
@@ -102,6 +121,9 @@ export const ChatMessage = Schema.Struct({
   /** Model that wrote the reply. */
   model: Schema.NullOr(Schema.String),
   createdAt: Schema.Int,
+}).annotate({
+  identifier: 'ChatMessage',
+  description: 'One user or assistant message in a conversation, including optional reasoning and timings.',
 });
 export type ChatMessage = typeof ChatMessage.Type;
 
@@ -115,6 +137,9 @@ export const Conversation = Schema.Struct({
   thinking: Schema.Boolean,
   createdAt: Schema.Int,
   updatedAt: Schema.Int,
+}).annotate({
+  identifier: 'Conversation',
+  description: 'Conversation metadata, system prompt, sampling configuration and timestamps.',
 });
 export type Conversation = typeof Conversation.Type;
 
@@ -126,6 +151,9 @@ export const ConversationSummary = Schema.Struct({
   messageCount: Schema.Int,
   modelPath: Schema.NullOr(Schema.String),
   live: Schema.Boolean,
+}).annotate({
+  identifier: 'ConversationSummary',
+  description: 'Summary row returned when listing conversations; live is true while a reply is streaming.',
 });
 export type ConversationSummary = typeof ConversationSummary.Type;
 
@@ -134,6 +162,9 @@ export const ConversationDetail = Schema.Struct({
   ...Conversation.fields,
   messages: Schema.Array(ChatMessage),
   live: Schema.Boolean,
+}).annotate({
+  identifier: 'ConversationDetail',
+  description: 'Full conversation including its ordered messages and live streaming indicator.',
 });
 export type ConversationDetail = typeof ConversationDetail.Type;
 
@@ -149,7 +180,10 @@ export const ChatEvent = Schema.Union([
     reasoning: Schema.optionalKey(Schema.String),
   }),
   Schema.Struct({ type: Schema.Literal('done'), message: ChatMessage }),
-]);
+]).annotate({
+  identifier: 'ChatEvent',
+  description: 'JSON payload of one chat SSE event (start, delta, or done).',
+});
 export type ChatEvent = typeof ChatEvent.Type;
 
 /**

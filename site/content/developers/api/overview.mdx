@@ -1,19 +1,29 @@
 ---
 title: API overview
-description: Base URL, the REST, WebSocket and SSE channels, the request guard, the error shape, status codes and the conventions every endpoint follows.
+description: Base URL, the interactive OpenAPI 3.1 reference, the REST, WebSocket and SSE channels, the request guard, the error shape, status codes and the conventions every endpoint follows.
 ---
-
-<Callout type="note">
-
-Checked against commit `74d0f4d`.
-
-</Callout>
 
 llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. It is declared once,
 with Effect's `HttpApi`, in `packages/webui-shared/src/api/` (`@llama-webui/shared`): `Api` (`api/Api.ts`) is made of
 one group per domain (`ProfilesApi`, `BenchApi`…), and each endpoint states its path, its parameters, its body, its
 query, its reply and the errors it can answer, as schemas. The server implements that declaration
-(`app/server/<domain>/http.ts`), and the web app derives its client from it.
+(`app/server/<domain>/http.ts`), the web app derives its client from it, and the OpenAPI 3.1 specification and
+[interactive HTTP reference](/developers/api/reference/) are generated directly from the same contract.
+
+## Interactive reference and OpenAPI
+
+Every REST endpoint, request body, response schema and tagged error is documented in the generated OpenAPI 3.1
+specification, available in two places:
+
+- **On this site**: browse all 67 endpoints and schemas in the [HTTP reference](/developers/api/reference/) (powered by
+  Scalar), or download the raw OpenAPI 3.1 document from the download link in its header (`/openapi.json`). This page
+  does not send requests: a page of this site cannot reach your instance (the browser blocks an `http://` request from
+  an `https://` page, and the guard refuses another Origin), so try an endpoint from your instance's `/api/docs`.
+- **On any running llama-webui server**: open `http://127.0.0.1:7860/api/docs` for the same interactive Scalar UI
+  (bundled offline with no external CDN requests), or fetch `GET /api/openapi.json` directly (gzip-compressed when the
+  client sends `Accept-Encoding: gzip`). Both routes sit behind the [request guard](#the-request-guard).
+
+The `/ws` push channel cannot be expressed in OpenAPI 3.1 and has its own page: [WebSocket](/developers/api/websocket/).
 
 ## Base URL
 
@@ -37,8 +47,24 @@ these pages use `http://127.0.0.1:7860`.
 | Server-sent events | `POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate`, `GET /api/chat/:id/stream` | The events of a chat reply while it is generated (`event: <type>` then `data: <json>`, a `: ping` comment after 15 seconds of silence). |
 
 The WebSocket only sends `hello` when a client connects, then events as they happen. A client reads the current state
-over REST and applies the messages on top of it: see [WebSocket](/developers/api/websocket/). The chat streams are
-described on [Chat](/developers/api/chat/).
+over REST and applies the messages on top of it: see [WebSocket](/developers/api/websocket/). Chat streams follow the
+SSE framing below (see [Chat SSE stream](#chat-sse-stream) and [Chat runs](/developers/server/chat/)).
+
+### Chat SSE stream
+
+`POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate` and `GET /api/chat/:id/stream` respond with
+`text/event-stream` (`204 No Content` on `GET /api/chat/:id/stream` when no reply is in progress). Each frame carries an
+`event:` line matching the `type` field of its JSON `data:` (`ChatEvent`):
+
+- `start`: `{ type: "start", user, assistant, title }` (`user` is `null` on regenerate or attach; `title` is included
+  when the conversation title was generated from the first message).
+- `delta`: `{ type: "delta", field: "content" | "reasoning", text }` as tokens arrive from `llama-server`.
+- `done`: `{ type: "done", message }` with the persisted final `ChatMessage` (status `done`, `stopped` or `error`, plus
+  `stats` when `llama-server` returned timings).
+
+After 15 seconds without an event, the server emits a `: ping` SSE comment so proxies do not drop idle connections
+during long prompt processing. Closing the stream only unsubscribes that client; the server keeps generating until
+completion or `POST /api/chat/:id/stop`.
 
 ## The request guard
 
@@ -132,15 +158,16 @@ Expected object`. The web app shows each issue under the field its first `path` 
 
 ### Error tags
 
-Before the move to Effect, a few errors carried a machine-readable `code`. Each is now a `_tag`:
+Before the move to Effect, a few errors carried a machine-readable `code`. Each is now a `_tag` documented on its
+endpoints in the [HTTP reference](/developers/api/reference/):
 
-| Former `code`                                                                      | `_tag`                                                                                                            | Status                            |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `name-taken`                                                                       | `ProfileNameTaken` ([Profiles](/developers/api/profiles/))                                                        | `409`                             |
-| `server-running`                                                                   | `ServerRunning` ([Benchmarks](/developers/api/bench/))                                                            | `409`                             |
-| `hf-gated`, `hf-not-found`, `hf-unauthorized`, `hf-rate-limited`, `hf-unreachable` | `HfGated`, `HfNotFound`, `HfUnauthorized`, `HfRateLimited`, `HfUnreachable` ([Hugging Face](/developers/api/hf/)) | `403`, `404`, `401`, `429`, `502` |
-| `already-queued`, `not-finished`                                                   | `AlreadyQueued`, `NotFinished` ([Hugging Face](/developers/api/hf/))                                              | `409`                             |
-| `disk-full`                                                                        | `DiskFull` ([Hugging Face](/developers/api/hf/))                                                                  | `507`                             |
+| Former `code`                                                                      | `_tag`                                                                      | Group                   | Status                            |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------- | --------------------------------- |
+| `name-taken`                                                                       | `ProfileNameTaken`                                                          | Profiles                | `409`                             |
+| `server-running`                                                                   | `ServerRunning`                                                             | Benchmarks, Sweeps      | `409`                             |
+| `hf-gated`, `hf-not-found`, `hf-unauthorized`, `hf-rate-limited`, `hf-unreachable` | `HfGated`, `HfNotFound`, `HfUnauthorized`, `HfRateLimited`, `HfUnreachable` | Hugging Face, Downloads | `403`, `404`, `401`, `429`, `502` |
+| `already-queued`, `not-finished`                                                   | `AlreadyQueued`, `NotFinished`                                              | Downloads               | `409`                             |
+| `disk-full`                                                                        | `DiskFull`                                                                  | Downloads               | `507`                             |
 
 ## Status codes
 
@@ -230,25 +257,29 @@ every other key as llama-server sent it.
 
 To add an endpoint, see [How-to guides](/developers/contributing/how-to/).
 
-## API pages
+## Endpoint groups
 
-67 endpoints (a method on a path), plus the WebSocket. Their declarations are under `packages/webui-shared/src/api/`:
+67 endpoints across 15 OpenAPI groups (declared in `packages/webui-shared/src/api/`), all browsable in the
+[HTTP reference](/developers/api/reference/) and at `GET /api/docs`, plus `/ws`:
 
-| Page                                              | Groups                             | Endpoints | Paths                                                    |
-| ------------------------------------------------- | ---------------------------------- | --------- | -------------------------------------------------------- |
-| [Health and settings](/developers/api/app/)       | `HealthApi`, `SettingsApi`         | 3         | `/api/health`, `/api/settings`                           |
-| [Setup](/developers/api/setup/)                   | `SetupApi`                         | 1         | `/api/setup`                                             |
-| [Profiles](/developers/api/profiles/)             | `ProfilesApi`                      | 9         | `/api/profiles/*`                                        |
-| [Server, state and logs](/developers/api/server/) | `ServerApi`, `FlagsApi`, `LogsApi` | 9         | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs` |
-| [Models](/developers/api/models/)                 | `ModelsApi`                        | 4         | `/api/models`, `/api/models/info`, `/api/models/usage`   |
-| [Hugging Face](/developers/api/hf/)               | `HfApi`, `DownloadsApi`            | 8         | `/api/hf/*`, `/api/downloads/*`                          |
-| [Chat](/developers/api/chat/)                     | `ChatApi`                          | 9         | `/api/chat/*`                                            |
-| [Monitor and system](/developers/api/monitor/)    | `MonitorApi`                       | 3         | `/api/monitor/*`, `/api/system/info`                     |
-| [Topology](/developers/api/topology/)             | `MonitorApi`                       | 1         | `/api/topology`                                          |
-| [Benchmarks](/developers/api/bench/)              | `BenchApi`                         | 8         | `/api/bench/*`                                           |
-| [Sweeps](/developers/api/sweeps/)                 | `SweepsApi`                        | 7         | `/api/sweeps/*`                                          |
-| [Tuning](/developers/api/tuning/)                 | `TuningApi`                        | 5         | `/api/tuning/*`                                          |
-| [WebSocket](/developers/api/websocket/)           | `app/server/ws/WsHub.ts`           | 1         | `/ws`, 16 message types                                  |
+| Group (`OpenAPI` tag)                   | Module                   | Endpoints | Paths                                                  |
+| --------------------------------------- | ------------------------ | --------- | ------------------------------------------------------ |
+| Health                                  | `HealthApi.ts`           | 1         | `/api/health`                                          |
+| Settings                                | `SettingsApi.ts`         | 2         | `/api/settings`                                        |
+| Profiles                                | `ProfilesApi.ts`         | 9         | `/api/profiles/*`                                      |
+| Flags                                   | `FlagsApi.ts`            | 1         | `/api/flags`                                           |
+| Logs                                    | `LogsApi.ts`             | 1         | `/api/logs`                                            |
+| Server                                  | `ServerApi.ts`           | 7         | `/api/state`, `/api/server/*`                          |
+| Monitor                                 | `MonitorApi.ts`          | 4         | `/api/monitor/*`, `/api/system/info`, `/api/topology`  |
+| Chat                                    | `ChatApi.ts`             | 9         | `/api/chat/*`                                          |
+| Models                                  | `ModelsApi.ts`           | 4         | `/api/models`, `/api/models/info`, `/api/models/usage` |
+| Hugging Face                            | `HfApi.ts`               | 3         | `/api/hf/*`                                            |
+| Downloads                               | `DownloadsApi.ts`        | 5         | `/api/downloads/*`                                     |
+| Benchmarks                              | `BenchApi.ts`            | 8         | `/api/bench/*`                                         |
+| Sweeps                                  | `SweepsApi.ts`           | 7         | `/api/sweeps/*`                                        |
+| Tuning                                  | `TuningApi.ts`           | 5         | `/api/tuning/*`                                        |
+| Setup                                   | `SetupApi.ts`            | 1         | `/api/setup`                                           |
+| [WebSocket](/developers/api/websocket/) | `app/server/ws/WsHub.ts` | 1         | `/ws`, 16 message types                                |
 
 ## Conventions
 

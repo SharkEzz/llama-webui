@@ -6,7 +6,10 @@ import { dual } from 'effect/Function';
 import type { Snapshot } from './monitor.ts';
 import type { ServerState } from './server.ts';
 
-export const TopologyNodeKind = Schema.Literals(['cpu', 'ram', 'nvme', 'gpu', 'chipset']);
+export const TopologyNodeKind = Schema.Literals(['cpu', 'ram', 'nvme', 'gpu', 'chipset']).annotate({
+  identifier: 'TopologyNodeKind',
+  description: 'Kind of hardware node in the sysfs PCIe/memory topology graph.',
+});
 export type TopologyNodeKind = typeof TopologyNodeKind.Type;
 
 export const TopologyNode = Schema.Struct({
@@ -21,7 +24,7 @@ export const TopologyNode = Schema.Struct({
   block: Schema.optionalKey(Schema.String),
   /** Static facts shown in the block's details (model, cores, size…); null = unknown. */
   detail: Schema.Record(Schema.String, Schema.NullOr(Schema.Union([Schema.String, Schema.Finite]))),
-});
+}).annotate({ identifier: 'TopologyNode', description: 'One hardware component in the machine topology graph.' });
 export type TopologyNode = typeof TopologyNode.Type;
 
 export const TopologyLink = Schema.Struct({
@@ -35,6 +38,9 @@ export const TopologyLink = Schema.Struct({
   widthMax: Schema.NullOr(Schema.Int),
   genCur: Schema.NullOr(Schema.Int),
   widthCur: Schema.NullOr(Schema.Int),
+}).annotate({
+  identifier: 'TopologyLink',
+  description: 'Directed PCIe, memory or internal link between two topology nodes.',
 });
 export type TopologyLink = typeof TopologyLink.Type;
 
@@ -42,7 +48,7 @@ export const TopologyGraph = Schema.Struct({
   nodes: Schema.Array(TopologyNode),
   links: Schema.Array(TopologyLink),
   at: Schema.Int,
-});
+}).annotate({ identifier: 'TopologyGraph', description: 'Live PCIe and memory hardware graph discovered from sysfs.' });
 export type TopologyGraph = typeof TopologyGraph.Type;
 
 /** Model, KV cache and compute bytes of a device, from the loading logs. */
@@ -60,6 +66,9 @@ export const PlacementBuffer = Schema.Struct({
    * largest part of each one.
    */
   estimated: Schema.optionalKey(Schema.Boolean),
+}).annotate({
+  identifier: 'PlacementBuffer',
+  description: 'Memory allocated on one ggml device for model weights, KV cache and compute buffers.',
 });
 export type PlacementBuffer = typeof PlacementBuffer.Type;
 
@@ -71,7 +80,10 @@ export type PlacementBuffer = typeof PlacementBuffer.Type;
  * - `requested`: the launch set `GGML_CUDA_P2P` and nothing says whether the driver allows it (llama.cpp enables it
  *   where it can, silently).
  */
-export const P2pStatus = Schema.Literals(['active', 'unavailable', 'requested']);
+export const P2pStatus = Schema.Literals(['active', 'unavailable', 'requested']).annotate({
+  identifier: 'P2pStatus',
+  description: 'GPU peer-to-peer status inferred from launch environment and NCCL logs.',
+});
 export type P2pStatus = typeof P2pStatus.Type;
 
 export const ModelPlacement = Schema.Struct({
@@ -84,6 +96,9 @@ export const ModelPlacement = Schema.Struct({
   p2p: Schema.optionalKey(P2pStatus),
   /** Where the buffer breakdown came from; absent on legacy records (treated as logs). */
   source: Schema.optionalKey(Schema.Literals(['logs', 'sse'])),
+}).annotate({
+  identifier: 'ModelPlacement',
+  description: 'Loaded model layer offloading and per-device buffer allocation parsed from logs or /models/sse.',
 });
 export type ModelPlacement = typeof ModelPlacement.Type;
 

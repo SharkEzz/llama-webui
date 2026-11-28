@@ -58,12 +58,13 @@ export interface Launched extends AsyncDisposable {
   stderr: () => string;
 }
 
-/** The environment of the test run, as a user's: Vitest's `TEST`, a CI's `CI`, `NODE_ENV` (Vitest sets `test`) and
- * `LLAMA_WEBUI_DEV` left out, users never set them; `extra` on top. */
+/** The environment of the test run, as a user's: Vitest's `TEST`, a CI's `CI`, `NODE_ENV` (Vitest sets `test`),
+ * `LLAMA_WEBUI_DEV` and ambient `OTEL_*` left out; `extra` on top. */
 export function userEnv(extra: Record<string, string> = {}): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = { ...process.env, ...extra };
+  const env: Record<string, string | undefined> = { ...process.env };
   for (const k of ['CI', 'TEST', 'NODE_ENV', 'LLAMA_WEBUI_DEV']) delete env[k];
-  return env;
+  for (const k of Object.keys(env)) if (k.startsWith('OTEL_')) delete env[k];
+  return { ...env, ...extra };
 }
 
 /**

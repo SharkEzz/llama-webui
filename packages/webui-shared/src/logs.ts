@@ -1,14 +1,28 @@
 import { Array as Arr, Option, Order, Schema, String as Str } from 'effect';
 import { dual } from 'effect/Function';
 
-export const LogLevel = Schema.Literals(['error', 'warn', 'info', 'debug']);
+export const LogLevel = Schema.Literals(['error', 'warn', 'info', 'debug']).annotate({
+  identifier: 'LogLevel',
+  description: 'Severity level parsed from a llama-server log line.',
+});
 export type LogLevel = typeof LogLevel.Type;
 
-export const LogKind = Schema.Literals(['srv', 'slot', 'other']);
+export const LogKind = Schema.Literals(['srv', 'slot', 'other']).annotate({
+  identifier: 'LogKind',
+  description: 'Category of a llama-server log line (HTTP server, slot activity, or general).',
+});
 export type LogKind = typeof LogKind.Type;
 
 /** A line of llama-server's log, numbered from 0 on each boot of llama-webui. */
-export const LogLine = Schema.Struct({ seq: Schema.Int, text: Schema.String, level: LogLevel, kind: LogKind });
+export const LogLine = Schema.Struct({
+  seq: Schema.Int.annotate({ description: 'Monotonic sequence number starting at 0 per bootId.' }),
+  text: Schema.String.annotate({ description: 'Raw line written by llama-server or llama-webui.' }),
+  level: LogLevel,
+  kind: LogKind,
+}).annotate({
+  identifier: 'LogLine',
+  description: 'One line from the in-memory ring buffer (last 10,000 lines).',
+});
 export type LogLine = typeof LogLine.Type;
 
 /** Log line written by llama-webui before each llama-server launch; the model placement is read from the next lines. */

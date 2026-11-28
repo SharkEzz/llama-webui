@@ -221,6 +221,10 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
   add('read', 'GET /api/health (Host localhost)', bare('GET', '/api/health', { Host: 'localhost' }));
 
   // Outside the API definition.
+  add('other', 'GET /api/openapi.json', bare('GET', '/api/openapi.json'), { headOnly: true });
+  add('other', 'GET /api/docs', bare('GET', '/api/docs'), { headOnly: true });
+  add('other', 'GET /api/docs/ (trailing slash)', bare('GET', '/api/docs/'));
+  add('other', 'POST /api/docs', bare('POST', '/api/docs'));
   add('other', 'GET /api/nope', bare('GET', '/api/nope'));
   add('other', 'GET /api/settings/ (trailing slash)', bare('GET', '/api/settings/'));
   add('other', 'GET /api/settings/?x=1 (trailing slash, query)', bare('GET', '/api/settings/?x=1'));

@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && node scripts/postbuild.ts",
+    "build": "node ../app/build/siteOpenApi.ts && react-router build && node scripts/postbuild.ts",
     "check-links": "node scripts/check-links.ts",
     "demo-seed": "node scripts/demo-seed.ts",
-    "dev": "react-router dev --host 0.0.0.0",
+    "dev": "node ../app/build/siteOpenApi.ts && react-router dev --host 0.0.0.0",
     "og": "node scripts/og.ts",
     "preview": "node scripts/serve.ts",
     "screenshots": "node scripts/screenshots.ts",

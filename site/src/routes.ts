@@ -9,6 +9,7 @@ const pages = contentRoutes(readdirSync(contentDir, { recursive: true, encoding:
 
 export default [
   index('routes/home.tsx'),
+  route('developers/api/reference', 'routes/api-reference.tsx'),
   layout(
     'routes/docs-layout.tsx',
     pages.map((p) => route(p.path, `../content/${p.file}`)),

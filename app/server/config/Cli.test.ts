@@ -159,6 +159,9 @@ layer(TestLayer)('cli', (it) => {
         'env: LLAMA_WEBUI_PORT',
         'env: LLAMA_WEBUI_DATA_DIR',
         'env: LLAMA_WEBUI_ENV_OVERRIDE',
+        'OTEL_EXPORTER_OTLP_ENDPOINT',
+        'OTEL_EXPORTER_OTLP_PROTOCOL',
+        'OTEL_SERVICE_NAME',
       ])
         assert.include(text, name);
     }),

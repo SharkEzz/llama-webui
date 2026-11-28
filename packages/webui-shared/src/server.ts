@@ -17,11 +17,17 @@ export const LoadProgress = Schema.Struct({
   current: Schema.String,
   /** Fraction loaded within `current` in `[0, 1]`; null when the stage has no scalar progress yet. */
   value: Schema.NullOr(Schema.Finite),
+}).annotate({
+  identifier: 'LoadProgress',
+  description: 'Live model-loading progress reported by llama-server over /models/sse.',
 });
 export type LoadProgress = typeof LoadProgress.Type;
 
 /** Live status of an external llama-server reported by `/models/sse`, when that server supports it. */
-export const ExternalStatus = Schema.Literals(['loading', 'ready', 'sleeping']);
+export const ExternalStatus = Schema.Literals(['loading', 'ready', 'sleeping']).annotate({
+  identifier: 'ExternalStatus',
+  description: 'Live state reported by an external llama-server over /models/sse.',
+});
 export type ExternalStatus = typeof ExternalStatus.Type;
 
 /**
@@ -60,14 +66,20 @@ export const ServerState = Schema.Union([
     status: Schema.optionalKey(ExternalStatus),
     progress: Schema.optionalKey(LoadProgress),
   }),
-]);
+]).annotate({
+  identifier: 'ServerState',
+  description: 'Discriminated union describing the current lifecycle state of llama-server.',
+});
 export type ServerState = typeof ServerState.Type;
 
 /** The state, the last launched command (shell-quoted, without the setpriv prefix) and the profile they belong to. */
 export const ServerView = Schema.Struct({
   state: ServerState,
-  command: Schema.NullOr(Schema.String),
-  profileId: Schema.NullOr(Schema.Int),
+  command: Schema.NullOr(Schema.String).annotate({ description: 'Last shell-quoted launch command, or null.' }),
+  profileId: Schema.NullOr(Schema.Int).annotate({ description: 'Active or last launched profile ID, or null.' }),
+}).annotate({
+  identifier: 'ServerView',
+  description: 'Supervisor state, last launched command and associated profile ID.',
 });
 export type ServerView = typeof ServerView.Type;
 
@@ -103,7 +115,10 @@ export const ServerProps = Schema.StructWithRest(
     ),
   }),
   rest,
-);
+).annotate({
+  identifier: 'ServerProps',
+  description: 'JSON returned by llama-server /props, preserving all extra keys sent by the upstream build.',
+});
 export type ServerProps = typeof ServerProps.Type;
 
 /** The `--host` of a state's server: null for an external one (reached on loopback) or no server. */

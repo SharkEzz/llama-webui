@@ -7,6 +7,8 @@ import { flatten, locate, type NavSection, sectionOf } from './nav.ts';
 
 const contentDir = fileURLToPath(new URL('../../content', import.meta.url));
 const pages = contentRoutes(readdirSync(contentDir, { recursive: true, encoding: 'utf8' }));
+/** Non-MDX static routes declared directly in src/routes.ts that appear in the docs sidebar. */
+const CUSTOM_ROUTES = new Set(['developers/api/reference']);
 
 describe('content/nav.ts', () => {
   const entries = flatten(NAV);
@@ -16,9 +18,9 @@ describe('content/nav.ts', () => {
     expect(pages.map((p) => p.path).filter((p) => !listed.has(p))).toEqual([]);
   });
 
-  test('has a file for every entry, listed once', () => {
+  test('has a file or custom route for every entry, listed once', () => {
     const files = new Set(pages.map((p) => p.path));
-    expect(entries.map((e) => e.path).filter((p) => !files.has(p))).toEqual([]);
+    expect(entries.map((e) => e.path).filter((p) => !files.has(p) && !CUSTOM_ROUTES.has(p))).toEqual([]);
     expect(new Set(entries.map((e) => e.path)).size).toBe(entries.length);
   });
 

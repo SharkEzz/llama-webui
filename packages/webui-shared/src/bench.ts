@@ -70,7 +70,13 @@ export const BenchParams = Schema.Struct({
   t: Schema.optionalKey(BENCH_FIELDS.t),
   b: Schema.optionalKey(BENCH_FIELDS.b),
   ub: Schema.optionalKey(BENCH_FIELDS.ub),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'BenchParams',
+  description:
+    'Validated llama.cpp performance flags shared by llama-bench and llama-server (ngl, ot, ncmoe, dev, ts, sm, fa, ctk, ctv, t, b, ub).',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type BenchParams = typeof BenchParams.Type;
 type Key = keyof BenchParams;
 
@@ -88,6 +94,9 @@ export const StoredBenchParams = Schema.Struct({
   t: Schema.optionalKey(Schema.Finite),
   b: Schema.optionalKey(Schema.Finite),
   ub: Schema.optionalKey(Schema.Finite),
+}).annotate({
+  identifier: 'StoredBenchParams',
+  description: 'Stored llama.cpp flags associated with a benchmark run, draft or sweep.',
 }) satisfies Schema.Codec<BenchParams>;
 
 interface Field {
@@ -115,7 +124,10 @@ const FIELDS: ReadonlyArray<Field> = [
 export const FIELD_ORDER: ReadonlyArray<Key> = Arr.map(FIELDS, (f) => f.key);
 const BY_FLAG = new Map(Arr.flatMap(FIELDS, (f) => Arr.map([f.short, ...f.long], (flag) => [flag, f] as const)));
 
-export const BenchKind = Schema.Literals(['bench', 'server']);
+export const BenchKind = Schema.Literals(['bench', 'server']).annotate({
+  identifier: 'BenchKind',
+  description: 'Measurement backend: llama-bench CLI (bench) or a trial llama-server instance (server).',
+});
 export type BenchKind = typeof BenchKind.Type;
 /** Prefix of the error recorded for a run that ran out of memory. */
 export const OOM_ERROR = 'Out of memory';
@@ -127,7 +139,10 @@ export const isOomError = (error: string | null | undefined): boolean =>
   (Str.startsWith(OOM_ERROR)(error) || Arr.some(LEGACY_OOM_ERRORS, (prefix) => Str.startsWith(prefix)(error)));
 
 /** `queued`: a sweep item waiting its turn. */
-export const BenchStatus = Schema.Literals(['queued', 'running', 'ok', 'failed', 'cancelled', 'interrupted']);
+export const BenchStatus = Schema.Literals(['queued', 'running', 'ok', 'failed', 'cancelled', 'interrupted']).annotate({
+  identifier: 'BenchStatus',
+  description: 'Execution status of a benchmark run or sweep item.',
+});
 export type BenchStatus = typeof BenchStatus.Type;
 
 /** Why an argument of “Other server flags” is refused: a reserved flag, or a flag one of the fields covers. */
@@ -182,7 +197,12 @@ export const BenchSpec = Schema.Struct({
   ...benchSpecBase,
   params: BenchParams.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   serverArgs: serverArgsField,
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'BenchSpec',
+  description: 'Strict specification for starting a llama-bench or trial llama-server benchmark run.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type BenchSpec = typeof BenchSpec.Type;
 export type BenchSpecInput = typeof BenchSpec.Encoded;
 
@@ -192,6 +212,9 @@ export const StoredBenchSpec = Schema.Struct({
   ...storedSpecBase,
   params: StoredBenchParams,
   serverArgs: Schema.Array(Schema.String),
+}).annotate({
+  identifier: 'StoredBenchSpec',
+  description: 'Stored specification recorded with a benchmark run.',
 }) satisfies Schema.Codec<BenchSpec>;
 
 /** A pp or tg measure of a run. */
@@ -199,6 +222,9 @@ export const Measure = Schema.Struct({
   tps: Schema.Finite,
   stddev: Schema.Finite,
   tokens: Schema.Finite,
+}).annotate({
+  identifier: 'BenchMeasure',
+  description: 'Measured prompt processing (pp) or token generation (tg) throughput with standard deviation.',
 }) satisfies Schema.Codec<BenchMeasure>;
 export type Measure = typeof Measure.Type;
 
@@ -207,11 +233,17 @@ export const BenchHardware = Schema.Struct({
   cpu: Schema.String,
   gpus: Schema.Array(Schema.Struct({ name: Schema.String, busId: Schema.String, vramTotalBytes: Schema.Finite })),
   build: Schema.NullOr(Schema.String),
+}).annotate({
+  identifier: 'BenchHardware',
+  description: 'CPU, GPU inventory and llama.cpp build version captured when a benchmark run started.',
 });
 export type BenchHardware = typeof BenchHardware.Type;
 
 /** The estimator's verdict on a configuration (`FitVerdict` of `tuning.ts`). */
-const Fit = Schema.Literals(['fits', 'tight', 'no']) satisfies Schema.Codec<FitVerdict>;
+const Fit = Schema.Literals(['fits', 'tight', 'no']).annotate({
+  identifier: 'BenchFitVerdict',
+  description: 'Memory estimator verdict recorded when planning a sweep item.',
+}) satisfies Schema.Codec<FitVerdict>;
 
 /** A benchmark run, one-off or an item of a sweep. */
 export const BenchRun = Schema.Struct({
@@ -235,6 +267,9 @@ export const BenchRun = Schema.Struct({
   /** The estimator's verdict at planning time. */
   fit: Schema.NullOr(Fit),
   createdAt: Schema.Int,
+}).annotate({
+  identifier: 'BenchRun',
+  description: 'Persisted benchmark run (one-off or sweep item) with measurements, peak VRAM and command line.',
 });
 export type BenchRun = typeof BenchRun.Type;
 
@@ -246,7 +281,7 @@ export const BenchPhase = Schema.Literals([
   'generation',
   'measure',
   'restarting-server',
-]);
+]).annotate({ identifier: 'BenchPhase', description: 'Current execution phase of an active benchmark run.' });
 export type BenchPhase = typeof BenchPhase.Type;
 
 /** The live state of the current run. */
@@ -260,7 +295,7 @@ export const BenchLive = Schema.Struct({
   lines: Schema.Array(Schema.String),
   /** Live loading progress from llama-server's `/models/sse` during a server trial's `loading` phase. */
   loadProgress: Schema.optionalKey(LoadProgress),
-});
+}).annotate({ identifier: 'BenchLive', description: 'Live progress snapshot of the currently running benchmark.' });
 export type BenchLive = typeof BenchLive.Type;
 
 /** A device of `llama-bench --list-devices`, with what the monitor knows of it. */
@@ -276,6 +311,9 @@ export const BenchDevice = Schema.Struct({
    * estimator deducts it from the budget. Missing: unknown (card not matched to the monitor, or not read).
    */
   otherUsedMib: Schema.optionalKey(Schema.Finite),
+}).annotate({
+  identifier: 'BenchDevice',
+  description: 'Compute device reported by llama-bench --list-devices, enriched with live VRAM usage in MiB.',
 }) satisfies Schema.Codec<LlamaBenchDevice & { readonly otherUsedMib?: number }>;
 export type BenchDevice = typeof BenchDevice.Type;
 
@@ -286,6 +324,10 @@ export const BenchDraft = Schema.Struct({
   profileId: Schema.Int,
   params: StoredBenchParams,
   serverArgs: Schema.Array(Schema.String),
+}).annotate({
+  identifier: 'BenchDraft',
+  description:
+    'Benchmark form pre-filled from a saved profile, splitting recognized BenchParams from extra serverArgs.',
 });
 export type BenchDraft = typeof BenchDraft.Type;
 

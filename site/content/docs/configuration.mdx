@@ -99,8 +99,18 @@ DESCRIPTION
                            default ~/.cache/huggingface/token)
     HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
     HTTPS_PROXY, HTTP_PROXY, NO_PROXY
-                           proxy for the requests to Hugging Face; localhost and loopback addresses are
-                           never proxied
+                           proxy for the requests to Hugging Face and OTLP; localhost and loopback addresses
+                           are never proxied
+
+  OpenTelemetry (OTLP over HTTP, spans and metrics):
+    OTEL_EXPORTER_OTLP_ENDPOINT
+                           base collector URL (e.g. http://127.0.0.1:4318); unset disables export
+    OTEL_EXPORTER_OTLP_PROTOCOL
+                           http/protobuf (default) or http/json
+    OTEL_EXPORTER_OTLP_HEADERS
+                           comma-separated headers (key=value, URI-encoded)
+    OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES
+                           service identity (default: llama-webui) and resource attributes
 
 USAGE
   llama-webui [flags]
@@ -215,8 +225,8 @@ Downloaded files go to `<models folder>/<org>/<name>/`; see [Hugging Face downlo
 
 ### Behind a proxy
 
-llama-webui sends its requests to Hugging Face (search, repository listings, downloads) through the proxy the usual
-variables name, set in the environment or in `.env`:
+llama-webui sends its outgoing requests to Hugging Face (search, repository listings, downloads) and to an OpenTelemetry
+collector (when OTLP export is enabled) through the proxy the usual variables name, set in the environment or in `.env`:
 
 | Variable                    | Effect                                                                             |
 | --------------------------- | ---------------------------------------------------------------------------------- |
@@ -224,8 +234,45 @@ variables name, set in the environment or in `.env`:
 | `NO_PROXY`                  | Comma-separated hosts reached directly (`example.com`, `.example.com`, an address) |
 
 The lowercase names work too. `localhost`, `127.0.0.1` and `::1` are always reached directly, so the requests to
-`llama-server` never go through the proxy. If a profile makes `llama-server` listen on another address of the machine
-(`--host 192.168.1.20`), add that address to `NO_PROXY`.
+`llama-server` and a local OTLP collector never go through the proxy. If a profile makes `llama-server` listen on
+another address of the machine (`--host 192.168.1.20`), add that address to `NO_PROXY`.
+
+## OpenTelemetry (OTLP)
+
+llama-webui can export its server spans and metrics (including Effect runtime metrics) over OTLP/HTTP using standard
+OpenTelemetry environment variables. Export is disabled by default and incurs no network traffic until an endpoint is
+configured. Logs are not exported over OTLP.
+
+```bash title="Terminal"
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 llama-webui
+```
+
+Setting `OTEL_EXPORTER_OTLP_ENDPOINT` exports traces to `<endpoint>/v1/traces` and metrics to `<endpoint>/v1/metrics`.
+Signal-specific endpoints (`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`) are used as
+written, without appending a path. All standard options can be set in the environment or in `.env`:
+
+| Variable                                                                               | Default                    | Effect                                                                                                                                  |
+| -------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_SDK_DISABLED`                                                                    | `false`                    | Set to `true` (any case) to disable all OTLP export regardless of other `OTEL_*` variables                                              |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                                                          | unset                      | Base OTLP/HTTP collector URL; unset disables export unless a signal endpoint is set                                                     |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`            | unset                      | Full URL for traces or metrics only (used verbatim, overrides the base endpoint)                                                        |
+| `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`                                        | `otlp`                     | Comma-separated exporters: a signal is exported when its list contains `otlp` (`none` turns it off); others are ignored                 |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` (and `_TRACES_`, `_METRICS_`)                            | `http/protobuf`            | Wire format: `http/protobuf` or `http/json` (with `grpc`, unsupported, that signal is not exported)                                     |
+| `OTEL_EXPORTER_OTLP_HEADERS` (and `_TRACES_`, `_METRICS_`)                             | unset                      | Comma-separated `key=value` HTTP headers (URI-encoded values, e.g. `Authorization=...`)                                                 |
+| `OTEL_EXPORTER_OTLP_COMPRESSION` (and `_TRACES_`, `_METRICS_`)                         | unset                      | Set to `gzip` to compress OTLP HTTP request bodies                                                                                      |
+| `OTEL_EXPORTER_OTLP_TIMEOUT` (and `_TRACES_`, `_METRICS_`)                             | `10000`                    | Time limit of each export request in milliseconds (else `OTEL_BSP_EXPORT_TIMEOUT` for traces, `OTEL_METRIC_EXPORT_TIMEOUT` for metrics) |
+| `OTEL_BSP_SCHEDULE_DELAY`, `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`, `OTEL_BSP_MAX_QUEUE_SIZE` | `5000`, `512`, `2048`      | Trace batch export interval (ms), max batch size and max buffered spans                                                                 |
+| `OTEL_METRIC_EXPORT_INTERVAL`                                                          | `60000`                    | Metric export interval in milliseconds                                                                                                  |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`                                    | `cumulative`               | Metric aggregation temporality: `cumulative` or `delta`                                                                                 |
+| `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION`                                            | `llama-webui`, app version | OpenTelemetry `service.name` and `service.version` resource attributes                                                                  |
+| `OTEL_RESOURCE_ATTRIBUTES`                                                             | unset                      | Extra comma-separated `key=value` resource attributes (e.g. `deployment.environment=home`)                                              |
+
+On shutdown (`SIGINT` or `SIGTERM`), buffered spans and metrics are flushed after the shutdown steps complete, bounded
+at 1 second (or the export timeout, if shorter) so an unreachable collector never stalls exit.
+
+Without an endpoint, no other `OTEL_*` variable is read, so a value set for another program does not affect llama-webui.
+A value llama-webui cannot use never stops it from starting: it is logged as a warning and its default applies (an
+invalid endpoint or an unsupported protocol leaves that signal unexported).
 
 ## Everything else is in Settings
 

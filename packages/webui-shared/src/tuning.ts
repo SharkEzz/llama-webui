@@ -4,7 +4,9 @@ import { BenchDevice, BenchParams, CACHE_TYPES } from './bench.ts';
 import { CpuInfo } from './monitor.ts';
 
 export const PRESET_IDS = ['chat', 'agent', 'context', 'fit', 'big'] as const;
-export const PresetId = Schema.Literals(PRESET_IDS);
+export const PresetId = Schema.Literals(PRESET_IDS).annotate({
+  description: 'Tuning preset objective: chat, agent, context, fit or big.',
+});
 export type PresetId = typeof PresetId.Type;
 
 export interface Preset {
@@ -85,7 +87,10 @@ export const presetOf = (id: PresetId): Preset =>
 /** llama-bench's relative measurement noise (J5: pp ±8–15% from run to run, tg < 1%). Below it, two configs are a tie. */
 export const NOISE = { pp: 0.1, tg: 0.02 } as const;
 
-export const FitVerdict = Schema.Literals(['fits', 'tight', 'no']);
+export const FitVerdict = Schema.Literals(['fits', 'tight', 'no']).annotate({
+  identifier: 'FitVerdict',
+  description: 'Memory fit verdict: fits comfortably, tight margin, or exceeds VRAM/RAM budget (no).',
+});
 export type FitVerdict = typeof FitVerdict.Type;
 
 export const DeviceBudget = Schema.Struct({
@@ -97,7 +102,7 @@ export const DeviceBudget = Schema.Struct({
   totalBytes: Schema.Finite,
   /** VRAM held by other processes than the managed llama-server; missing or 0 when unknown. */
   otherBytes: Schema.optionalKey(Schema.Finite),
-});
+}).annotate({ identifier: 'DeviceBudget', description: 'Estimated memory allocation and usable budget on one GPU.' });
 export type DeviceBudget = typeof DeviceBudget.Type;
 
 export const Fit = Schema.Struct({
@@ -106,7 +111,7 @@ export const Fit = Schema.Struct({
   ramBytes: Schema.Finite,
   ramAvailableBytes: Schema.Finite,
   reason: Schema.NullOr(Schema.String),
-});
+}).annotate({ identifier: 'Fit', description: 'Estimated per-GPU VRAM and host RAM footprint for a configuration.' });
 export type Fit = typeof Fit.Type;
 
 /** What the estimator plans on: the devices llama-bench lists, with their live memory, the CPU and the RAM. */
@@ -117,10 +122,19 @@ export const TuningHardware = Schema.Struct({
   cpu: CpuInfo,
   ramTotalBytes: Schema.Finite,
   ramAvailableBytes: Schema.Finite,
+}).annotate({
+  identifier: 'TuningHardware',
+  description:
+    'Hardware inventory used by the tuning estimator: llama-bench devices with live free VRAM, CPU and host RAM.',
 });
 export type TuningHardware = typeof TuningHardware.Type;
 
-export const Recommendation = Schema.Struct({ flag: Schema.String, value: Schema.String, why: Schema.String });
+export const Recommendation = Schema.Struct({ flag: Schema.String, value: Schema.String, why: Schema.String }).annotate(
+  {
+    identifier: 'Recommendation',
+    description: 'One recommended llama-server flag with its value and rationale.',
+  },
+);
 export type Recommendation = typeof Recommendation.Type;
 
 export const Estimate = Schema.Struct({
@@ -140,10 +154,16 @@ export const Estimate = Schema.Struct({
   /** Bytes read from disk per generated token when RAM overflows (0 otherwise). */
   diskReadBytesPerToken: Schema.Finite,
   warnings: Schema.Array(Schema.String),
+}).annotate({
+  identifier: 'Estimate',
+  description: 'Recommended llama-server configuration, memory fit breakdown and RAM overflow projection.',
 });
 export type Estimate = typeof Estimate.Type;
 
-export const PlanItem = Schema.Struct({ params: BenchParams, label: Schema.String, fit: Fit });
+export const PlanItem = Schema.Struct({ params: BenchParams, label: Schema.String, fit: Fit }).annotate({
+  identifier: 'PlanItem',
+  description: 'One candidate combination produced by planning a sweep with its memory fit verdict.',
+});
 export type PlanItem = typeof PlanItem.Type;
 
 export const PlanResult = Schema.Struct({
@@ -153,12 +173,21 @@ export const PlanResult = Schema.Struct({
   /** (-dev, -ts) pairs discarded for unequal lengths. */
   droppedTs: Schema.Int,
   estimatedSeconds: Schema.Int,
+}).annotate({
+  identifier: 'PlanResult',
+  description: 'Expanded sweep combinations, exclusion counters and estimated run time.',
 });
 export type PlanResult = typeof PlanResult.Type;
 
-export const CheckState = Schema.Literals(['ok', 'warn', 'unknown', 'na']);
+export const CheckState = Schema.Literals(['ok', 'warn', 'unknown', 'na']).annotate({
+  identifier: 'CheckState',
+  description: 'Outcome of a system tuning check.',
+});
 export type CheckState = typeof CheckState.Type;
-export const CheckFamily = Schema.Literals(['nvidia', 'amd', 'cpu', 'build', 'kernel']);
+export const CheckFamily = Schema.Literals(['nvidia', 'amd', 'cpu', 'build', 'kernel']).annotate({
+  identifier: 'CheckFamily',
+  description: 'Subsystem audited by a tuning check.',
+});
 export type CheckFamily = typeof CheckFamily.Type;
 
 export const Check = Schema.Struct({
@@ -172,7 +201,7 @@ export const Check = Schema.Struct({
   command: Schema.optionalKey(Schema.String),
   persistence: Schema.optionalKey(Schema.Literals(['session', 'permanent'])),
   impact: Schema.String,
-});
+}).annotate({ identifier: 'Check', description: 'One hardware, kernel or build diagnostic check.' });
 export type Check = typeof Check.Type;
 
 /**
@@ -188,13 +217,24 @@ const NEEDS_MODEL_OR_SERVER = [
 
 export const isSetupCheck = (id: string): boolean => !Arr.some(NEEDS_MODEL_OR_SERVER, (re) => re.test(id));
 
-export const CheckSummary = Schema.Struct({ warn: Schema.Int, ok: Schema.Int, unknown: Schema.Int, na: Schema.Int });
+export const CheckSummary = Schema.Struct({
+  warn: Schema.Int,
+  ok: Schema.Int,
+  unknown: Schema.Int,
+  na: Schema.Int,
+}).annotate({
+  identifier: 'CheckSummary',
+  description: 'Counts of tuning checks per state.',
+});
 export type CheckSummary = typeof CheckSummary.Type;
 
 export const ChecksReport = Schema.Struct({
   checks: Schema.Array(Check),
   summary: CheckSummary,
   at: Schema.Int,
+}).annotate({
+  identifier: 'ChecksReport',
+  description: 'Full host and build diagnostic report produced by GET /api/tuning/checks.',
 });
 export type ChecksReport = typeof ChecksReport.Type;
 
@@ -203,6 +243,9 @@ export const DiskSpeed = Schema.Struct({
   sampledBytes: Schema.Int,
   path: Schema.String,
   at: Schema.Int,
+}).annotate({
+  identifier: 'DiskSpeed',
+  description: 'Sequential disk read measurement on a GGUF file in bytes/s.',
 });
 export type DiskSpeed = typeof DiskSpeed.Type;
 
@@ -221,11 +264,19 @@ export const EstimateRequest = Schema.Struct({
       Schema.isLessThanOrEqualTo(10_000_000, { message: 'at most 10000000' }),
     ),
   ),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'EstimateRequest',
+  description: 'Strict payload to estimate a recommended configuration for a GGUF model and preset.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type EstimateRequest = typeof EstimateRequest.Type;
 
 /** `POST /api/tuning/disk-speed` (strict). */
 export const DiskSpeedRequest = Schema.Struct({ modelPath: ModelPath }).annotate({
+  identifier: 'DiskSpeedRequest',
+  description: 'Strict payload specifying the GGUF file to benchmark for sequential read throughput.',
+  message: 'Expected object',
   messageUnexpectedKey: 'unknown key',
 });
 

@@ -8,6 +8,10 @@ dist
 .output
 *.tgz
 
+# Generated OpenAPI spec and Scalar HTML for the docs site (app/build/siteOpenApi.ts)
+site/public/openapi.json
+site/public/scalar.html
+
 # code coverage
 coverage
 *.lcov

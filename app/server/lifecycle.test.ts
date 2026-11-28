@@ -504,3 +504,81 @@ test('SIGTERM during a download keeps its .part and the next start resumes it', 
     await hub.close();
   }
 }, 30_000);
+
+test('OTLP export sends traces and metrics on shutdown and respects the 2 s budget when unreachable', async () => {
+  const received: Array<{ url: string; contentType: string | undefined; body: string }> = [];
+  const collector = createHttpServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      received.push({
+        url: req.url ?? '',
+        contentType: req.headers['content-type'],
+        body: Buffer.concat(chunks).toString('utf8'),
+      });
+      res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+    });
+  });
+  const port = await freePort();
+  await new Promise<void>((r) => collector.listen(port, '127.0.0.1', r));
+  try {
+    const data = dataDir();
+    await using app = await launch({
+      dataDir: data,
+      env: {
+        LLAMA_WEBUI_TEST_MONITOR: 'stub',
+        OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${port}`,
+        OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
+        OTEL_SERVICE_NAME: 'llama-webui-lifecycle',
+      },
+    });
+    const health = await fetch(`${app.base}/api/health`);
+    expect(health.status).toBe(200);
+    await health.body?.cancel();
+    const t0 = performance.now();
+    app.proc.kill('SIGTERM');
+    expect(await app.exited).toBe(0);
+    expect(performance.now() - t0).toBeLessThan(2000);
+    const traces = received
+      .filter((r) => r.url === '/v1/traces')
+      .map((r) => r.body)
+      .join('\n');
+    const metrics = received
+      .filter((r) => r.url === '/v1/metrics')
+      .map((r) => r.body)
+      .join('\n');
+    expect(traces).toContain('llama-webui-lifecycle');
+    expect(traces).toContain('Shutdown.run');
+    expect(metrics).toContain('llama_webui_http_requests');
+    expect(metrics).toContain('llama_webui_shutdown_steps_duration');
+  } finally {
+    await new Promise((r) => collector.close(r));
+  }
+
+  // A silent collector that never answers must not push SIGTERM past the 2 s shutdown budget.
+  const stuck = createHttpServer((_req, _res) => {
+    // Intentionally never answers.
+  });
+  const stuckPort = await freePort();
+  await new Promise<void>((r) => stuck.listen(stuckPort, '127.0.0.1', r));
+  try {
+    const data = dataDir();
+    await using app = await launch({
+      dataDir: data,
+      env: {
+        LLAMA_WEBUI_TEST_MONITOR: 'stub',
+        OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${stuckPort}`,
+      },
+    });
+    const health = await fetch(`${app.base}/api/health`);
+    expect(health.status).toBe(200);
+    await health.body?.cancel();
+    const t0 = performance.now();
+    app.proc.kill('SIGTERM');
+    expect(await app.exited).toBe(0);
+    expect(performance.now() - t0).toBeLessThan(2000);
+  } finally {
+    stuck.closeAllConnections();
+    await new Promise((r) => stuck.close(r));
+  }
+}, 30_000);

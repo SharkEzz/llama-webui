@@ -42,6 +42,7 @@ import { TuningHandlers } from '../tuning/http.ts';
 import { SetupHandlers } from '../tuning/setup.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { Guarded } from './Guard.ts';
+import { OpenApiDocsLive } from './OpenApiDocs.ts';
 import { RequestErrorsLive } from './RequestErrors.ts';
 import * as Static from './Static.ts';
 
@@ -55,10 +56,11 @@ const UnknownApi = HttpRouter.add(
 );
 
 /**
- * The endpoints of the API (each group's handlers, and the answer to a request that does not decode), and the 404 of
- * any other /api path, all behind the guard and the 308 of a trailing slash.
+ * The endpoints of the API (each group's handlers, and the answer to a request that does not decode), the OpenAPI
+ * specification and Scalar UI (`/api/openapi.json`, `/api/docs`), and the 404 of any other /api path, all behind the
+ * guard and the 308 of a trailing slash.
  */
-export const ApiRoutes = Layer.merge(
+export const ApiRoutes = Layer.mergeAll(
   HttpApiBuilder.layer(Api).pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -80,6 +82,7 @@ export const ApiRoutes = Layer.merge(
       ).pipe(Layer.provideMerge(RequestErrorsLive)),
     ),
   ),
+  OpenApiDocsLive,
   UnknownApi,
 ).pipe(Layer.provide(Guarded));
 

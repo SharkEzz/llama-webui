@@ -1,7 +1,10 @@
 import { Effect, Schema, String as Str } from 'effect';
 import { dual } from 'effect/Function';
 
-export const ModelKind = Schema.Literals(['model', 'mmproj']);
+export const ModelKind = Schema.Literals(['model', 'mmproj']).annotate({
+  identifier: 'ModelKind',
+  description: 'Kind of GGUF file: main language model or multimodal projector (mmproj).',
+});
 export type ModelKind = typeof ModelKind.Type;
 
 /**
@@ -33,6 +36,9 @@ export const ModelSummary = Schema.Struct({
   recurrent: Schema.Boolean,
   slidingWindow: Schema.NullOr(Schema.Finite),
   hasChatTemplate: Schema.Boolean,
+}).annotate({
+  identifier: 'ModelSummary',
+  description: 'Header metadata parsed from a GGUF file (or first shard of a split model) and cached in SQLite.',
 });
 export type ModelSummary = typeof ModelSummary.Type;
 
@@ -47,7 +53,11 @@ export const ModelEntry = Schema.Union([
     fileBytes: Schema.Int,
     error: Schema.String,
   }),
-]);
+]).annotate({
+  identifier: 'ModelEntry',
+  description:
+    'Result of scanning one GGUF entry: parsed ModelSummary when ok is true, or an error string when unreadable.',
+});
 export type ModelEntry = typeof ModelEntry.Type;
 
 export const ModelList = Schema.Struct({
@@ -58,6 +68,9 @@ export const ModelList = Schema.Struct({
   home: Schema.String,
   scannedAt: Schema.Int,
   models: Schema.Array(ModelEntry),
+}).annotate({
+  identifier: 'ModelList',
+  description: 'Result of scanning the configured models directory for GGUF files.',
 });
 export type ModelList = typeof ModelList.Type;
 
@@ -69,6 +82,9 @@ export const ModelWeights = Schema.Struct({
   expertsBytes: Schema.Int,
   otherBytes: Schema.Int,
   totalBytes: Schema.Int,
+}).annotate({
+  identifier: 'ModelWeights',
+  description: 'Byte breakdown of a GGUF model weights by tensor group.',
 });
 export type ModelWeights = typeof ModelWeights.Type;
 
@@ -77,11 +93,17 @@ export const ModelDetail = Schema.Struct({
   ...ModelSummary.fields,
   tensorCount: Schema.Int,
   weights: ModelWeights,
+}).annotate({
+  identifier: 'ModelDetail',
+  description: 'Detailed inspection of one GGUF file including tensor count and weight breakdown.',
 });
 export type ModelDetail = typeof ModelDetail.Type;
 
 /** A profile that opens a model file, as its model or as its projector. */
-export const ModelProfileUse = Schema.Struct({ id: Schema.Int, name: Schema.String, role: ModelKind });
+export const ModelProfileUse = Schema.Struct({ id: Schema.Int, name: Schema.String, role: ModelKind }).annotate({
+  identifier: 'ModelProfileUse',
+  description: 'Reference from a saved profile to a GGUF file.',
+});
 export type ModelProfileUse = typeof ModelProfileUse.Type;
 
 /** What deleting a model would remove, and why it is refused (`blocked`), from `GET /api/models/usage`. */
@@ -93,6 +115,9 @@ export const ModelUsage = Schema.Struct({
   profiles: Schema.Array(ModelProfileUse),
   /** Why the model cannot be deleted now (the running server or a download uses it); null if it can. */
   blocked: Schema.NullOr(Schema.String),
+}).annotate({
+  identifier: 'ModelUsage',
+  description: 'Files, referencing profiles and active-use blocker checked before deleting a GGUF model.',
 });
 export type ModelUsage = typeof ModelUsage.Type;
 
@@ -103,13 +128,21 @@ export const ModelDelete = Schema.Struct({
   ),
   /** Also delete the profiles that use the model. */
   deleteProfiles: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'ModelDelete',
+  description: 'Request payload to delete a GGUF model (all shards) and optionally its referencing profiles.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type ModelDelete = typeof ModelDelete.Type;
 
 /** What a deletion removed: the files, and the ids of the profiles. */
 export const ModelDeleted = Schema.Struct({
   deletedFiles: Schema.Array(Schema.String),
   deletedProfiles: Schema.Array(Schema.Int),
+}).annotate({
+  identifier: 'ModelDeleted',
+  description: 'Files removed from disk and profile IDs deleted by DELETE /api/models.',
 });
 export type ModelDeleted = typeof ModelDeleted.Type;
 

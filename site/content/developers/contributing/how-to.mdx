@@ -91,8 +91,11 @@ export const ProfileInput = Schema.Struct({
 
 The endpoint goes into its domain's group, `packages/webui-shared/src/api/<Domain>Api.ts`, with everything it reads
 as schemas: `params` (an id is `IdParam` of `api/params.ts`), `payload`, `query`, and its `success` and `error`. An
-error it answers is a `Schema.TaggedError` with its status (`httpApiStatus`), exported from the package's index; the
-web tells it by its `_tag`.
+error it answers is a `Schema.TaggedError` with its status (`httpApiStatus`) and a `description`, exported from the
+package's index; the web tells it by its `_tag`. Annotate each group (`title`, `description`) and each endpoint
+(`summary`, `description`) with `OpenApi.annotations(...)`, and give each domain schema an `identifier` and
+`description` (input structs also carry `message: 'Expected object'` so validation messages stay unchanged):
+`packages/webui-shared/src/api/openapi.test.ts` fails if any endpoint, group or schema lacks OpenAPI documentation.
 
 ```ts title="packages/webui-shared/src/api/ProfilesApi.ts"
 export class ProfileNotFound extends Schema.TaggedError<ProfileNotFound, { readonly ProfileNotFound: unique symbol }>()(
@@ -189,9 +192,9 @@ See [Write a test](/developers/contributing/testing/#write-a-test).
   </Step>
 </Steps>
 
-**Docs to update**: the API reference page of the domain (`site/content/developers/api/<domain>.mdx`, written by
-hand: every endpoint, body, response and error), and the user page of the feature. The common rules (guard, error
-shape) live on the [API overview](/developers/api/overview/).
+**Docs to update**: the [HTTP reference](/developers/api/reference/) (and `/api/docs` / `/api/openapi.json`) updates
+automatically from the OpenAPI annotations in `packages/webui-shared/src/`. Update the user page of the feature, and
+[API overview](/developers/api/overview/) if common rules change.
 
 ## Add a service
 
@@ -446,6 +449,6 @@ holds the message of its issue, which `TextField` shows under the field. The fir
   </Step>
 </Steps>
 
-**Docs to update**: [Settings](/docs/settings/) (the setting, its default and limits), [Health and
-settings](/developers/api/app/) (`PATCH /api/settings`), the Settings screenshots, and
-[First run](/docs/getting-started/first-run/) if the checklist shows it.
+**Docs to update**: [Settings](/docs/settings/) (the setting, its default and limits), the Settings screenshots, and
+[First run](/docs/getting-started/first-run/) if the checklist shows it. (`PATCH /api/settings` in the OpenAPI reference
+updates automatically from `packages/webui-shared/src/settings.ts`.)

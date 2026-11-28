@@ -65,8 +65,18 @@ const LINES = [
   '                         default ~/.cache/huggingface/token)',
   '  HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)',
   '  HTTPS_PROXY, HTTP_PROXY, NO_PROXY',
-  '                         proxy for the requests to Hugging Face; localhost and loopback addresses are',
-  '                         never proxied',
+  '                         proxy for the requests to Hugging Face and OTLP; localhost and loopback addresses',
+  '                         are never proxied',
+  '',
+  'OpenTelemetry (OTLP over HTTP, spans and metrics):',
+  '  OTEL_EXPORTER_OTLP_ENDPOINT',
+  '                         base collector URL (e.g. http://127.0.0.1:4318); unset disables export',
+  '  OTEL_EXPORTER_OTLP_PROTOCOL',
+  '                         http/protobuf (default) or http/json',
+  '  OTEL_EXPORTER_OTLP_HEADERS',
+  '                         comma-separated headers (key=value, URI-encoded)',
+  '  OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES',
+  '                         service identity (default: llama-webui) and resource attributes',
 ];
 
 /** The formatter indents the first line of the description only: the others get the same two spaces here. */
