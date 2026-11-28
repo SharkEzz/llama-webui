@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:f
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { Array as Arr, Option, pipe, String as Str } from 'effect';
 import { afterAll, expect, test, vi } from 'vitest';
 import { launch } from './testing/launch.ts';
@@ -105,6 +106,43 @@ test('a deep URL gets the shell', async ({ signal }) => {
     expect(response.status).toBe(200);
     // An unread body leaves its stream pending.
     await response.body?.cancel();
+  }
+});
+
+test('each script and style over 1 KiB ships with its Brotli and gzip variants (#105)', () => {
+  const files = Arr.filter(readdirSync(assets), (f) => /\.(?:js|css)$/.test(f));
+  const large = Arr.filter(files, (f) => readFileSync(join(assets, f)).length > 1024);
+  expect(large.length).toBeGreaterThan(10);
+  for (const f of large) {
+    const file = readFileSync(join(assets, f));
+    expect({ f, br: brotliDecompressSync(readFileSync(join(assets, `${f}.br`))).equals(file) }).toEqual({
+      f,
+      br: true,
+    });
+    expect({ f, gz: gunzipSync(readFileSync(join(assets, `${f}.gz`))).equals(file) }).toEqual({ f, gz: true });
+  }
+});
+
+test('the built server sends an asset in the encoding the client accepts (#105)', async ({ signal }) => {
+  const data = join(dir.path, 'encoded');
+  mkdirSync(data);
+  await using server = await launch({ dataDir: data });
+  const html = await (await fetch(`${server.base}/`, { signal })).text();
+  const entry = Str.match(/src="(\/assets\/[^"]+\.js)"/)(html).pipe(
+    Option.flatMap((m) => Option.fromUndefinedOr(m[1])),
+  );
+  const path = Option.getOrThrow(entry);
+  const file = readFileSync(join(OUTPUT, 'public', path), 'utf8');
+  for (const [encoding, expected] of [
+    ['br', 'br'],
+    ['gzip', 'gzip'],
+    ['identity', null],
+  ] as const) {
+    const res = await fetch(`${server.base}${path}`, { signal, headers: { 'accept-encoding': encoding } });
+    expect(res.headers.get('content-encoding')).toBe(expected);
+    expect(res.headers.get('vary')).toBe('Accept-Encoding');
+    // fetch decodes the body: it is the file.
+    expect(await res.text()).toBe(file);
   }
 });
 

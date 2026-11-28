@@ -154,5 +154,6 @@ Besides the API's endpoints, the HTTP server (`app/server/http/HttpLive.ts`) han
 - `/ws`: the WebSocket upgrade (`app/server/ws/WsHub.ts`; `426` without an upgrade). See
   [WebSocket](/developers/api/websocket/).
 - The web app for every other path: Vite with HMR in development; in production, the built files of
-  `app/.output/public/` and, for any other `GET`, `index.html` (`app/server/http/Static.ts`, see
+  `app/.output/public/` (a hashed asset as its precompressed `.br` or `.gz` copy when the client accepts it) and, for
+  any other `GET`, `index.html` (`app/server/http/Static.ts`, see
   [Serving the UI](/developers/architecture/#serving-the-ui)).
