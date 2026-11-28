@@ -254,7 +254,9 @@ To add an endpoint, see [How-to guides](/developers/contributing/how-to/).
 
 - **JSON everywhere.** Bodies are JSON, sent with `content-type: application/json`. Responses are JSON, except a `204`
   (no body), a `308` (no body), the chat event streams (`text/event-stream`), the profile exports (a JSON file sent as
-  an attachment) and the `426` of `/ws` (plain text).
+  an attachment) and the `426` of `/ws` (plain text). A JSON response of 1 KiB or more is sent in gzip
+  (`Content-Encoding: gzip`, `Vary: Accept-Encoding`) to a client whose `Accept-Encoding` accepts it; the event
+  streams never are.
 - **Ids** are SQLite integer ids (`id INTEGER PRIMARY KEY`), positive integers in paths (`/api/profiles/3`) and numbers
   in bodies (`{"profileId": 3}`, never `"3"`).
 - **Times** are epoch milliseconds: `createdAt`, `updatedAt`, `finishedAt`, `since`, `at`, `scannedAt`, `serverTime`.

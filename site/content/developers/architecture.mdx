@@ -178,7 +178,9 @@ In development, the server sends its spans and its metrics to the
 `node build/server.ts`, in `app/`, and writes `app/.output/`:
 
 - `public/`: the client, split per page: each page loads only its own chunks. The files of `public/assets/` are
-  content-hashed;
+  content-hashed, and each text one (script, style, SVG…) of more than 1 KiB has its Brotli (`<file>.br`, quality 11)
+  and gzip (`<file>.gz`, level 9) copies next to it, each kept only when it is smaller (`app/build/precompress.ts`,
+  run at the end of `build/server.ts`): about 3.7 MiB of assets become 0.65 MiB in Brotli;
 - `server/index.mjs`: the server, one file with every dependency bundled (it imports only `node:*`);
 - `server/nvml-worker.mjs`: the NVML sampler, built from `app/server/collectors/nvml/worker.ts`, and started as a
   child process. Development runs its sources as they are;
@@ -193,8 +195,17 @@ prints it, and the status bar shows it: the tag, else the short commit hash. Fro
 
 `app/server/http/Static.ts` serves the UI next to the bundle (`<bundle folder>/../public`): `/assets/*` with
 `Cache-Control: public, max-age=31536000, immutable`, and a missing asset is a `404` (a stale tab after an upgrade
-asks for the old names). Every other `GET` is a file of `public/` when there is one, `index.html` otherwise, both
-with `Cache-Control: no-cache`, since `index.html` points to the current chunks. The API sets no cache header.
+asks for the old names). An asset the build compresses goes out as its `.br` or `.gz` copy when the request's
+`Accept-Encoding` accepts it (the highest `q` first, Brotli before gzip on a tie, `q=0` refused), with the file's
+`Content-Type`, `Content-Encoding` and `Vary: Accept-Encoding`; without an accepted copy, or for a `Range` request
+(a range counts the bytes of the file), the file itself. Every other `GET` is a file of `public/` when there is one,
+`index.html` otherwise, both with `Cache-Control: no-cache`, since `index.html` points to the current chunks. The API
+sets no cache header.
+
+The server compresses only one thing at each request: a JSON response of 1 KiB or more, in gzip, for a client that
+accepts it (`compressJson` of `app/server/http/HttpLive.ts`, Effect's `HttpMiddleware.compression`): the lists of the
+API shrink about fourfold (`/api/flags`: 56 KB, 13 KB in gzip). A stream of events (`text/event-stream`) goes out as
+written, each event at once.
 
 ### Distribution
 

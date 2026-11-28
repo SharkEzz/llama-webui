@@ -109,6 +109,10 @@ that compared the raw path with `/api/` let them through.
 - The web interface itself (`index.html`, its hashed assets, served by `app/server/http/Static.ts`) is not guarded: it
   is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
   refused with `Host not allowed`.
+- The API compresses its JSON responses of 1 KiB or more in gzip (`compressJson` of `app/server/http/HttpLive.ts`).
+  A compressed response can leak a secret through its length when it holds both that secret and text an attacker
+  chose (BREACH): no response of the API holds a secret, the Hugging Face token never leaves the server (`/api/hf/status`
+  says only where it was found), so nothing is to be learnt from a length.
 
 ## Errors
 
