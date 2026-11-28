@@ -150,12 +150,42 @@ export const removeEmptyFolders = Effect.fn('models.removeEmptyFolders')(functio
   );
 });
 
+/** Where `file` is set aside before it is removed: a hidden name next to it, which no scan lists as a model. */
+const asideOf = (paths: Path.Path, file: string) =>
+  paths.join(paths.dirname(file), `.${paths.basename(file)}.llama-webui-deleting`);
+
+/**
+ * Removes all of `files` or none (a link: the link only): each is first renamed aside, in its own folder, and they are
+ * removed only once every rename succeeded. A rename that fails puts back the files already set aside, then is a
+ * defect; a file already gone is skipped. A model of several files (shards, a projector) is never left in part.
+ */
+const removeAllOrNone = Effect.fnUntraced(function* (files: ReadonlyArray<string>) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* Path.Path;
+  const aside: Array<readonly [file: string, aside: string]> = [];
+  const putBack = Effect.forEach(aside, ([file, moved]) => Effect.ignore(fs.rename(moved, file)), { discard: true });
+  for (const file of files) {
+    const moved = asideOf(paths, file);
+    const renamed = yield* fs.rename(file, moved).pipe(
+      Effect.as(true),
+      Effect.catchIf(
+        (error) => error.reason._tag === 'NotFound',
+        () => Effect.succeed(false),
+      ),
+      Effect.tapError(() => putBack),
+      Effect.orDie,
+    );
+    if (renamed) aside.push([file, moved]);
+  }
+  yield* Effect.forEach(aside, ([, moved]) => Effect.orDie(fs.remove(moved, { force: true })), { discard: true });
+});
+
 /**
  * Deletes a model the scan found: refused (409) while it is used (`blocked`); then, in one SQL transaction, with
- * `deleteProfiles` the profiles that open it (the running server's refused, 409), then its files (a link: the link
- * only); then the folders left empty up to `root`, and the default profile setting when it named a deleted profile.
- * A file that cannot be removed is a defect (500) that rolls the profiles back: no profile is lost for a model still
- * on disk, and no file for a profile kept. A model of several files can then be left with some of them removed.
+ * `deleteProfiles` the profiles that open it (the running server's refused, 409), then its files, all or none
+ * (`removeAllOrNone`); then the folders left empty up to `root`, and the default profile setting when it named a
+ * deleted profile. A file that cannot be removed is a defect (500) that rolls the profiles back and leaves every file
+ * of the model in place: no profile is lost for a model still on disk, and no file for a profile kept.
  */
 export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
   readonly entry: ModelEntry;
@@ -174,7 +204,6 @@ export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
   | Path.Path
 > {
   const { entry, root, deleteProfiles } = options;
-  const fs = yield* FileSystem.FileSystem;
   const sql = yield* SqlClient.SqlClient;
   const profiles = yield* ProfilesRepo;
   const usage = yield* modelUsage(entry);
@@ -192,7 +221,7 @@ export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
         ),
       { discard: true },
     );
-    yield* Effect.forEach(entry.files, (file) => Effect.orDie(fs.remove(file, { force: true })), { discard: true });
+    yield* removeAllOrNone(entry.files);
   }).pipe(sql.withTransaction, Effect.catchTag('SqlError', Effect.die));
   yield* removeEmptyFolders(root, entry.files);
   yield* clearDefaultProfile(ids);

@@ -241,9 +241,10 @@ curl -G http://127.0.0.1:7860/api/models/usage --data-urlencode 'path=/home/me/m
 
 Checks first that nothing uses the model (`409` `ModelInUse`). Then, in one SQL transaction: with `deleteProfiles`,
 the profiles using the model (as [Delete a profile](/developers/api/profiles/#delete-a-profile) does: the running
-server's is refused), then the entry's files (a symbolic link: the link, not its target). A file that cannot be
-removed answers `500` and rolls the profiles back, so no profile is lost for a model still on disk; a model of several
-files can then keep some of them. After the commit, the folders left empty between the files and the models folder
+server's is refused), then the entry's files (a symbolic link: the link, not its target), all or none: each is first
+renamed aside in its own folder (`.<name>.llama-webui-deleting`), and they are removed once every rename succeeded. A
+file that cannot be moved answers `500`, puts back the files already moved and rolls the profiles back, so no profile
+is lost for a model still on disk and a model of several files keeps all of them. After the commit, the folders left empty between the files and the models folder
 are removed, and `defaultProfileId` goes back to `null` if it named a deleted profile. Benchmark runs, sweeps and
 conversations keep their `model_path` as text.
 

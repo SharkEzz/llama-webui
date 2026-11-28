@@ -18,6 +18,7 @@ import {
   FileSystem,
   Layer,
   Option,
+  Order,
   Path,
   PlatformError,
   Ref,
@@ -75,25 +76,21 @@ class Writes extends Context.Service<Writes, Ref.Ref<ReadonlyArray<DownloadItem>
 /** A shard the file system refuses to remove. */
 const STUCK = 'Stuck-00002-of-00002.gguf';
 
-/** Node's file system, but `remove` of a `STUCK` file fails as a refused permission. */
+/** Node's file system, but `rename` and `remove` of a `STUCK` file fail as a refused permission. */
 const StuckFs = Layer.effect(
   FileSystem.FileSystem,
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const paths = yield* Path.Path;
+    const refused = (method: string, file: string) =>
+      Effect.fail(
+        PlatformError.systemError({ _tag: 'PermissionDenied', module: 'FileSystem', method, pathOrDescriptor: file }),
+      );
     return FileSystem.FileSystem.of({
       ...fs,
+      rename: Effect.fn((from, to) => (paths.basename(from) === STUCK ? refused('rename', from) : fs.rename(from, to))),
       remove: Effect.fn((file, options) =>
-        paths.basename(file) === STUCK
-          ? Effect.fail(
-              PlatformError.systemError({
-                _tag: 'PermissionDenied',
-                module: 'FileSystem',
-                method: 'remove',
-                pathOrDescriptor: file,
-              }),
-            )
-          : fs.remove(file, options),
+        paths.basename(file) === STUCK ? refused('remove', file) : fs.remove(file, options),
       ),
     });
   }),
@@ -412,22 +409,27 @@ describe('ModelsApi', () => {
       }),
     );
 
-    it.effect('a file that cannot be removed answers 500 and rolls back the profiles deleted before it', () =>
-      Effect.gen(function* () {
-        const { fs, models, write } = yield* workspace;
-        const parts = [yield* write('Stuck-00001-of-00002.gguf'), yield* write(STUCK)];
-        const repo = yield* ProfilesRepo;
-        const settings = yield* SettingsRepo;
-        const a = yield* repo.create(profile('A', { cwd: models, model: 'Stuck-00001-of-00002.gguf' }));
-        yield* settings.patch({ defaultProfileId: a.id });
-        const reply = yield* remove(parts[0] ?? '', true);
-        assert.strictEqual(reply.status, 500);
-        // The profiles go first, then the files: the first part is gone, the stuck one is not, the profile is back.
-        assert.deepStrictEqual([yield* fs.exists(parts[0] ?? ''), yield* fs.exists(parts[1] ?? '')], [false, true]);
-        const profilesKept = yield* profileIds;
-        assert.deepStrictEqual(profilesKept, [a.id]);
-        assert.strictEqual((yield* settings.get).defaultProfileId, a.id);
-      }),
+    it.effect(
+      'a file that cannot be removed answers 500, keeps every file of the model and rolls back the profiles (#110)',
+      () =>
+        Effect.gen(function* () {
+          const { fs, models, write } = yield* workspace;
+          const parts = [yield* write('Stuck-00001-of-00002.gguf'), yield* write(STUCK)];
+          const repo = yield* ProfilesRepo;
+          const settings = yield* SettingsRepo;
+          const a = yield* repo.create(profile('A', { cwd: models, model: 'Stuck-00001-of-00002.gguf' }));
+          yield* settings.patch({ defaultProfileId: a.id });
+          const before = yield* fs.readDirectory(models);
+          const reply = yield* remove(parts[0] ?? '', true);
+          assert.strictEqual(reply.status, 500);
+          // The first part, set aside before the stuck one refused, is put back: both parts are there, nothing else.
+          assert.deepStrictEqual([yield* fs.exists(parts[0] ?? ''), yield* fs.exists(parts[1] ?? '')], [true, true]);
+          const after = yield* fs.readDirectory(models);
+          assert.deepStrictEqual(Arr.sort(after, Order.String), Arr.sort(before, Order.String));
+          const profilesKept = yield* profileIds;
+          assert.deepStrictEqual(profilesKept, [a.id]);
+          assert.strictEqual((yield* settings.get).defaultProfileId, a.id);
+        }),
     );
 
     it.effect('a model the running server uses or a download writes is a 409, and nothing is deleted', () =>

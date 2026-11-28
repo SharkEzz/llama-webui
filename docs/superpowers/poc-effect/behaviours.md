@@ -798,9 +798,10 @@ None. E8 owns no WebSocket message type (`packages/webui-shared/src/ws.ts`), and
       missing file. Profiles keep any path; a resume or a validate replays a stored spec. Tests: `models/http.test.ts`,
       `tuning/http.test.ts`, `bench/http.test.ts`, four contract refusals.
 - [x] `DELETE /api/models`: the usage checks, then in one SQL transaction the profiles (the running server's refused,
-      409 `ProfileRunning`), then the files; a file that cannot be removed is a 500 that rolls the profiles back; the
-      empty folders and `defaultProfileId` after the commit. Test: `models/http.test.ts` (a file that cannot be removed
-      answers 500 and rolls back the profiles deleted before it).
+      409 `ProfileRunning`), then the files, all or none (renamed aside, then removed: #110); a file that cannot be
+      removed is a 500 that rolls the profiles back and keeps every file; the empty folders and `defaultProfileId` after
+      the commit. Test: `models/http.test.ts` (a file that cannot be removed answers 500, keeps every file of the model
+      and rolls back the profiles (#110)).
 - [x] Bench shutdown: the step publishes the run and the sweep it saves `interrupted`, then `bench-progress` and
       `sweep-progress` null, before the hub's flush. Tests: `bench/BenchRunner.test.ts`, `lifecycle.test.ts` (SIGTERM
       during a benchmark ends it interrupted, tells the open page and kills llama-bench).

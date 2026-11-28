@@ -98,8 +98,9 @@ reviewing this list, done in E11: `docs/superpowers/plans/2026-11-15-effect-e11-
 - Deleting a model deletes its files before its profiles. `changed after the E10 review (user, 2026-11-15)` (was a `design choice`): the checks first, then the
   profiles and the files in one SQL transaction, profiles first, so a profile the server started meanwhile removes no
   file, and a file that cannot be removed rolls the profiles back; the default profile setting after the commit. A
-  model of several files can be left with part of them removed (`models/http.test.ts`: a file that cannot be removed
-  answers 500 and rolls back the profiles deleted before it).
+  model of several files could be left with part of them removed; `fixed (#110)`: its files are renamed aside first and
+  removed once every rename succeeded, a failed rename putting back the ones already moved (`models/http.test.ts`: a
+  file that cannot be removed answers 500, keeps every file of the model and rolls back the profiles (#110)).
 - No test posts a valid download. `confirmed`, `fixed in E6`: `downloads/http.test.ts` (a valid download request
   stores the canonical repo id and the resolved sha and answers 202 with the items; a request naming a key the repo
   lacks is a 404 No GGUF; a key listed twice is a 400), on a fake Hub (`app/server/testing/hub.ts`).
