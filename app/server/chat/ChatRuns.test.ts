@@ -465,11 +465,23 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
       });
       const cmd = yield* buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE, host: '127.0.0.1' } });
       yield* supervisor.start(cmd);
+      // Until the start ends either way, within the test's 5 s: a fake that cannot listen (its port taken) fails here
+      // with its exit, not as a timeout of the whole test (#113).
       const ready = yield* supervisor.state.pipe(
-        Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (state) => state.kind === 'ready' }),
-        Effect.timeout('5 seconds'),
+        Effect.repeat({
+          schedule: Schedule.spaced('10 millis'),
+          until: (state) => state.kind !== 'idle' && state.kind !== 'starting',
+        }),
+        Effect.timeout('4 seconds'),
       );
-      const pid = ready.kind === 'ready' ? ready.pid : assert.fail('not ready');
+      const pid =
+        ready.kind === 'ready'
+          ? ready.pid
+          : assert.fail(
+              ready.kind === 'crashed'
+                ? `the fake llama-server crashed (code ${ready.exitCode}): ${ready.message ?? 'no message'}`
+                : `the fake llama-server is ${ready.kind}`,
+            );
       // The target is the managed server, as `ChatRuns.layer` finds it.
       const runs = yield* runsWith({});
       const conv = yield* repo.create({ profileId: null, modelPath: null });
