@@ -1,6 +1,6 @@
 // llamacpp-js (published, tests on node:test): the base alone, no Vitest rule.
 import { defineConfig } from 'oxlint';
-import { base, nodeBuiltins } from '../../oxlint.config.ts';
+import { bans, base, nodeBuiltins } from '../../oxlint.config.ts';
 
 const standalone = 'the package has no dependency; Node APIs live behind `llamacpp-js/node`';
 // llama-webui's packages, by name or by a relative path out of the package (`../../webui-shared/…`, `../../../app/…`)
@@ -10,7 +10,7 @@ const effect = { regex: '^(effect|@effect/[^/]+)(/|$)', message: standalone };
 export default defineConfig({
   extends: [base],
   rules: {
-    'no-restricted-imports': ['error', { patterns: [webui, effect, { ...nodeBuiltins, message: standalone }] }],
+    ...bans([webui, effect, { ...nodeBuiltins, message: standalone }]),
   },
   overrides: [
     {
@@ -21,7 +21,7 @@ export default defineConfig({
     {
       // Node's modules: in the `llamacpp-js/node` export (`exports` of `package.json`) and in the tests
       files: ['src/node.ts', 'tests/**'],
-      rules: { 'no-restricted-imports': ['error', { patterns: [webui, effect] }] },
+      rules: bans([webui, effect]),
     },
   ],
 });
