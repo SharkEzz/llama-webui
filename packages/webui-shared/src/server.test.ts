@@ -7,6 +7,7 @@ import {
   isServerSleeping,
   loadProgressPct,
   loadStageLabel,
+  ServerProps,
   ServerState,
   serverView,
   servesRequests,
@@ -110,4 +111,32 @@ test('servesRequests: ready, sleeping, waking up and external take requests, a l
   expect(servesRequests({ kind: 'idle' })).toBe(false);
   expect(servesRequests(undefined)).toBe(false);
   expect(Schema.encodeResult(ServerState)(waking)).toEqual(Result.succeed(waking));
+});
+
+test('ServerProps keeps the fields of their type, drops a field of another type and passes the other keys (#115)', () => {
+  const decode = Schema.decodeUnknownResult(ServerProps);
+  expect(
+    decode({
+      model_path: '/m/a.gguf',
+      model_ftype: 'Q4_K - Medium',
+      total_slots: 1,
+      modalities: { vision: true, audio: false },
+      default_generation_settings: { n_ctx: 4096, params: { temperature: 0.8 }, id: 0 },
+      chat_template: '{{ x }}',
+    }),
+  ).toEqual(
+    Result.succeed({
+      model_path: '/m/a.gguf',
+      model_ftype: 'Q4_K - Medium',
+      total_slots: 1,
+      modalities: { vision: true, audio: false },
+      default_generation_settings: { n_ctx: 4096, params: { temperature: 0.8 }, id: 0 },
+      chat_template: '{{ x }}',
+    }),
+  );
+  expect(
+    decode({ model_path: 3, total_slots: '1', default_generation_settings: { n_ctx: '4096', params: [] } }),
+  ).toEqual(Result.succeed({ default_generation_settings: {} }));
+  expect(decode({})).toEqual(Result.succeed({}));
+  expect(Result.isFailure(decode([]))).toBe(true);
 });

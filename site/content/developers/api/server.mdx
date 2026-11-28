@@ -182,14 +182,27 @@ curl -X POST http://127.0.0.1:7860/api/server/stop
 
 Proxies `GET <host>:<port>/props` of the ready server (managed: on its `--host`, loopback for `0.0.0.0`; external:
 on loopback), with a 2-second timeout. The
-response is `llama-server`'s own JSON, unchanged: its fields depend on the llama.cpp build.
+response is `llama-server`'s own JSON, whose fields depend on the llama.cpp build. The shared `ServerProps` schema
+types the fields the app reads; each may be absent, and one of another type is dropped. Every other key passes as it
+came.
 
 **Response**: `200` with the `/props` body.
 
+| Field                                | Type    | Description                                                      |
+| ------------------------------------ | ------- | ---------------------------------------------------------------- |
+| `model_path`                         | string  | The loaded model file.                                           |
+| `model_alias`                        | string  | Its `--alias`, or the file name.                                 |
+| `model_ftype`                        | string  | Its quantization (`Q4_K - Medium`…).                             |
+| `total_slots`                        | integer | The `--parallel` slots.                                          |
+| `build_info`                         | string  | The llama.cpp build (`b12062-29c720eaf`).                        |
+| `modalities`                         | object  | Each input besides text (`vision`, `video`, `audio`): a boolean. |
+| `default_generation_settings.n_ctx`  | integer | The context of a slot, in tokens.                                |
+| `default_generation_settings.params` | object  | The default sampling settings (`temperature`, `top_k`…).         |
+
 **Errors**: `409` `ServerNotReady` `Server not ready` (any state but `ready`, `sleeping`, a `starting` with `waking` and
 `external`), `502`
-`PropsUnavailable`: `llama-server is not responding on /props`, `llama-server /props: HTTP <status>` or
-`llama-server /props: the reply is not JSON`.
+`PropsUnavailable`: `llama-server is not responding on /props`, `llama-server /props: HTTP <status>`,
+`llama-server /props: the reply is not JSON` or `llama-server /props: the reply is not a JSON object`.
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/server/props

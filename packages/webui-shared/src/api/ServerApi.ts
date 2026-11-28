@@ -1,6 +1,6 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
-import { ServerView } from '../server.ts';
+import { ServerProps, ServerView } from '../server.ts';
 import { BenchRunning } from './BenchApi.ts';
 import { ProfileNotFound } from './ProfilesApi.ts';
 
@@ -76,9 +76,9 @@ export class ServerApi extends HttpApiGroup.make('server').add(
     error: [BenchRunning, NoProfileToRestart, ProfileNotFound, OperationInProgress, PortInUse],
   }),
   HttpApiEndpoint.post('stop', '/api/server/stop', { success: ServerView, error: BenchRunning }),
-  // llama-server's own JSON, passed as it is.
+  // llama-server's own JSON: the fields the app reads typed, the others passed as they are.
   HttpApiEndpoint.get('props', '/api/server/props', {
-    success: Schema.Unknown,
+    success: ServerProps,
     error: [ServerNotReady, PropsUnavailable],
   }),
   HttpApiEndpoint.get('snapshot', '/api/state', {

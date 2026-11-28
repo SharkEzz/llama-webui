@@ -253,7 +253,7 @@ layer(Served, { excludeTestServices: true, buildPerTest: true })('ServerApi over
   );
 
   it.effect(
-    "props: llama-server's JSON as it is when ready; a 409 ServerNotReady when idle or starting; a 502 for an error status, for a body that is not JSON (#37) and for no answer",
+    "props: llama-server's JSON when ready; a 409 ServerNotReady when idle or starting; a 502 for an error status, for a body that is not JSON (#37) or not an object (#115) and for no answer",
     () =>
       Effect.gen(function* () {
         const notReady = { status: 409, json: { _tag: 'ServerNotReady', message: 'Server not ready' } };
@@ -275,12 +275,12 @@ layer(Served, { excludeTestServices: true, buildPerTest: true })('ServerApi over
         yield* send('POST', '/api/server/stop');
 
         // A server started by hand, whose /props answers badly, then not at all.
-        let mode: 'status' | 'text' = 'status';
+        let mode: 'status' | 'text' | 'array' = 'status';
         const stubScope = yield* Scope.make();
         const stub = yield* httpStub((req, res) => {
           if (req.url === '/health') res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
           else if (mode === 'status') res.writeHead(500).end('{}');
-          else res.writeHead(200, { 'content-type': 'application/json' }).end('<html>');
+          else res.writeHead(200, { 'content-type': 'application/json' }).end(mode === 'text' ? '<html>' : '[]');
         }).pipe(Scope.provide(stubScope));
         const supervisor = yield* Supervisor;
         const detected = yield* supervisor.detectExternal(stub.port);
@@ -295,6 +295,13 @@ layer(Served, { excludeTestServices: true, buildPerTest: true })('ServerApi over
           message: 'llama-server /props: the reply is not JSON',
         });
         assert.strictEqual(text.status, 502);
+        mode = 'array';
+        const array = yield* send('GET', '/api/server/props');
+        assert.deepStrictEqual(array.json, {
+          _tag: 'PropsUnavailable',
+          message: 'llama-server /props: the reply is not a JSON object',
+        });
+        assert.strictEqual(array.status, 502);
         yield* Scope.close(stubScope, Exit.void);
         const silent = yield* send('GET', '/api/server/props');
         assert.deepStrictEqual(silent.json, {
