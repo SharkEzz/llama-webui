@@ -254,6 +254,9 @@ const server = serve(port, host, async (req) => {
   if (path === "/completion" && req.method === "POST") {
     await needsModel();
     const body = (await req.json()) as { n_predict?: number };
+    // FAKE_COMPLETION_DELAY_MS: /completion answers that late (a request that gets no response in time).
+    const completionDelay = Number(process.env.FAKE_COMPLETION_DELAY_MS ?? 0);
+    if (completionDelay > 0) await sleep(completionDelay);
     if (process.env.FAKE_CRASH_ON_PREDICT !== undefined && body.n_predict === Number(process.env.FAKE_CRASH_ON_PREDICT)) {
       // Dies mid-request, as llama-server does on a CUDA out-of-memory: the socket closes, no answer.
       log("CUDA error: out of memory");

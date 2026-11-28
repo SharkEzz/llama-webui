@@ -5,7 +5,6 @@ import {
   BenchRunning,
   type BenchSpec,
   type ExternalServerRunning,
-  type BenchHardware as Hardware,
   NothingToResume,
   NothingToValidate,
   RunNotFound,
@@ -53,12 +52,11 @@ import { WsHub } from '../ws/WsHub.ts';
 import { BenchHardware } from './BenchHardware.ts';
 import { BenchRunsRepo, type QueuedItem } from './BenchRunsRepo.ts';
 import { commandOf, type ExecResult, execute } from './execute.ts';
-import { makeGate } from './gate.ts';
+import { type Gate, makeGate } from './gate.ts';
 import { SweepsRepo } from './SweepsRepo.ts';
 
 /** The error of a run left running when llama-webui stopped. */
 const INTERRUPTED = 'interrupted (llama-webui stopped)';
-const NO_HARDWARE: Hardware = { cpu: '', gpus: [], build: null };
 
 /** The model and the projector a run or a sweep reads. */
 export type RunFiles = Pick<BenchSpec, 'modelPath' | 'mmprojPath'>;
@@ -172,7 +170,8 @@ export class BenchRunner extends Context.Service<
   /**
    * The runner. `killTimeout`: from SIGTERM to SIGKILL on a cancel; `pause`: between two sweep items;
    * `stoppingTimeout`: the wait for a stop in progress when the gate is taken; `liveThrottle`: the most frequent
-   * `bench-progress` of new lines. At its build, the runs and sweeps left `running` become `interrupted`. Its shutdown
+   * `bench-progress` of new lines; `gate`: the gate on the supervisor (`makeGate` by default; a test gives a stub to
+   * hold a request in a step of it). At its build, the runs and sweeps left `running` become `interrupted`. Its shutdown
    * step interrupts the work, saves the current run and the running sweep `interrupted` and publishes them, then no
    * live (`bench-progress` and `sweep-progress` null), before the hub closes; it does not restart llama-server.
    */
@@ -181,6 +180,7 @@ export class BenchRunner extends Context.Service<
     readonly pause: Duration.Input;
     readonly stoppingTimeout: Duration.Input;
     readonly liveThrottle: Duration.Input;
+    readonly gate?: Gate;
   }): Layer.Layer<
     BenchRunner,
     never,
@@ -226,7 +226,7 @@ export class BenchRunner extends Context.Service<
         yield* runs.stopOrphans;
         yield* sweeps.stopOrphans;
 
-        const gate = yield* makeGate({ stoppingTimeout: options.stoppingTimeout });
+        const gate = options.gate ?? (yield* makeGate({ stoppingTimeout: options.stoppingTimeout }));
         const state = yield* SynchronizedRef.make<State>(IDLE);
         const throttle = yield* makeThrottle(options.liveThrottle);
 
@@ -502,7 +502,7 @@ export class BenchRunner extends Context.Service<
 
         /** One item: its command and hardware frozen, executed, saved. A failure (OOM included) does not stop the sweep. */
         const item = Effect.fnUntraced(function* (queued: BenchRun, sweepId: number) {
-          const hardware = yield* hardwareNow.pipe(Effect.orElseSucceed(() => NO_HARDWARE));
+          const hardware = yield* hardwareNow;
           const command = yield* commandOf(queued.spec).pipe(Effect.provideContext(context));
           const run = yield* runs.begin(queued.id, { command: command.display, hardware });
           yield* publish({ type: 'bench-run', payload: run });

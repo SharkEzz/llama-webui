@@ -18,7 +18,7 @@ lives in `app/server/monitor/`, the readers of each data source in `app/server/c
 | `llamacpp-js/metrics`                                                      | `parseSlots()`, `parsePrometheus()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)).                            |
 | `app/server/collectors/Collectors.ts`                                      | `Collectors`: builds the readers and follows the settings.                                                                                        |
 | `app/server/collectors/gpu.ts`                                             | `GpuNeeds`, `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.                                                                          |
-| `app/server/collectors/nvml/`                                              | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `Nvml.ts`, `protocol.ts`).                                                |
+| `app/server/collectors/nvml/`                                              | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `sampling.ts`, `Nvml.ts`, `protocol.ts`).                                 |
 | `app/server/collectors/nvidia.ts`                                          | The `nvidia-smi` fallback.                                                                                                                        |
 | `app/server/collectors/amdgpu.ts`                                          | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                                                                              |
 | `app/server/collectors/proc.ts`                                            | `makeProcSampler()`: CPU and RSS of the `llama-server` process.                                                                                   |
@@ -204,7 +204,8 @@ The NVML sampler (`app/server/collectors/nvml/worker.ts`) is an Effect program o
 throughput counters blocks about 50 ms per GPU, and a call stuck in the driver must not hold the server: the server
 kills the program (`SIGKILL`) whatever it is doing. It opens `libnvidia-ml.so.1` (or `$LLAMA_WEBUI_NVML_LIB` when
 set, to test the library missing) with `dlopen()` from `node:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then
-writes one `sample` per interval (100 ms at least). The server speaks to it in NDJSON, one JSON value per line, on
+writes one `sample` per interval (100 ms at least, the round's own time taken off the wait: the loop of
+`nvml/sampling.ts`, which the worker gives its NVML read, so a test runs it without `node:ffi`). The server speaks to it in NDJSON, one JSON value per line, on
 its stdin and stdout, and both sides decode the lines with the schemas of `nvml/protocol.ts`:
 
 | Direction                         | Message                                                                                       |

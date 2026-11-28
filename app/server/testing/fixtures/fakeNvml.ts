@@ -8,6 +8,8 @@
 // - `silent`: never answers, and stays up once its stdin ends: only a kill ends it.
 // - `exit-after-ready`: answers `ready`, sends one sample, then exits 0 after 300 ms.
 // - `exit-twice`: as `exit-after-ready` for the first two starts in `<dir>`, as `ready-then-sample` after.
+// - `ready-then-error`: answers `ready` and one sample, then an `error` 300 ms later, and stays up: only a kill ends
+//   it.
 // - `garbage-before-ready`: answers `start` with a line that is not a message, then stays up: only a kill ends it.
 // - `garbage-after-ready`: answers `ready` and one sample, then a line that is not a message, then samples every
 //   `intervalMs` and stays up: only a kill ends it.
@@ -74,6 +76,12 @@ lines.on('line', (line) => {
     send({ type: 'ready' });
     send({ type: 'sample', snapshot: SNAPSHOT });
     setTimeout(() => process.exit(0), 300);
+  }
+  if (behaviour === 'ready-then-error') {
+    setInterval(() => {}, 60_000);
+    send({ type: 'ready' });
+    send({ type: 'sample', snapshot: SNAPSHOT });
+    setTimeout(() => send({ type: 'error', message: 'NVML failed after ready' }), 300);
   }
   if (behaviour === 'garbage-before-ready') {
     setInterval(() => {}, 60_000);
