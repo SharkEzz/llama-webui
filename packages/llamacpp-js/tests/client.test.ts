@@ -5,9 +5,13 @@ import {
   type ChatCompletionChunk,
   fetchLlama,
   fetchProps,
+  healthOf,
+  isLlamaHealthBody,
   probeHealth,
   probeLlamaServer,
   probeUrl,
+  readChatChunk,
+  readChatEvent,
   streamChatCompletion,
 } from '../src/client.ts';
 import { LlamaHttpError, LlamaReplyError, LlamaStreamCutError, LlamaStreamError } from '../src/errors.ts';
@@ -194,4 +198,45 @@ describe('fetchProps', () => {
     await assert.rejects(fetchProps('http://h:1', { fetch: fakeFetch('', 500).impl }), LlamaHttpError);
     await assert.rejects(fetchProps('http://h:1', { fetch: fakeFetch('<html>').impl }), LlamaReplyError);
   });
+});
+
+test('healthOf reads a /health status (#116)', () => {
+  assert.equal(healthOf(200), 'ok');
+  assert.equal(healthOf(503), 'loading');
+  assert.equal(healthOf(500), 'error');
+});
+
+test('isLlamaHealthBody knows llama-server by its /health body (#116)', () => {
+  assert.equal(isLlamaHealthBody({ status: 'ok' }), true);
+  assert.equal(isLlamaHealthBody({ error: { code: 503, type: 'unavailable_error' } }), true);
+  assert.equal(isLlamaHealthBody({ error: { type: 'server_error' } }), false);
+  assert.equal(isLlamaHealthBody({ status: 1 }), false);
+  assert.equal(isLlamaHealthBody('ok'), false);
+  assert.equal(isLlamaHealthBody(null), false);
+});
+
+test('readChatEvent reads [DONE], an error, a chunk, and skips what is not JSON (#116)', () => {
+  assert.deepEqual(readChatEvent('[DONE]'), { type: 'done' });
+  assert.equal(readChatEvent('not json'), null);
+  assert.deepEqual(readChatEvent('{"error":{"code":500,"message":"boom","type":7}}'), {
+    type: 'error',
+    error: { code: 500, message: 'boom' },
+  });
+  assert.deepEqual(readChatEvent('{"choices":[{"delta":{"content":"hi"}}]}'), {
+    type: 'chunk',
+    chunk: { choices: [{ delta: { content: 'hi' } }] },
+  });
+});
+
+test('readChatChunk keeps the fields of the right type, a delta survives timings that are not ones (#116)', () => {
+  assert.deepEqual(
+    readChatChunk({
+      choices: [{ delta: { content: 'a', reasoning_content: null } }, { delta: { content: 3 } }, {}],
+      timings: { prompt_n: 1 },
+    }),
+    { choices: [{ delta: { content: 'a', reasoning_content: null } }, { delta: {} }, {}] },
+  );
+  const timings = { prompt_n: 1, prompt_per_second: 2, predicted_n: 3, predicted_per_second: 4, cache_n: 5 };
+  assert.deepEqual(readChatChunk({ timings }), { timings });
+  assert.deepEqual(readChatChunk(42), {});
 });

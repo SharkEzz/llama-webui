@@ -14,8 +14,9 @@ logs, profiles), `buildCommand()`, the benchmark runner and gate, tuning, and th
 (`llamaErrorMessage()`, `benchFailure()`).
 
 The llama-webui server uses the package's pure parts: the parsers (`parseSlots()`, `parsePrometheus()`,
-`parseHelp()`, `parseBenchJson()`, `parseDeviceList()`, `parseLlamaError()`…), `probeUrl()`, `parseCmdline()`,
-`portFromArgv()` and `benchBinary()`. It does its own I/O with Effect: the requests to `llama-server` go through
+`parseHelp()`, `catalogOfHelp()`, `parseBenchJson()`, `parseDeviceList()`, `parseLlamaError()`, `readChatEvent()`…),
+`probeUrl()`, `healthOf()`, `isLlamaHealthBody()`, `parseCmdline()`, `isLlamaServerOn()` and `benchBinary()`; the
+package's own I/O calls the same functions, so the two read llama-server alike. It does its own I/O with Effect: the requests to `llama-server` go through
 `LlamaHttp` (`app/server/llama/`), the programs through `effect/process`, so it calls neither the `fetch`-based
 functions nor `loadFlags()` and `findLlamaServerPid()`. Those stay for the package's other users, and its tests cover
 them.
@@ -26,14 +27,14 @@ Each module has its own subpath export, and the root re-exports every module tha
 
 | Import                | Module       | What it exports                                                                                                                                                                                                                                                                    |
 | --------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `llamacpp-js/client`  | `client.ts`  | `probeUrl()`, `probeHealth()`, `probeLlamaServer()`, `fetchLlama()`, `fetchProps()`, `streamChatCompletion()`, the `LlamaTimings` and `ChatCompletionChunk` types.                                                                                                                 |
+| `llamacpp-js/client`  | `client.ts`  | `probeUrl()`, `probeHealth()`, `probeLlamaServer()`, `fetchLlama()`, `fetchProps()`, `streamChatCompletion()`; the pure readers `healthOf()`, `isLlamaHealthBody()`, `readChatEvent()`, `readChatChunk()`; the `LlamaTimings`, `ChatCompletionChunk` and `ChatStreamEvent` types.  |
 | `llamacpp-js/metrics` | `metrics.ts` | `parsePrometheus()`, `parseSlots()`, `liveRates()`, `lastRequestStats()`, `kvUsage()`, `requestDelta()`, `foldRecent()`, `mergeRequestStats()`, `specStats()`, `slotContextTokens()`, the `SlotView`, `Health`, `LlamaRaw`, `RequestStats`, `SpecStats` and `RequestRecord` types. |
 | `llamacpp-js/models`  | `models.ts`  | `parseModelsSseEvent()`, `streamModelsSse()` (for `GET /models/sse` in router and single-model modes), the `ModelsSseEvent`, `ModelsSseStatus`, `ModelLoadProgress`, `ModelMemory`, `ModelMemoryDevice` and `DownloadFileProgress` types.                                          |
-| `llamacpp-js/flags`   | `flags.ts`   | The flag catalogue of a `--help`: `parseHelp()`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`.                                                                                                                               |
+| `llamacpp-js/flags`   | `flags.ts`   | The flag catalogue of a `--help`: `parseHelp()`, `catalogOfHelp()`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`.                                                                                                            |
 | `llamacpp-js/bench`   | `bench.ts`   | `parseBenchJson()`, `parseBenchProgress()`, `parseDeviceList()`, `ERROR_LINE` and `OOM_LINE`, the `BenchMeasure` and `BenchDevice` types.                                                                                                                                          |
 | `llamacpp-js/sse`     | `sse.ts`     | `SseParser`, an incremental `text/event-stream` reader.                                                                                                                                                                                                                            |
-| `llamacpp-js/errors`  | `errors.ts`  | `LlamaError`, `contextOverflow()`, `parseLlamaError()` and the error classes below.                                                                                                                                                                                                |
-| `llamacpp-js/node`    | `node.ts`    | `loadFlags()` (runs `<binary> --help`), `findLlamaServerPid()`, `parseCmdline()`, `portFromArgv()`, `benchBinary()`.                                                                                                                                                               |
+| `llamacpp-js/errors`  | `errors.ts`  | `LlamaError`, `contextOverflow()`, `parseLlamaError()`, `readLlamaError()` and the error classes below.                                                                                                                                                                            |
+| `llamacpp-js/node`    | `node.ts`    | `loadFlags()` (runs `<binary> --help`), `findLlamaServerPid()`, `isLlamaServerOn()`, `parseCmdline()`, `portFromArgv()`, `benchBinary()`.                                                                                                                                          |
 | `llamacpp-js`         | `index.ts`   | Everything above except `llamacpp-js/node`.                                                                                                                                                                                                                                        |
 
 Only `llamacpp-js/node` uses Node APIs (`node:child_process`, `node:fs/promises`, `node:path`); every other module

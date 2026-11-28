@@ -356,7 +356,8 @@ Decided (the E5 plan):
   token and the duration.
 - The chat does not use the I/O of `llamacpp-js`: the request goes through `LlamaHttp` (`llama/chatStream.ts`), the
   SSE body is parsed by `Sse.decode` of `effect/encoding`, and the failures are tagged (`LlamaHttpFailed`,
-  `LlamaStreamFailed`, `LlamaStreamCut`, `LlamaUnreachable`) instead of thrown `Llama*Error`s.
+  `LlamaStreamFailed`, `LlamaStreamCut`, `LlamaUnreachable`) instead of thrown `Llama*Error`s. Each event is read by
+  `readChatEvent` of the package since #116, field by field like its own stream.
 
 Found while porting E5, accepted with its result:
 

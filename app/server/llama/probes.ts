@@ -1,8 +1,8 @@
 import { PropsUnavailable, ServerProps } from '@llama-webui/shared';
 import { Clock, Effect, Option, Schema } from 'effect';
 import type { HttpClientResponse } from 'effect/http';
-import { probeUrl } from 'llamacpp-js/client';
-import { type Health, type LlamaRaw, parsePrometheus, parseSlots } from 'llamacpp-js/metrics';
+import { healthOf, isLlamaHealthBody, probeUrl } from 'llamacpp-js/client';
+import { type LlamaRaw, parsePrometheus, parseSlots } from 'llamacpp-js/metrics';
 import { LlamaHttp } from './LlamaHttp.ts';
 
 /** How long a probe of `/health` waits for its answer. */
@@ -29,8 +29,6 @@ export const health = Effect.fn('probes.health')(function* (target: Target) {
     Effect.orElseSucceed(Option.none<number>),
   );
 });
-
-const healthOf = (status: number): Health => (status === 200 ? 'ok' : status === 503 ? 'loading' : 'error');
 
 /**
  * One monitoring read of llama-server: `/health` (200 `ok`, 503 `loading`, another status `error`, nothing within
@@ -78,16 +76,8 @@ export const isLlamaServer = Effect.fn('probes.isLlamaServer')(function* (target
     Effect.timeoutOption(PROBE_TIMEOUT),
     Effect.orElseSucceed(Option.none<unknown>),
   );
-  return Option.exists(body, isHealthBody);
+  return Option.exists(body, isLlamaHealthBody);
 });
-
-/** What llama-server's `/health` answers: its status, or the error of a model still loading. */
-const isHealthBody = Schema.is(
-  Schema.Union([
-    Schema.Struct({ status: Schema.String }),
-    Schema.Struct({ error: Schema.Struct({ type: Schema.Literal('unavailable_error') }) }),
-  ]),
-);
 
 /** `/props` gave no JSON: nothing answered (`silent`), an error `status`, or a body that is not JSON (`body`). */
 export class PropsFailed extends Schema.TaggedError<PropsFailed, { readonly PropsFailed: unique symbol }>()(

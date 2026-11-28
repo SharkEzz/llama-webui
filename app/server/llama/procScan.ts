@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Option, Path } from 'effect';
-import { parseCmdline, portFromArgv } from 'llamacpp-js/node';
+import { isLlamaServerOn, parseCmdline } from 'llamacpp-js/node';
 
 /**
  * The pid of the `llama-server` listening on `port`, read from `/proc` (Linux; `root` for a test): the first process
@@ -16,12 +16,7 @@ export const findLlamaServerPid = Effect.fn('procScan.findLlamaServerPid')(funct
   const entries = yield* fs.readDirectory(root).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
   const isServerOnPort = (entry: string) =>
     fs.readFileString(path.join(root, entry, 'cmdline')).pipe(
-      Effect.map((raw) => {
-        const argv = parseCmdline(raw);
-        return (
-          argv.length > 0 && path.basename(argv[0] ?? '') === 'llama-server' && portFromArgv(argv) === options.port
-        );
-      }),
+      Effect.map((raw) => isLlamaServerOn(parseCmdline(raw), options.port)),
       Effect.orElseSucceed(() => false),
     );
   const pids = Arr.filter(entries, (entry: string) => /^\d+$/.test(entry));

@@ -58,13 +58,23 @@ export async function probeLlamaServer(
   try {
     const r = await fetchImpl(`${probeUrl(host, port)}/health`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     const body: unknown = await r.json().catch(() => null);
-    if (!body || typeof body !== 'object') return false;
-    if ('status' in body && typeof body.status === 'string') return true;
-    const error = 'error' in body ? body.error : undefined;
-    return typeof error === 'object' && error !== null && 'type' in error && error.type === 'unavailable_error';
+    return isLlamaHealthBody(body);
   } catch {
     return false;
   }
+}
+
+/** Whether a `/health` JSON body is llama-server's: `{"status":…}`, or `{"error":{"type":"unavailable_error"}}` while loading. */
+export function isLlamaHealthBody(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false;
+  if ('status' in body && typeof body.status === 'string') return true;
+  const error = 'error' in body ? body.error : undefined;
+  return typeof error === 'object' && error !== null && 'type' in error && error.type === 'unavailable_error';
+}
+
+/** The state a `/health` status says: 200 `ok` (loaded), 503 `loading`, any other `error`. */
+export function healthOf(status: number): Health {
+  return status === 200 ? 'ok' : status === 503 ? 'loading' : 'error';
 }
 
 function get(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<Response> {
@@ -77,7 +87,7 @@ export async function fetchLlama(baseUrl: string, fetchImpl: typeof fetch = fetc
   let health: Health;
   try {
     const r = await get(`${baseUrl}/health`, fetchImpl, timeoutMs);
-    health = r.status === 200 ? 'ok' : r.status === 503 ? 'loading' : 'error';
+    health = healthOf(r.status);
     await r.body?.cancel().catch(() => {});
   } catch {
     return { at, health: 'down', slots: null, metrics: null };
@@ -164,9 +174,9 @@ type Delta = NonNullable<Choice['delta']>;
 
 /**
  * An event as a chunk, field by field: a field of another type is left out, the others are kept (the text of a
- * delta survives a `timings` that is not one). The `error` is read apart (`streamChatCompletion`).
+ * delta survives a `timings` that is not one). The `error` is read apart (`readChatEvent`).
  */
-function readChunk(v: unknown): ChatCompletionChunk {
+export function readChatChunk(v: unknown): ChatCompletionChunk {
   const choice = (c: unknown): Choice => {
     const delta = field(c, 'delta');
     if (typeof delta !== 'object' || delta === null) return {};
@@ -182,6 +192,29 @@ function readChunk(v: unknown): ChatCompletionChunk {
   const timings = readTimings(field(v, 'timings'));
   if (timings) out.timings = timings;
   return out;
+}
+
+/** What one event of a streamed `/v1/chat/completions` says: the end (`[DONE]`), the stream's error, or a chunk. */
+export type ChatStreamEvent =
+  | { type: 'done' }
+  | { type: 'error'; error: LlamaError }
+  | { type: 'chunk'; chunk: ChatCompletionChunk };
+
+/**
+ * The `data` of one event of a streamed `/v1/chat/completions`, read: `[DONE]` ends the stream, an `error` field is the
+ * stream's error (its fields read by `readLlamaError`), any other JSON a chunk (`readChatChunk`); null when the data
+ * is not JSON (the event is skipped).
+ */
+export function readChatEvent(data: string): ChatStreamEvent | null {
+  if (data === '[DONE]') return { type: 'done' };
+  let j: unknown;
+  try {
+    j = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  const error = field(j, 'error');
+  return error ? { type: 'error', error: readLlamaError(error) } : { type: 'chunk', chunk: readChatChunk(j) };
 }
 
 /**
@@ -220,19 +253,14 @@ export async function* streamChatCompletion(
       // A fetch body's chunks are bytes (its stream is typed `any` under Node's types)
       if (!(chunk.value instanceof Uint8Array)) throw new LlamaReplyError('the stream is not bytes');
       for (const ev of parser.push(decoder.decode(chunk.value, { stream: true }))) {
-        if (ev.data === '[DONE]') {
+        const event = readChatEvent(ev.data);
+        if (event === null) continue;
+        if (event.type === 'done') {
           finished = true;
           return;
         }
-        let j: unknown;
-        try {
-          j = JSON.parse(ev.data);
-        } catch {
-          continue;
-        }
-        const error = field(j, 'error');
-        if (error) throw new LlamaStreamError(readLlamaError(error));
-        yield readChunk(j);
+        if (event.type === 'error') throw new LlamaStreamError(event.error);
+        yield event.chunk;
       }
     }
   } finally {
