@@ -66,9 +66,10 @@ export class TransferFailed extends Schema.TaggedError<TransferFailed, { readonl
 ) {}
 
 /**
- * Writes the files of an item not done yet, each marked done (`DownloadsRepo.fileDone`) once in place, and tells its
- * progress through `report`. The queue interrupts it when the item is canceled or the app stops: it keeps the `.part`
- * of the file it was on (the queue deletes it on a cancel; the next start resumes it after a stop).
+ * Writes the files of an item not done yet, each recorded placed by the item (`DownloadsRepo.filePlaced`) as it is
+ * renamed into place, then marked done (`DownloadsRepo.fileDone`; a file found in place is only marked done), and
+ * tells its progress through `report`. The queue interrupts it when the item is canceled or the app stops: it keeps
+ * the `.part` of the file it was on (the queue deletes it on a cancel; the next start resumes it after a stop).
  */
 export type Transfer = (
   item: DownloadItem,
@@ -288,7 +289,8 @@ export const transferWith = (options: {
           // Checked when the variant was read from the Hub: a path that leaves the folder never gets here.
           const dest = yield* Effect.orDie(fileDest(item.dir, file.path));
           const part = partPath(dest);
-          // Already in place: a stop between the rename and the row that records it.
+          // Already in place: another download placed it (not this item's to delete), or a stop came between this
+          // item's rename and the row that marks it done.
           const placed = yield* sizeAt(dest);
           if (Option.contains(placed, file.size)) return;
           yield* fs.makeDirectory(path.dirname(dest), { recursive: true }).pipe(Effect.mapError(localFailure));
@@ -325,7 +327,14 @@ export const transferWith = (options: {
               status: 422,
             });
           }
-          yield* fs.rename(part, dest).pipe(Effect.mapError(localFailure));
+          // Recorded with the rename, never one without the other: a cancel deletes only the files it placed.
+          yield* fs
+            .rename(part, dest)
+            .pipe(
+              Effect.mapError(localFailure),
+              Effect.andThen(repo.filePlaced(item.id, file.path)),
+              Effect.uninterruptible,
+            );
         });
 
       /** The attempts at `file`, a transient failure logged, published `retrying` and paused for before the next. */

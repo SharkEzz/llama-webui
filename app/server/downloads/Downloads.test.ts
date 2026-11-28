@@ -51,16 +51,23 @@ type Step = (
   item: DownloadItem,
 ) => Effect.Effect<void, TransferFailed, FileSystem.FileSystem | Path.Path | DownloadsRepo | SqlClient.SqlClient>;
 
-/** Writes every file not done at its size, as the real transfer puts it in place, and marks it done. */
+/**
+ * Puts every file not done in place as the real transfer does: one found in place at its size is only marked done;
+ * another is written, recorded placed by the item, then marked done.
+ */
 const place: Step = Effect.fnUntraced(function* (item) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const repo = yield* DownloadsRepo;
   for (const file of Arr.filter(item.files, (f) => !f.done)) {
     const dest = path.join(item.dir, file.path);
-    yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
-    yield* fs.writeFileString(dest, Str.repeat(file.size)('x'));
-    yield* fs.remove(`${dest}.part`, { force: true });
+    const found = yield* fs.stat(dest).pipe(Effect.option);
+    if (!Option.exists(found, (info) => Number(info.size) === file.size)) {
+      yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
+      yield* fs.writeFileString(dest, Str.repeat(file.size)('x'));
+      yield* fs.remove(`${dest}.part`, { force: true });
+      yield* repo.filePlaced(item.id, file.path);
+    }
     yield* repo.fileDone(item.id, file.path);
   }
 }, Effect.orDie);
@@ -534,6 +541,84 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Downloads', (it)
         yield* expectFalse(exists('b.gguf.part'));
         yield* expectTrue(exists('mmproj.gguf'));
         yield* expectTrue(exists('a.gguf'));
+      }),
+    ),
+  );
+
+  it.effect('cancel keeps a file another download placed, once that item is cleared from the list (#109)', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const downloads = yield* Downloads;
+        const transfers = yield* Transfers;
+        // Three variants of one repository, queued while their shared projector is not on disk: each lists it.
+        const [a, b, c] = yield* downloads.enqueue([
+          yield* input('a.gguf', [
+            ['a.gguf', 100],
+            ['mmproj.gguf', 50],
+          ]),
+          yield* input('b.gguf', [
+            ['mmproj.gguf', 50],
+            ['b.gguf', 100],
+          ]),
+          yield* input('c.gguf', [
+            ['mmproj.gguf', 50],
+            ['c.gguf', 100],
+          ]),
+        ]);
+        if (a === undefined || b === undefined || c === undefined) return assert.fail('no items');
+        yield* transfers.release(a.id);
+        yield* reaches(a.id, 'done');
+        yield* expectEqual(downloads.clear, 1);
+        // A running item canceled, which found the projector in place (marked done) and began its own file.
+        yield* transfers.release(b.id, (item) =>
+          Effect.flatMap(place({ ...item, files: Arr.take(item.files, 1) }), () =>
+            hang(40)({ ...item, files: Arr.drop(item.files, 1) }),
+          ),
+        );
+        yield* eventually(exists('b.gguf.part'));
+        yield* downloads.remove(b.id);
+        yield* reaches(b.id, 'canceled');
+        yield* expectFalse(exists('b.gguf.part'));
+        yield* expectTrue(exists('mmproj.gguf'));
+        // A queued item canceled: no item of the list names the projector any more, and it stays all the same.
+        yield* downloads.remove(c.id);
+        yield* reaches(c.id, 'canceled');
+        yield* expectTrue(exists('mmproj.gguf'));
+        yield* expectTrue(exists('a.gguf'));
+      }),
+    ),
+  );
+
+  it.effect('a canceled item retried owns none of the files it placed before (#109)', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const downloads = yield* Downloads;
+        const transfers = yield* Transfers;
+        const repo = yield* DownloadsRepo;
+        const [a, b] = yield* downloads.enqueue([
+          yield* input('a.gguf', [
+            ['mmproj.gguf', 50],
+            ['a.gguf', 100],
+          ]),
+          yield* input('b.gguf', [
+            ['mmproj.gguf', 50],
+            ['b.gguf', 100],
+          ]),
+        ]);
+        if (a === undefined || b === undefined) return assert.fail('no items');
+        // The first places the projector, then is canceled: the projector stays for the second, which names it.
+        yield* transfers.release(a.id, (item) =>
+          Effect.flatMap(place({ ...item, files: Arr.take(item.files, 1) }), () =>
+            hang(40)({ ...item, files: Arr.drop(item.files, 1) }),
+          ),
+        );
+        yield* eventually(exists('a.gguf.part'));
+        yield* expectEqual(repo.placedFiles(a.id), ['mmproj.gguf']);
+        yield* downloads.remove(a.id);
+        yield* reaches(a.id, 'canceled');
+        yield* expectTrue(exists('mmproj.gguf'));
+        yield* downloads.retry(a.id);
+        yield* expectEqual(repo.placedFiles(a.id), []);
       }),
     ),
   );

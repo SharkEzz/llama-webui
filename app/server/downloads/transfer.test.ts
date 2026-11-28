@@ -368,6 +368,35 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
     ),
   );
 
+  it.effect('a file it renames into place is recorded placed by the item, one it finds in place is not (#109)', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const downloads = yield* Downloads;
+        const repo = yield* DownloadsRepo;
+        const projector = data(500, 1);
+        const model = data(1000, 2);
+        yield* serve([
+          ['mmproj.gguf', projector],
+          ['b.gguf', model],
+        ]);
+        // Queued together: both name the projector; the first puts it in place, the second finds it there.
+        const [a, b] = yield* downloads.enqueue([
+          yield* input('mmproj.gguf', [['mmproj.gguf', projector]]),
+          yield* input('b.gguf', [
+            ['mmproj.gguf', projector],
+            ['b.gguf', model],
+          ]),
+        ]);
+        if (a === undefined || b === undefined) return assert.fail('no items');
+        yield* reaches(b.id, 'done');
+        yield* expectEqual(repo.placedFiles(a.id), ['mmproj.gguf']);
+        yield* expectEqual(repo.placedFiles(b.id), ['b.gguf']);
+        const resolves = yield* requestsOf('resolve');
+        assert.strictEqual(resolves.length, 2);
+      }),
+    ),
+  );
+
   it.effect('resumes an existing .part with a Range request', () =>
     withQueue(
       Effect.gen(function* () {

@@ -114,7 +114,8 @@ export class Downloads extends Context.Service<
     /**
      * A running item is canceled (its transfer stopped, then what it wrote deleted), a queued one canceled at once
      * (its files deleted: a deletion that fails dies once the item is saved and published `canceled`), any other taken
-     * out of the list with its files kept. A cancel leaves a file another item of the list names too.
+     * out of the list with its files kept. A cancel deletes only the files the item put in place itself, and
+     * leaves a file another item of the list names too.
      */
     readonly remove: (id: number) => Effect.Effect<void, DownloadNotFound>;
     /** Takes the finished items (done, error, canceled) out of the list, their files kept; how many. */
@@ -229,10 +230,11 @@ export class Downloads extends Context.Service<
         });
 
         /**
-         * Deletes what an item wrote: the `.part` files, the files it put in place, then the folders left empty. A
-         * file another item of the list names too (queued, running, done or failed; not a canceled one, whose files
-         * are gone) is left as it is, its `.part` included: two variants of a repository share their projector, and
-         * the copy the first one placed, or the `.part` the next one resumes, is not this item's to delete.
+         * Deletes what an item wrote: the `.part` files, the files it put in place itself (`placedFiles`: not one it
+         * found in place, which another download placed, even one cleared from the list since), then the folders left
+         * empty. A file another item of the list names too (queued, running, done or failed; not a canceled one, whose
+         * files are gone) is left as it is, its `.part` included: two variants of a repository share their projector,
+         * and the copy the first one placed, or the `.part` the next one resumes, is not this item's to delete.
          */
         const discard = Effect.fnUntraced(function* (item: DownloadItem) {
           const all = yield* repo.list;
@@ -244,14 +246,15 @@ export class Downloads extends Context.Service<
               if (Option.isSome(dest)) shared.add(dest.value);
             }
           }
+          const placedByItem = yield* repo.placedFiles(item.id);
+          const placed = new Set(placedByItem);
           const dests: Array<string> = [];
           for (const file of item.files) {
             const dest = yield* fileDest(item.dir, file.path);
             dests.push(dest);
             if (shared.has(dest)) continue;
             yield* fs.remove(partPath(dest), { force: true });
-            const placed = yield* sizeAt(dest);
-            if (file.done || Option.contains(placed, file.size)) yield* fs.remove(dest, { force: true });
+            if (placed.has(file.path)) yield* fs.remove(dest, { force: true });
           }
           // Up to the models folder, `<models>/<org>/<name>` being the item's.
           yield* removeEmptyFolders(path.dirname(path.dirname(item.dir)), dests).pipe(
