@@ -181,6 +181,9 @@ Resolved by the port itself (no action): the stale untracked `shared/` directory
 `packages/webui-shared/tsconfig.json` comment that still named Bun types; fonts were base64-inlined into a 568 KB CSS file by Bun's bundler; Vite emits
 them as files.
 
+Done since: gzip/brotli for static assets (#105), the hashed assets precompressed at build time
+(`app/build/precompress.ts`) and sent by `Accept-Encoding` (`app/server/http/Static.ts`), the API's JSON in gzip.
+
 ## Contract divergences (N5 onwards)
 
 Differences between the hand-written API reference (`site/content/developers/api/*.mdx`) and the behaviour recorded

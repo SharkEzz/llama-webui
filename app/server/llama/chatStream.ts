@@ -1,11 +1,15 @@
-import { LlamaTimingsSchema } from '@llama-webui/shared';
 import { Effect, Filter, Option, Predicate, Schema, Stream } from 'effect';
 import { Sse } from 'effect/encoding';
 import { dual, identity } from 'effect/Function';
 import { type HttpClientError, HttpClientRequest } from 'effect/http';
+import { type ChatCompletionChunk, readChatEvent } from 'llamacpp-js/client';
+import { parseLlamaError } from 'llamacpp-js/errors';
 import { LlamaHttp } from './LlamaHttp.ts';
 
-/** The `error` object llama-server sends, in an HTTP error body or in a stream event (`LlamaError` of `llamacpp-js/errors`). */
+/**
+ * The `error` object llama-server sends, in an HTTP error body or in a stream event, as the failures below carry it:
+ * `LlamaError` of `llamacpp-js/errors`, which reads it field by field (`readLlamaError`).
+ */
 export const LlamaError = Schema.Struct({
   code: Schema.optionalKey(Schema.Finite),
   message: Schema.optionalKey(Schema.String),
@@ -43,43 +47,19 @@ export class LlamaUnreachable extends Schema.TaggedError<
 export type ChatStreamFailure = LlamaHttpFailed | LlamaStreamFailed | LlamaStreamCut | LlamaUnreachable;
 
 /**
- * One chunk of `/v1/chat/completions` as far as the chat reads it: the first choice's delta and the timings (absent
- * when they do not decode).
+ * One chunk of `/v1/chat/completions`, read field by field by `readChatChunk` of `llamacpp-js/client`: a field of
+ * another type is left out, the others are kept (the delta survives timings that are not ones).
  */
-export const ChatChunk = Schema.Struct({
-  choices: Schema.Struct({
-    delta: Schema.optionalKey(
-      Schema.Struct({
-        content: Schema.String.pipe(Schema.NullOr, Schema.optionalKey),
-        reasoning_content: Schema.String.pipe(Schema.NullOr, Schema.optionalKey),
-      }),
-    ),
-  }).pipe(Schema.Array, Schema.optionalKey),
-  // Timings that do not decode are dropped alone: the chunk keeps its delta.
-  timings: Schema.optionalKey(LlamaTimingsSchema.pipe(Schema.catchDecoding(() => Effect.succeedNone))),
-});
-export type ChatChunk = typeof ChatChunk.Type;
-
-const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
-const decodeError = Schema.decodeUnknownOption(Schema.Struct({ error: LlamaError }));
-const decodeChunk = Schema.decodeUnknownOption(ChatChunk);
-
-/** The JSON error of an HTTP error body, when the body is llama-server JSON. */
-const errorOfBody = (body: string): Option.Option<LlamaError> =>
-  decodeJson(body).pipe(
-    Option.flatMap(decodeError),
-    Option.map((data) => data.error),
-  );
+export type ChatChunk = ChatCompletionChunk;
 
 /**
- * What the data of one event says: a chunk, nothing (a chunk that does not decode is skipped), or the stream's error.
+ * What the data of one event says: a chunk, nothing (data that is not JSON is skipped; `[DONE]` never gets here), or
+ * the stream's error.
  */
 const chunkOf = (data: string): Effect.Effect<Option.Option<ChatChunk>, LlamaStreamFailed> => {
-  const json = decodeJson(data);
-  const error = Option.flatMap(json, decodeError);
-  return Option.isSome(error)
-    ? Effect.fail(LlamaStreamFailed.make({ error: error.value.error }))
-    : Effect.succeed(Option.flatMap(json, decodeChunk));
+  const event = readChatEvent(data);
+  if (event?.type === 'error') return Effect.fail(LlamaStreamFailed.make({ error: event.error }));
+  return Effect.succeed(event?.type === 'chunk' ? Option.some(event.chunk) : Option.none());
 };
 
 const DONE = '[DONE]';
@@ -133,7 +113,8 @@ export const streamChat: {
       const res = yield* client.execute(request).pipe(Effect.mapError(unreachable));
       if (!isOk(res.status)) {
         const text = yield* res.text.pipe(Effect.orElseSucceed(() => ''));
-        return yield* LlamaHttpFailed.make({ status: res.status, body: text, error: errorOfBody(text) });
+        const error = Option.fromNullishOr(parseLlamaError(text));
+        return yield* LlamaHttpFailed.make({ status: res.status, body: text, error });
       }
       return chunksOf(res.stream);
     }),

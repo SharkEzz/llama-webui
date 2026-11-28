@@ -1,14 +1,22 @@
 import { assert, layer } from '@effect/vitest';
-import { Array as Arr, Effect, Layer, Logger, Metric, Schedule } from 'effect';
-import { HttpClient, HttpClientRequest, HttpRouter } from 'effect/http';
+import { Array as Arr, Effect, Layer, Logger, Metric, Schedule, Stream, String as Str } from 'effect';
+import { HttpClient, HttpClientRequest, HttpRouter, HttpServerResponse } from 'effect/http';
 import { HttpMetrics } from '../runtime/Metrics.ts';
 import { ServerTest } from '../testing/http.ts';
 import { PublicTest } from '../testing/public.ts';
 import { ServicesTest } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { ApiRoutes, serve } from './HttpLive.ts';
+import { sseResponse } from './Sse.ts';
 
 const Boom = HttpRouter.add('GET', '/api/boom', Effect.die(new Error('secret')));
+
+/** A JSON of 4 KiB and a stream of events of as much, outside the API: the compression is the server's, not a group's. */
+const BIG = { rows: Arr.makeBy(128, (i) => ({ id: i, name: `model-${i}.gguf` })) };
+const Big = Layer.mergeAll(
+  HttpRouter.add('GET', '/big', HttpServerResponse.json(BIG)),
+  HttpRouter.add('GET', '/events', sseResponse(Stream.make({ data: Str.repeat(4096)('x') }))),
+);
 
 /** The messages the server logged at error level. */
 const errors: Array<unknown> = [];
@@ -26,8 +34,8 @@ const countReaches = (metric: Metric.Counter<number>, n: number) =>
     Effect.map((state) => state.count),
   );
 
-/** The API, /ws, a route that dies, and a UI of one page, served as the app serves them. */
-const TestApp = serve(Layer.mergeAll(ApiRoutes, WsHub.route, Boom, PublicTest)).pipe(
+/** The API, /ws, a route that dies, the big replies, and a UI of one page, served as the app serves them. */
+const TestApp = serve(Layer.mergeAll(ApiRoutes, WsHub.route, Boom, Big, PublicTest)).pipe(
   Layer.provide(ServicesTest),
   Layer.provideMerge(ServerTest),
   Layer.provide(Errors),
@@ -170,6 +178,43 @@ layer(TestApp, { excludeTestServices: true })('HttpLive', (it) => {
       });
       const invalid = yield* Metric.value(HttpMetrics.invalid);
       assert.strictEqual(invalid.occurrences.get('Payload'), before.invalid + 1);
+    }),
+  );
+
+  it.effect('a JSON of 1 KiB or more goes out in gzip to a client that accepts it, nothing else does (#105)', () =>
+    Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const get = (path: string, encoding?: string) =>
+        client.execute(
+          encoding === undefined
+            ? HttpClientRequest.get(path)
+            : HttpClientRequest.get(path).pipe(HttpClientRequest.setHeader('accept-encoding', encoding)),
+        );
+      const big = yield* get('/big', 'gzip, deflate, br');
+      assert.strictEqual(big.headers['content-encoding'], 'gzip');
+      assert.strictEqual(big.headers.vary, 'Accept-Encoding');
+      const gzipped = yield* big.stream.pipe(
+        Stream.toReadableStream,
+        (body) => body.pipeThrough(new DecompressionStream('gzip')),
+        (body) => Stream.fromReadableStream({ evaluate: () => body, onError: () => 'not gzip' as const }),
+        Stream.decodeText,
+        Stream.mkString,
+      );
+      const plain = yield* get('/big');
+      assert.isUndefined(plain.headers['content-encoding']);
+      const text = yield* plain.text;
+      assert.strictEqual(gzipped, text);
+      assert.isAbove(text.length, 4096);
+      // Under 1 KiB, a client that refuses gzip, a stream of events: as written.
+      for (const [path, encoding] of [
+        ['/api/health', 'gzip'],
+        ['/big', 'gzip;q=0, br'],
+        ['/events', 'gzip'],
+      ] as const) {
+        const res = yield* get(path, encoding);
+        assert.isUndefined(res.headers['content-encoding'], path);
+        yield* res.text;
+      }
     }),
   );
 });

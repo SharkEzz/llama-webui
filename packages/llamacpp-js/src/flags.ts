@@ -76,6 +76,12 @@ export function parseHelp(text: string): FlagCatalog {
   return catalogFrom(flags);
 }
 
+/** The catalogue of a `--help` output; null when it lists no flag (the binary printed something else). */
+export function catalogOfHelp(text: string): FlagCatalog | null {
+  const catalog = parseHelp(text);
+  return catalog.flags.length > 0 ? catalog : null;
+}
+
 /** The flag an argument passes (`--ctx-size=8192` passes `--ctx-size`), if the catalogue knows it. */
 export function flagOf(catalog: FlagCatalog, arg: string): Flag | undefined {
   if (!arg.startsWith('-')) return undefined;

@@ -15,7 +15,7 @@ import {
   String as Str,
   Stream,
 } from 'effect';
-import { HttpClient, HttpRouter, type HttpServer } from 'effect/http';
+import { HttpClient, type HttpPlatform, HttpRouter, type HttpServer } from 'effect/http';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { ServerTest, ServerWithClient } from '../testing/http.ts';
 import { serve } from './HttpLive.ts';
@@ -29,7 +29,7 @@ interface Event {
 /** `GET /events` (and the other `routes`) served as the app serves them, with `Shutdown` outermost as in `App`. */
 const appWith = <E, R, E2, R2>(
   routes: Layer.Layer<never, E, R>,
-  server: Layer.Layer<HttpClient.HttpClient | HttpServer.HttpServer, E2, R2>,
+  server: Layer.Layer<HttpClient.HttpClient | HttpServer.HttpServer | HttpPlatform.HttpPlatform, E2, R2>,
 ) =>
   Shutdown.layerRunner.pipe(
     Layer.provideMerge(serve(routes).pipe(Layer.provideMerge(server))),

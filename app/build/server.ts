@@ -3,13 +3,15 @@
  * server (`server/main.ts`) into `.output/server/index.mjs`, the NVML sampler (`server/collectors/nvml/worker.ts`)
  * into `.output/server/nvml-worker.mjs` and the launcher (`bin/llama-webui.ts`) into `.output/llama-webui.mjs`, each
  * one file that requires nothing but Node builtins, then writes
- * `.output/server/THIRD-PARTY-LICENSES.md` from the modules bundled into the server and the sampler.
+ * `.output/server/THIRD-PARTY-LICENSES.md` from the modules bundled into the server and the sampler, and the `.br` and
+ * `.gz` of the client's hashed assets (`build/precompress.ts`).
  */
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { build, type Plugin } from 'rolldown';
 import { writeLicenses } from './licenses.ts';
+import { precompress } from './precompress.ts';
 
 const r = (p: string) => resolve(import.meta.dirname, '..', p);
 const OUTPUT = r('.output');
@@ -74,3 +76,7 @@ writeLicenses(
   [...server.output, ...sampler.output].flatMap((out) => (out.type === 'chunk' ? out.moduleIds : [])),
   join(SERVER, 'THIRD-PARTY-LICENSES.md'),
 );
+
+const assets = await precompress(join(OUTPUT, 'public', 'assets'));
+const kib = (n: number) => `${Math.round(n / 1024)} KiB`;
+console.log(`precompressed ${assets.files} assets: ${kib(assets.bytes)} → ${kib(assets.br)} br, ${kib(assets.gz)} gz`);

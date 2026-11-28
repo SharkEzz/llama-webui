@@ -5,14 +5,29 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'oxlint';
 import { tests } from './scripts/oxlint/oxlint.tests.ts';
 
-// The import bans (`no-restricted-imports`), one pattern per boundary, each matched on the specifier as written: the
-// package name and its subpaths (`(/|$)`), and the relative forms that walk into the same directory
-// (`../../server/x.ts`), with or without the `@/` alias in front. The rule reports `import`, `import type`,
-// `export … from`, `import x = require('…')` and `import('…')` of a string alike. It does not see an `import()` of a
-// template literal or of a computed string, a `require`, nor a path given to `vi.mock`; nor a type written
-// `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the path. Each
-// project config sets the rule with its own bans; the patterns shared by several projects are exported here. A
-// `node:*` ban is for source files only: each project lists its bans again, without it, for its tests.
+// The import bans, one pattern per boundary, each matched on the specifier as written: the package name and its
+// subpaths (`(/|$)`), and the relative forms that walk into the same directory (`../../server/x.ts`), with or without
+// the `@/` alias in front. `no-restricted-imports` reports `import`, `import type`, `export … from`,
+// `import x = require('…')` and `import('…')` of a string alike; `imports/no-restricted-calls` (local plugin,
+// `scripts/oxlint/imports.ts`) applies the same patterns to `require('…')`, `require.resolve`, `createRequire(…)(…)`,
+// an `import()` of a template literal and a path given to `vi.mock` and its kin, and refuses a path known only at run
+// time. A type written `import('…').T` or `typeof import('…')` is refused by `typescript/consistent-type-imports`
+// whatever the path. Each project config sets both rules with its own bans (`bans`); the patterns shared by several
+// projects are exported here. A `node:*` ban is for source files only: each project lists its bans again, without
+// it, for its tests.
+
+interface Ban {
+  regex: string;
+  message?: string;
+}
+
+type BanRule = ['error', { patterns: Ban[] }];
+
+/** The two rules of a project's import bans, set with the same patterns. */
+export const bans = (patterns: Ban[]): Record<'no-restricted-imports' | 'imports/no-restricted-calls', BanRule> => ({
+  'no-restricted-imports': ['error', { patterns }],
+  'imports/no-restricted-calls': ['error', { patterns }],
+});
 
 // Node's built-in modules (`unicorn/prefer-node-protocol` leaves `node:` as their only spelling)
 export const nodeBuiltins = { regex: '^node:' };
@@ -27,7 +42,10 @@ export const llamacppNode = {
 export const base = defineConfig({
   plugins: ['eslint', 'typescript', 'unicorn', 'oxc', 'import', 'promise'],
   // An absolute path: oxlint refuses a relative plugin path in a config that another one `extends`
-  jsPlugins: [fileURLToPath(import.meta.resolve('./scripts/oxlint/directives.ts'))],
+  jsPlugins: [
+    fileURLToPath(import.meta.resolve('./scripts/oxlint/directives.ts')),
+    fileURLToPath(import.meta.resolve('./scripts/oxlint/imports.ts')),
+  ],
   // tsgolint finds the tsconfig.json of each file; a file outside every project (the root files, app/bin) gets an
   // inferred one: no configuration error, and the type-aware rules still report there (checked at L3)
   // An unused suppression is also shown in the editor; `pnpm lint` fails on it (`--report-unused-disable-directives`

@@ -2,8 +2,26 @@
 import { createServer } from 'node:http';
 import * as NodeHttpServer from '@effect/platform-node/NodeHttpServer';
 import { Api, RouteNotFound } from '@llama-webui/shared';
-import { Array as Arr, Cause, Clock, Duration, Effect, ErrorReporter, Exit, Layer, Metric } from 'effect';
-import { HttpRouter, HttpServer, HttpServerError, HttpServerRequest, HttpServerResponse } from 'effect/http';
+import {
+  Array as Arr,
+  Cause,
+  Clock,
+  Duration,
+  Effect,
+  ErrorReporter,
+  Exit,
+  Layer,
+  Metric,
+  String as Str,
+} from 'effect';
+import {
+  HttpMiddleware,
+  HttpRouter,
+  HttpServer,
+  HttpServerError,
+  HttpServerRequest,
+  HttpServerResponse,
+} from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { BenchHandlers, SweepsHandlers } from '../bench/http.ts';
 import { ChatHandlers } from '../chat/http.ts';
@@ -102,14 +120,27 @@ const measure = Effect.fnUntraced(function* <E, R>(app: Effect.Effect<HttpServer
 });
 
 /**
- * `routes` on the HTTP server as the app serves them: defects logged, every response measured (`HttpMetrics`), no
- * access log. The guard is not here: it is on the routes it protects (`Guarded`: `ApiRoutes`, `WsHub.route`).
+ * A JSON response of 1 KiB or more in gzip for a client that accepts it (#105): the lists of the API (flags, models,
+ * history) shrink about fourfold. Nothing else: a stream of events (SSE) goes out as written, each event at once,
+ * and the UI's assets are compressed at build time (`Static.ts`). No response holds a secret (the Hugging Face token
+ * never leaves the server), so the compressed length of a reply that echoes what a client sent tells nothing
+ * (BREACH).
+ */
+const compressJson = HttpMiddleware.compression({
+  algorithms: ['gzip'],
+  compressible: Str.startsWith('application/json'),
+  minSize: 1024,
+});
+
+/**
+ * `routes` on the HTTP server as the app serves them: JSON compressed (`compressJson`), defects logged, every response
+ * measured (`HttpMetrics`), no access log. The guard is not here: it is on the routes it protects (`Guarded`: `ApiRoutes`, `WsHub.route`).
  */
 export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
   HttpRouter.serve(routes, {
     disableLogger: true,
     disableListenLog: true,
-    middleware: (app) => app.pipe(logDefects, measure),
+    middleware: (app) => app.pipe(compressJson, logDefects, measure),
   });
 
 /**

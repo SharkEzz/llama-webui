@@ -110,7 +110,10 @@ each test:
 
 About 314 lines of the server redo about 190 of the package. The parsing is not redone: `parsePrometheus`,
 `parseSlots`, `parseHelp`, `parseBenchJson`, `parseBenchProgress`, `parseDeviceList`, `parseCmdline`, `portFromArgv`,
-`probeUrl`, `benchBinary` and the SSE parser come from `llamacpp-js`. The I/O of the package now serves only its own
+`probeUrl`, `benchBinary` and the SSE parser come from `llamacpp-js`. Since #116 the pure parts the port had
+rewritten come from the package too, and its own I/O uses them: `healthOf` and `isLlamaHealthBody` (`probes.ts`),
+`readChatEvent` and `parseLlamaError` (`chatStream.ts`, which read the events and errors with their own schemas),
+`isLlamaServerOn` (`procScan.ts`) and `catalogOfHelp` (`Flags.readHelp`). What exists twice is the transport only. The I/O of the package now serves only its own
 users; the server's version adds what the app needs (a bound on every wait, `LlamaHttp` with no limit on the body, the
 request tied to the scope of the reply so that a stop closes it).
 
