@@ -164,6 +164,7 @@ test('the licenses of the bundled code ship with the server', () => {
     const heading = `## ${name} - ${installedVersion(name)} `;
     expect(text).toMatch(new RegExp(`^${RegExp.escape(heading)}.*\n\n\\S`, 'm'));
   }
+  expect(text).toMatch(/^## @scalar\/api-reference - \S+ \(MIT\)\n\n\S/m);
 });
 
 test('the server finds the NVML sampler: the module that names it sits next to it', () => {

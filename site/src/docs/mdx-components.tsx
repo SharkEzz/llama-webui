@@ -4,7 +4,6 @@ import { ArchitectureDiagram } from './ArchitectureDiagram';
 import { Callout } from './Callout';
 import { CodeBlock } from './CodeBlock';
 import { Tab, Tabs } from './DocTabs';
-import { Endpoint } from './Endpoint';
 import { FileTree } from './FileTree';
 import { Kbd } from './Kbd';
 import { Screenshot } from './Screenshot';
@@ -20,7 +19,6 @@ export const mdxComponents: MDXComponents = {
   td: (props) => <td className="border-t border-border px-4 py-2.5 align-top" {...props} />,
   ArchitectureDiagram,
   Callout,
-  Endpoint,
   FileTree,
   Kbd,
   Screenshot,

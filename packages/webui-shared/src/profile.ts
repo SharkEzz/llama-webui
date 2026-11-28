@@ -48,22 +48,39 @@ const Args = Schema.Array(Schema.String).check(
 
 /** A profile as a person writes it: the input of a create or an update, and the import and export format. */
 export const ProfileInput = Schema.Struct({
-  name: Required,
-  model: Required,
-  mmproj: Schema.optionalKey(Schema.String),
-  cwd: Schema.optionalKey(Schema.String),
-  host: Schema.optionalKey(Schema.String),
-  port: Schema.optionalKey(Port),
-  args: Args.pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
-  env: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+  name: Required.annotate({ description: 'Unique profile name (case-sensitive).' }),
+  model: Required.annotate({ description: 'GGUF model path (-m): absolute, ~/…, or relative to cwd.' }),
+  mmproj: Schema.optionalKey(Schema.String.annotate({ description: 'Optional multimodal projector path (-mm).' })),
+  cwd: Schema.optionalKey(Schema.String.annotate({ description: 'Working directory for llama-server (~ expanded).' })),
+  host: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Listen address (--host); falls back to settings.host.' }),
+  ),
+  port: Schema.optionalKey(
+    Port.annotate({ description: 'Listen port (--port, 1–65535); falls back to settings.port.' }),
+  ),
+  args: Args.annotate({
+    description:
+      'Extra llama-server CLI arguments, one token per item. Cannot contain reserved flags (--host, --port, --metrics, --slots, --props, -m, --model, -mm, --mmproj).',
+  }).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  env: Schema.Record(Schema.String, Schema.String)
+    .annotate({ description: 'Environment variables merged on top of llama-webui and global settings.env.' })
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
+}).annotate({
+  identifier: 'ProfileInput',
+  description: 'Strict input payload for creating, updating or importing a llama-server launch profile.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type ProfileInput = typeof ProfileInput.Type;
 
 /**
  * Where a profile comes from: made in the UI or imported from a file. `llama-tui` is the source of the rows the Nitro
  * server imported from the llama-tui config; nothing writes it any more, but stored rows still carry it.
  */
-export const ProfileSource = Schema.Literals(['ui', 'import', 'llama-tui']);
+export const ProfileSource = Schema.Literals(['ui', 'import', 'llama-tui']).annotate({
+  identifier: 'ProfileSource',
+  description: 'Origin of a stored profile (ui, import, or legacy llama-tui).',
+});
 export type ProfileSource = typeof ProfileSource.Type;
 
 /**
@@ -83,7 +100,10 @@ const storedFields = {
 };
 
 /** A stored profile in the import and export format: the fields of `ProfileInput`, as stored. */
-export const ProfileExport = Schema.Struct(storedFields);
+export const ProfileExport = Schema.Struct(storedFields).annotate({
+  identifier: 'ProfileExport',
+  description: 'Portable JSON representation of a profile without id, source or timestamps.',
+});
 export type ProfileExport = typeof ProfileExport.Type;
 
 /** A stored profile: its fields, its id, where it comes from, when it was created and last changed (epoch ms). */
@@ -91,8 +111,11 @@ export const Profile = Schema.Struct({
   id: Schema.Int,
   ...storedFields,
   source: ProfileSource,
-  createdAt: Schema.Int,
-  updatedAt: Schema.Int,
+  createdAt: Schema.Int.annotate({ description: 'Creation timestamp (epoch ms).' }),
+  updatedAt: Schema.Int.annotate({ description: 'Last modification timestamp (epoch ms).' }),
+}).annotate({
+  identifier: 'Profile',
+  description: 'A persisted llama-server launch profile.',
 });
 export type Profile = typeof Profile.Type;
 

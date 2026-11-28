@@ -65,9 +65,11 @@ messages leave in the order of the changes:
 
 `HttpLive` serves, on `NodeHttpServer` (the server of `node:http`):
 
-- the API: `HttpApiBuilder.layer(Api)`, with each group's handlers (`app/server/<domain>/http.ts`, merged in
-  `ApiRoutes`): 67 endpoints in all. Any other path under `/api`, whatever its method, is a `404`
-  `{ "_tag": "RouteNotFound", "message": "Unknown route" }`, a method a path lacks too (there is no `405`);
+- the API: `HttpApiBuilder.layer(Api)`, with each group's handlers (`app/server/<domain>/http.ts`), plus
+  `OpenApiDocsLive` (`app/server/http/OpenApiDocs.ts`, serving the generated OpenAPI 3.1 spec at `GET /api/openapi.json`
+  and the offline Scalar UI at `GET /api/docs`), all merged in `ApiRoutes`: 67 endpoints plus the two docs routes. Any
+  other path under `/api`, whatever its method, is a `404` `{ "_tag": "RouteNotFound", "message": "Unknown route" }`, a
+  method a path lacks too (there is no `405`);
 - `/ws`: the WebSocket (see [WebSocket](#websocket)); a request without an upgrade gets `426`
   `WebSocket upgrade expected`;
 - the UI: the built files of `app/.output/public/`, and `index.html` for every other `GET`, so reloading `/chat/12`
@@ -186,8 +188,8 @@ In development, the server sends its spans and its metrics to the
   child process. Development runs its sources as they are;
 - `llama-webui.mjs`: the launcher, built from `app/bin/llama-webui.ts`, which starts with `#!/usr/bin/env node` and
   imports `./server/index.mjs`;
-- `server/THIRD-PARTY-LICENSES.md`: the licenses of the npm code bundled into the server and the sampler
-  (`app/build/licenses.ts`).
+- `server/THIRD-PARTY-LICENSES.md`: the licenses of the npm packages bundled into the server and the sampler, including
+  vendored upstream bundles such as `@scalar/api-reference` (`app/build/licenses.ts`).
 
 The build also replaces `LLAMA_WEBUI_VERSION` with `git describe --tags --always --dirty`, or the version of
 `package.json` without git. `AppInfo` (`app/server/config/AppInfo.ts`) reports it in `/api/health`, `--version`
@@ -274,6 +276,9 @@ or in `.env`. User-facing details are on [Launch options](/docs/configuration/).
    then the bench runner (its programs killed), the monitor (its collectors' programs), the chat runs and the
    downloads, then the supervisor stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds) while
    the log ring and the hub it writes to are still up, and the database closes last.
+4. **Telemetry flush**: when OpenTelemetry OTLP export is enabled (`app/server/runtime/Otlp.ts`), `Otlp.layer` sits
+   below `Services` and flushes remaining spans (including `Shutdown.run`) and metrics last, capped at 1 second so a
+   stalling collector never blocks exit.
 
 The process then exits with code 0, in well under 2 seconds with a page open and a reply streaming
 (`app/server/lifecycle.test.ts`). A second signal while it stops exits at once.
@@ -299,9 +304,18 @@ page gets its `1001` and `llama-server` stops; a second Ctrl+C kills the server 
 ## Metrics
 
 The metrics of the server are declared in `app/server/runtime/Metrics.ts`, each named `llama_webui_<domain>_<what>`
-with its description; the DevTools show them in their Metrics panel, refreshed while they are connected. They are
-recorded in production too (an update is a write to a map in memory), where nothing reads them. With the DevTools, the
-server also adds the fibers' own metrics (`child_fibers_*`).
+with its description. They are always recorded in memory (an update is a write to a map) and can be observed in two
+ways:
+
+- **OpenTelemetry (OTLP over HTTP)** in both production and development (`app/server/runtime/Otlp.ts`, using Effect's
+  built-in `effect/observability` `OtlpTracer` and `OtlpMetrics` over `NodeHttpClient` with the shared `proxyEnv` of
+  `app/server/http/proxyEnv.ts`): disabled by default, enabled by setting `OTEL_EXPORTER_OTLP_ENDPOINT` (or a
+  signal-specific endpoint). Exports spans and metrics only (no logs), enables Effect's runtime metrics
+  (`child_fibers_*`) when metrics export is active, and supports standard `OTEL_*` environment variables (see
+  [OpenTelemetry (OTLP)](/docs/configuration/#opentelemetry-otlp)).
+- **Effect DevTools** in development (`LLAMA_WEBUI_DEV=1`), showing spans and metrics live in VS Code. `Otlp.layer` is
+  provided below `DevToolsInDev` in `app/server/App.ts`, so both tracers chain cleanly when both are active in
+  development, and `Otlp.layer` flushes last on shutdown.
 
 The DevTools of the VS Code extension (0.10.0) still decode the metrics in the shape of Effect 3: the server's client
 (`app/server/runtime/DevToolsWire.ts`) rewrites its snapshots, and its span events without attributes, into that shape

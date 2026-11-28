@@ -17,7 +17,7 @@ the queue in `app/server/downloads/`, their schemas in `packages/webui-shared/sr
 | `app/server/hf/variants.ts`                    | `groupRepoFiles()`: files grouped into variants and projectors.                                                          |
 | `app/server/hf/paths.ts`                       | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`.                                                                     |
 | `app/server/hf/token.ts`                       | `hfToken`, `hfTokenPath`, `hfEndpoint`, `hubHeaders()`.                                                                  |
-| `app/server/hf/http.ts`                        | `HfHandlers`: the `hf` group (see [Hugging Face API](/developers/api/hf/)).                                              |
+| `app/server/hf/http.ts`                        | `HfHandlers`: the `hf` group (see [HTTP reference](/developers/api/reference/)).                                         |
 | `app/server/downloads/Downloads.ts`            | `Downloads`: the queue.                                                                                                  |
 | `app/server/downloads/transfer.ts`             | `transferWith()`: the files of an item, with range resume, retries and checks.                                           |
 | `app/server/downloads/freeSpace.ts`, `hash.ts` | `freeBytesOf()`; the streamed sha256.                                                                                    |

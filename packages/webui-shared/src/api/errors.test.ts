@@ -31,6 +31,16 @@ test('an issue of the whole value has no path in the message', () => {
   expect(error.issues[0]?.path).toEqual([]);
 });
 
+test('requestInvalid honours a named struct message inside a single-member Union (HttpApiBuilder payload)', () => {
+  const payload = Schema.Struct({ name: Schema.String }).annotate({
+    identifier: 'NamedPayload',
+    message: 'Expected object',
+  });
+  const error = requestInvalid(failureOf(Schema.Union([payload]), 1));
+  expect(error.message).toBe('Invalid data: Expected object');
+  expect(error.issues).toEqual([{ path: [], message: 'Expected object' }]);
+});
+
 test('IdParam reads decimal digits only', () => {
   const decode = Schema.decodeUnknownResult(IdParam);
   expect(decode('12')).toEqual(Result.succeed(12));

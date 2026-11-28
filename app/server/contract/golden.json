@@ -398,6 +398,34 @@
       "bootId": "<bootId>"
     }
   },
+  "GET /api/openapi.json": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "GET /api/docs": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html"
+    }
+  },
+  "GET /api/docs/ (trailing slash)": {
+    "status": 308,
+    "headers": {
+      "location": "/api/docs"
+    }
+  },
+  "POST /api/docs": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
   "GET /api/nope": {
     "status": 404,
     "headers": {

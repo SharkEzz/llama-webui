@@ -33,7 +33,13 @@ export const SweepSpace = Schema.Struct({
   t: values(BENCH_FIELDS.t),
   b: values(BENCH_FIELDS.b),
   ub: values(BENCH_FIELDS.ub),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'SweepSpace',
+  description:
+    'Search space of flag values expanded as a Cartesian product over base. Tensor splits (-ts) only apply when -dev has the matching number of devices (> 1).',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type SweepSpace = typeof SweepSpace.Type;
 
 const stored = <S extends Schema.Top>(field: S) => field.pipe(Schema.Array, Schema.optionalKey);
@@ -53,6 +59,9 @@ export const StoredSweepSpace = Schema.Struct({
   t: stored(storedFields.t.schema),
   b: stored(storedFields.b.schema),
   ub: stored(storedFields.ub.schema),
+}).annotate({
+  identifier: 'StoredSweepSpace',
+  description: 'Stored search-space dimensions of a sweep.',
 }) satisfies Schema.Codec<SweepSpace>;
 
 const nameMessage = '80 characters at most';
@@ -69,7 +78,12 @@ export const SweepSpec = Schema.Struct({
   space: SweepSpace.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   serverArgs: serverArgsField,
   includeUnfit: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'SweepSpec',
+  description: 'Strict specification for planning or launching a multi-configuration benchmark sweep.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type SweepSpec = typeof SweepSpec.Type;
 export type SweepSpecInput = typeof SweepSpec.Encoded;
 
@@ -82,9 +96,15 @@ export const StoredSweepSpec = Schema.Struct({
   space: StoredSweepSpace,
   serverArgs: Schema.Array(Schema.String),
   includeUnfit: Schema.Boolean,
+}).annotate({
+  identifier: 'StoredSweepSpec',
+  description: 'Stored sweep specification associated with a Sweep record.',
 }) satisfies Schema.Codec<SweepSpec>;
 
-export const SweepStatus = Schema.Literals(['running', 'done', 'cancelled', 'interrupted']);
+export const SweepStatus = Schema.Literals(['running', 'done', 'cancelled', 'interrupted']).annotate({
+  identifier: 'SweepStatus',
+  description: 'Lifecycle status of a benchmark sweep.',
+});
 export type SweepStatus = typeof SweepStatus.Type;
 
 /** A sweep: its spec, its best run and the count of its items by status. */
@@ -114,6 +134,9 @@ export const Sweep = Schema.Struct({
   }),
   createdAt: Schema.Int,
   finishedAt: Schema.NullOr(Schema.Int),
+}).annotate({
+  identifier: 'Sweep',
+  description: 'Persisted benchmark sweep with item status counts and best run summary.',
 });
 export type Sweep = typeof Sweep.Type;
 
@@ -125,6 +148,9 @@ export const SweepLive = Schema.Struct({
   index: Schema.Int,
   total: Schema.Int,
   stage: Schema.Literals(['explore', 'validate']),
+}).annotate({
+  identifier: 'SweepLive',
+  description: 'Live progress of the active sweep (1-based index and explore/validate stage).',
 });
 export type SweepLive = typeof SweepLive.Type;
 

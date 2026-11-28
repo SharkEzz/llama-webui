@@ -8,6 +8,9 @@ on:
     paths:
       - "site/**"
       - "packages/webui-theme/**"
+      - "packages/webui-shared/**"
+      - "app/build/siteOpenApi.ts"
+      - "app/server/http/OpenApiDocs.ts"
       - ".github/workflows/site-deploy.yml"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"

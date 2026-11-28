@@ -5,6 +5,9 @@ const Listen = Schema.Struct({
   host: Schema.String,
   /** Listening on a non-loopback address. */
   exposed: Schema.Boolean,
+}).annotate({
+  identifier: 'ListenExposure',
+  description: 'Configured listen host and whether it is exposed beyond loopback.',
 });
 
 /** First-run checklist: what llama-webui needs, and what makes it work better. */
@@ -44,6 +47,10 @@ export const SetupReport = Schema.Struct({
   llamaListen: Listen,
   /** The required steps pass: the binary is found and the models folder exists. */
   ready: Schema.Boolean,
+}).annotate({
+  identifier: 'SetupReport',
+  description:
+    'First-run readiness checklist covering llama-server, llama-bench, models folder, telemetry and network exposure.',
 });
 export type SetupReport = typeof SetupReport.Type;
 

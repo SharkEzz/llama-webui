@@ -11,7 +11,7 @@ one fiber per connection.
 
 ## Connect
 
-<Endpoint method="WS" path="/ws" />
+`WS /ws`
 
 The upgrade request goes through the same [request guard](/developers/api/overview/#the-request-guard) as the REST
 routes: its `Host` must be `localhost` or an IP address, and an `Origin`, when present, must be llama-webui's own. A
@@ -137,7 +137,7 @@ since the monitor ticks whether a client is connected or not (its `at` tells whe
 | `points`         | `Record<string, number \| null>`                 | The values appended to each history series at this tick.                    |
 | `history`        | `{ intervalMs, capacity }`                       | Shape of the history. A change (settings) means the client's copy is stale. |
 
-The nested types are described on [Monitor and system](/developers/api/monitor/) and
+The nested types are described in the [HTTP reference](/developers/api/reference/) (`Monitor` group) and
 [Monitor and collectors](/developers/server/monitor/).
 
 ### `log`
@@ -159,7 +159,7 @@ The `ServerView` (`packages/webui-shared/src/server.ts`), the same body as `GET 
 and `stopping` carry the `host` the server listens on; `starting` can carry the loading `progress` and `waking: true`
 for a reload after an idle sleep; `external` can carry the `status` and `progress` that `/models/sse` reports),
 `command` (the last launched command) and `profileId`. A message is sent on every change, a new loading `progress`
-included. The fields are described on [Server, state and logs](/developers/api/server/#serverview).
+included. The fields are described in the [HTTP reference](/developers/api/reference/) (`ServerView` schema).
 
 ### `bench-progress`
 
@@ -182,7 +182,7 @@ A whole `BenchRun` (`packages/webui-shared/src/bench.ts`): sent when the run sta
 when its turn comes), when it ends, and again if the server restart that follows it fails (the error is appended to
 the run's). Its fields: `id`, `kind`, `status`, `spec`, `command`, `hardware`, `pp`, `tg`, `draftAcceptPct`,
 `vramPeak`, `error`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
-See [Benchmarks](/developers/api/bench/).
+See the `BenchRun` schema in the [HTTP reference](/developers/api/reference/).
 
 ### `bench-deleted`
 
@@ -205,7 +205,7 @@ The `SweepLive` of the running sweep (`packages/webui-shared/src/sweep.ts`), `nu
 
 A whole `Sweep` (`packages/webui-shared/src/sweep.ts`), on every change: `id`, `name`, `status` (`running`, `done`, `cancelled`,
 `interrupted`), `spec`, `bestRunId`, `best` (a summary of the best run), `counts` (runs per status), `createdAt` and
-`finishedAt`. See [Sweeps](/developers/api/sweeps/).
+`finishedAt`. See the `Sweep` schema in the [HTTP reference](/developers/api/reference/).
 
 ### `sweep-deleted`
 
@@ -224,7 +224,7 @@ running or its placement is not known (an external server writes nothing to the 
 | `buffers`   | `PlacementBuffer[]`            | One entry per device: `device`, `busId`, `modelBytes`, `kvBytes`, `computeBytes`.                              |
 | `p2p`       | string, optional               | `active`, `unavailable` or `requested`: peer-to-peer between GPUs, absent when neither requested nor reported. |
 
-See [Topology](/developers/api/topology/).
+See the `ModelPlacement` schema in the [HTTP reference](/developers/api/reference/).
 
 ### `download-progress`
 
@@ -246,7 +246,8 @@ The `DownloadLive` of the running download (`packages/webui-shared/src/hf.ts`). 
 
 A whole `DownloadItem` (`packages/webui-shared/src/hf.ts`) on every status change (`queued`, `downloading`, `done`, `error`,
 `canceled`): `id`, `repo`, `revision`, `key`, `name`, `quant`, `kind`, `dir`, `files`, `status`, `bytesDone`,
-`totalBytes`, `error`, `code`, `createdAt` and `finishedAt`. See [Hugging Face](/developers/api/hf/).
+`totalBytes`, `error`, `code`, `createdAt` and `finishedAt`. See the `DownloadItem` schema in the
+[HTTP reference](/developers/api/reference/).
 
 ### `download-deleted`
 

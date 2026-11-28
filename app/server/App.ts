@@ -26,6 +26,7 @@ import { Monitor } from './monitor/Monitor.ts';
 import { Placement } from './monitor/Placement.ts';
 import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
 import * as DevToolsWire from './runtime/DevToolsWire.ts';
+import * as Otlp from './runtime/Otlp.ts';
 import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
 import { ExternalWatch } from './supervisor/ExternalWatch.ts';
@@ -127,9 +128,12 @@ const DevToolsInDev = Layer.unwrap(
 /**
  * The whole application but its configuration. `Shutdown.layerRunner` is built last, so its finalizer is the first
  * to run when the app stops: the shutdown steps run while the HTTP server still serves and clients are connected.
+ * `Otlp.layer` sits at the bottom so startup spans are captured, `DevToolsInDev` wraps its tracer in dev, and the
+ * final OTLP flush runs last on shutdown (after `Shutdown.run` and the services).
  */
 export const App = Shutdown.layerRunner.pipe(
   Layer.provide(Http),
   Layer.provide(Shutdown.layer),
   Layer.provide(DevToolsInDev),
+  Layer.provide(Otlp.layer),
 );

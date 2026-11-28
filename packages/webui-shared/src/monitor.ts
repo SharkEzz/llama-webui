@@ -5,7 +5,10 @@
 import { Schema, Struct } from 'effect';
 
 /** `/health` of llama-server: 200 → `ok`, 503 → `loading`, another status → `error`, no answer → `down`. */
-export const Health = Schema.Literals(['ok', 'loading', 'error', 'down']);
+export const Health = Schema.Literals(['ok', 'loading', 'error', 'down']).annotate({
+  identifier: 'LlamaHealth',
+  description: 'Health state polled from llama-server /health.',
+});
 export type Health = typeof Health.Type;
 
 /** One slot of llama-server's `/slots` (the `SlotView` of `llamacpp-js/metrics`). */
@@ -18,7 +21,7 @@ export const SlotView = Schema.Struct({
   nPromptProcessed: Schema.Int,
   nDecoded: Schema.Int,
   nRemain: Schema.NullOr(Schema.Int),
-});
+}).annotate({ identifier: 'SlotView', description: 'One inference slot read from llama-server /slots.' });
 export type SlotView = typeof SlotView.Type;
 
 /** The rates of the last request, from the `/metrics` counters (the `RequestStats` of `llamacpp-js/metrics`). */
@@ -26,6 +29,9 @@ export const RequestStats = Schema.Struct({
   genTps: Schema.NullOr(Schema.Finite),
   ppTps: Schema.NullOr(Schema.Finite),
   specAccept: Schema.NullOr(Schema.Finite),
+}).annotate({
+  identifier: 'RequestStats',
+  description: 'Throughput rates computed from llama-server /metrics counters.',
 });
 export type RequestStats = typeof RequestStats.Type;
 
@@ -38,7 +44,7 @@ export const SpecStats = Schema.Struct({
   meanAcceptedPerDraft: Schema.NullOr(Schema.Finite),
   /** Acceptance rate per draft position. */
   perPos: Schema.Array(Schema.Finite),
-});
+}).annotate({ identifier: 'SpecStats', description: 'Cumulative speculative decoding acceptance statistics.' });
 export type SpecStats = typeof SpecStats.Type;
 
 /** One tick's worth of `/metrics` counter deltas (the `RequestRecord` of `llamacpp-js/metrics`). */
@@ -52,6 +58,9 @@ export const RequestRecord = Schema.Struct({
   ppTps: Schema.NullOr(Schema.Finite),
   genTps: Schema.NullOr(Schema.Finite),
   specAccept: Schema.NullOr(Schema.Finite),
+}).annotate({
+  identifier: 'RequestRecord',
+  description: 'Token counts and speeds recorded for one completed request.',
 });
 export type RequestRecord = typeof RequestRecord.Type;
 
@@ -65,14 +74,28 @@ const Detail = Schema.Finite.pipe(Schema.NullOr, Schema.optionalKey);
  * topo -p2p rw` shows it): `ok`, or what stands in the way, the chipset, the card, the PCI topology between them, a
  * driver setting, or no reason given (`unsupported`, `unknown`).
  */
-export const GpuP2pStatus = Schema.Literals(['ok', 'chipset', 'gpu', 'topology', 'disabled', 'unsupported', 'unknown']);
+export const GpuP2pStatus = Schema.Literals([
+  'ok',
+  'chipset',
+  'gpu',
+  'topology',
+  'disabled',
+  'unsupported',
+  'unknown',
+]).annotate({
+  identifier: 'GpuP2pStatus',
+  description: 'NVML peer-to-peer read/write status between two NVIDIA GPUs.',
+});
 export type GpuP2pStatus = typeof GpuP2pStatus.Type;
 
 /**
  * Peer-to-peer from a card to the card at `busId`: what the driver allows, read and write, whether or not a program
  * uses it.
  */
-export const GpuPeer = Schema.Struct({ busId: Schema.String, status: GpuP2pStatus });
+export const GpuPeer = Schema.Struct({ busId: Schema.String, status: GpuP2pStatus }).annotate({
+  identifier: 'GpuPeer',
+  description: 'Peer-to-peer capability to another GPU identified by PCI busId.',
+});
 export type GpuPeer = typeof GpuPeer.Type;
 
 /** One GPU on one tick. */
@@ -114,7 +137,7 @@ export const GpuSample = Schema.Struct({
   suspended: Schema.optionalKey(Schema.Boolean),
   /** Hidden card (hiddenGpus setting): listed but not read. */
   hidden: Schema.optionalKey(Schema.Boolean),
-});
+}).annotate({ identifier: 'GpuSample', description: 'Live telemetry sample for one NVIDIA or AMD GPU.' });
 export type GpuSample = typeof GpuSample.Type;
 
 /** What a GPU collector reads: a sample before the VRAM of llama-server's processes is added. */
@@ -127,11 +150,14 @@ export const MemInfo = Schema.Struct({
   cachedBytes: Schema.Finite,
   swapTotalBytes: Schema.Finite,
   swapUsedBytes: Schema.Finite,
-});
+}).annotate({ identifier: 'MemInfo', description: 'Host RAM and swap usage in bytes.' });
 export type MemInfo = typeof MemInfo.Type;
 
 /** The machine's DRAM bandwidth (memory controller, via perf): everything that touches RAM, CPU, GPU and NVMe included. */
-export const MemBandwidth = Schema.Struct({ readBps: Schema.Finite, writeBps: Schema.Finite });
+export const MemBandwidth = Schema.Struct({ readBps: Schema.Finite, writeBps: Schema.Finite }).annotate({
+  identifier: 'MemBandwidth',
+  description: 'Host DRAM read and write bandwidth in bytes/s measured via perf.',
+});
 export type MemBandwidth = typeof MemBandwidth.Type;
 
 export const SystemSample = Schema.Struct({
@@ -144,10 +170,13 @@ export const SystemSample = Schema.Struct({
   mem: Schema.NullOr(MemInfo),
   /** Missing or null: not measurable (no perf, unknown PMU, permissions). */
   memBw: MemBandwidth.pipe(Schema.NullOr, Schema.optionalKey),
-});
+}).annotate({ identifier: 'SystemSample', description: 'Host CPU, load average, RAM and DRAM bandwidth telemetry.' });
 export type SystemSample = typeof SystemSample.Type;
 
-export const DiskRates = Schema.Struct({ readBps: Schema.Finite, writeBps: Schema.Finite });
+export const DiskRates = Schema.Struct({ readBps: Schema.Finite, writeBps: Schema.Finite }).annotate({
+  identifier: 'DiskRates',
+  description: 'Disk read and write throughput in bytes/s.',
+});
 export type DiskRates = typeof DiskRates.Type;
 
 /** The machine's physical disks: their total, each one (by block name, `nvme0n1`) and the model's. */
@@ -155,7 +184,7 @@ export const DiskSample = Schema.Struct({
   ...DiskRates.fields,
   perDisk: Schema.Record(Schema.String, DiskRates),
   model: Schema.NullOr(Schema.Struct({ disk: Schema.String, readBps: Schema.Finite })),
-});
+}).annotate({ identifier: 'DiskSample', description: 'Total, per-device and model-disk throughput in bytes/s.' });
 export type DiskSample = typeof DiskSample.Type;
 
 export const CpuInfo = Schema.Struct({
@@ -164,7 +193,7 @@ export const CpuInfo = Schema.Struct({
   logicalThreads: Schema.Int,
   flags: Schema.Array(Schema.String),
   numaNodes: Schema.Int,
-});
+}).annotate({ identifier: 'CpuInfo', description: 'Static CPU model, topology and instruction flags.' });
 export type CpuInfo = typeof CpuInfo.Type;
 
 /** Keys of the history series: only what a chart draws (the other values are read live from the snapshot). */
@@ -215,6 +244,9 @@ export const Snapshot = Schema.Struct({
   points: Schema.Record(Schema.String, Schema.NullOr(Schema.Finite)),
   /** Shape of the history: a change (settings) invalidates the client's copy. */
   history: Schema.Struct({ intervalMs: Schema.Int, capacity: Schema.Int }),
+}).annotate({
+  identifier: 'Snapshot',
+  description: 'One monitoring tick combining llama-server metrics, GPUs, host system and disk throughput.',
 });
 export type Snapshot = typeof Snapshot.Type;
 
@@ -227,11 +259,17 @@ export const HistoryDump = Schema.Struct({
   /** Time of each point (ms), same length as each series. */
   times: Schema.Array(Schema.Int),
   series: Schema.Record(Schema.String, Schema.Finite.pipe(Schema.NullOr, Schema.Array)),
+}).annotate({
+  identifier: 'HistoryDump',
+  description: 'Ring-buffer time series collected across monitoring ticks, oldest first (null indicates a gap).',
 });
 export type HistoryDump = typeof HistoryDump.Type;
 
 /** Where the NVIDIA GPUs are read from: the NVML library, else the `nvidia-smi` program. */
-export const NvidiaSource = Schema.Literals(['nvml', 'nvidia-smi']);
+export const NvidiaSource = Schema.Literals(['nvml', 'nvidia-smi']).annotate({
+  identifier: 'NvidiaSource',
+  description: 'Backend used to sample NVIDIA GPUs (libnvidia-ml or nvidia-smi fallback).',
+});
 export type NvidiaSource = typeof NvidiaSource.Type;
 
 /** The machine as the System page shows it: its CPU, every GPU (hidden and sleeping ones included), the NVIDIA source. */
@@ -239,5 +277,9 @@ export const SystemInfo = Schema.Struct({
   cpu: CpuInfo,
   gpus: Schema.Array(GpuSample.mapFields(Struct.pick(['key', 'name', 'vendor', 'busId', 'vramTotalBytes']))),
   nvidiaSource: NvidiaSource,
+}).annotate({
+  identifier: 'SystemInfo',
+  description:
+    'Static host hardware summary (CPU, all GPUs including hidden/sleeping ones, and NVIDIA telemetry source).',
 });
 export type SystemInfo = typeof SystemInfo.Type;

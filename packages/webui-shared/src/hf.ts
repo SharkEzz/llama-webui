@@ -66,6 +66,9 @@ export const HfStatus = Schema.Struct({
   tokenInvalid: Schema.Boolean,
   /** Hugging Face endpoint (`HF_ENDPOINT`, default https://huggingface.co). */
   endpoint: Schema.String,
+}).annotate({
+  identifier: 'HfStatus',
+  description: 'Detected Hugging Face token source, authenticated account name and configured Hub endpoint.',
 });
 export type HfStatus = typeof HfStatus.Type;
 
@@ -76,6 +79,9 @@ export const HfSearchHit = Schema.Struct({
   /** ISO date. */
   lastModified: Schema.NullOr(Schema.String),
   gated: Schema.Boolean,
+}).annotate({
+  identifier: 'HfSearchHit',
+  description: 'One GGUF repository returned by Hugging Face Hub search.',
 });
 export type HfSearchHit = typeof HfSearchHit.Type;
 
@@ -85,11 +91,17 @@ export const HfFile = Schema.Struct({
   size: Schema.Int,
   /** LFS sha256; null for a non-LFS file (no check). */
   sha256: Schema.NullOr(Schema.String),
+}).annotate({
+  identifier: 'HfFile',
+  description: 'One file in a Hugging Face repository with byte size and optional LFS SHA-256 digest.',
 });
 export type HfFile = typeof HfFile.Type;
 
 /** Local state of a variant: none of its files, some of them (or a `.part`), all of them with the right size. */
-export const HfPresence = Schema.Literals(['none', 'partial', 'complete']);
+export const HfPresence = Schema.Literals(['none', 'partial', 'complete']).annotate({
+  identifier: 'HfPresence',
+  description: 'Whether a Hugging Face variant is absent, partially downloaded (.part or subset), or complete on disk.',
+});
 export type HfPresence = typeof HfPresence.Type;
 
 /** A downloadable GGUF: one file, or all the shards of a split model. */
@@ -104,6 +116,9 @@ export const HfVariant = Schema.Struct({
   files: Schema.Array(HfFile),
   totalBytes: Schema.Int,
   present: HfPresence,
+}).annotate({
+  identifier: 'HfVariant',
+  description: 'Downloadable GGUF variant (single file or grouped shards) inside a Hugging Face repository.',
 });
 export type HfVariant = typeof HfVariant.Type;
 
@@ -120,13 +135,22 @@ export const HfRepo = Schema.Struct({
   variants: Schema.Array(HfVariant),
   /** Multimodal projectors (mmproj), smallest first. */
   projectors: Schema.Array(HfVariant),
+}).annotate({
+  identifier: 'HfRepo',
+  description: 'GGUF variants and multimodal projectors listed at a pinned commit of a Hugging Face repository.',
 });
 export type HfRepo = typeof HfRepo.Type;
 
-export const DownloadStatus = Schema.Literals(['queued', 'downloading', 'done', 'error', 'canceled']);
+export const DownloadStatus = Schema.Literals(['queued', 'downloading', 'done', 'error', 'canceled']).annotate({
+  identifier: 'DownloadStatus',
+  description: 'Lifecycle state of a queued Hugging Face download item.',
+});
 export type DownloadStatus = typeof DownloadStatus.Type;
 
-export const DownloadFile = Schema.Struct({ ...HfFile.fields, done: Schema.Boolean });
+export const DownloadFile = Schema.Struct({ ...HfFile.fields, done: Schema.Boolean }).annotate({
+  identifier: 'DownloadFile',
+  description: 'One file in a download item and whether it has completed verification.',
+});
 export type DownloadFile = typeof DownloadFile.Type;
 
 /** A download of the queue, as the `downloads` table holds it: no field has an input rule. */
@@ -152,6 +176,9 @@ export const DownloadItem = Schema.Struct({
   code: Schema.NullOr(Schema.String),
   createdAt: Schema.Int,
   finishedAt: Schema.NullOr(Schema.Int),
+}).annotate({
+  identifier: 'DownloadItem',
+  description: 'Persisted entry of the Hugging Face download queue.',
 });
 export type DownloadItem = typeof DownloadItem.Type;
 
@@ -167,11 +194,20 @@ export const DownloadLive = Schema.Struct({
   bps: Schema.Finite,
   /** `retrying`: when the next attempt starts (epoch ms). */
   retryAt: Schema.NullOr(Schema.Int),
+}).annotate({
+  identifier: 'DownloadLive',
+  description: 'Live transfer progress for the currently active download.',
 });
 export type DownloadLive = typeof DownloadLive.Type;
 
 /** The queue (`GET /api/downloads`): every item, and the live progress of the running one. */
-export const DownloadList = Schema.Struct({ items: Schema.Array(DownloadItem), live: Schema.NullOr(DownloadLive) });
+export const DownloadList = Schema.Struct({
+  items: Schema.Array(DownloadItem),
+  live: Schema.NullOr(DownloadLive),
+}).annotate({
+  identifier: 'DownloadList',
+  description: 'Current Hugging Face download queue and active transfer progress.',
+});
 export type DownloadList = typeof DownloadList.Type;
 
 export const isDownloadActive = (s: DownloadStatus) => s === 'queued' || s === 'downloading';
@@ -190,7 +226,12 @@ export const DownloadRequest = Schema.Struct({
     Schema.isMinLength(1, { message: 'At least one variant expected' }),
     Schema.isMaxLength(16, { message: '16 variants at most' }),
   ),
-}).annotate({ messageUnexpectedKey: 'unknown key' });
+}).annotate({
+  identifier: 'DownloadRequest',
+  description: 'Strict request payload to queue 1–16 GGUF variants from a pinned Hugging Face commit.',
+  message: 'Expected object',
+  messageUnexpectedKey: 'unknown key',
+});
 export type DownloadRequest = typeof DownloadRequest.Type;
 
 export type VramFit = 'fits' | 'tight' | 'offload';
