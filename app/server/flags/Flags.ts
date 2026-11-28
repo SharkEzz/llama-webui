@@ -1,8 +1,7 @@
 import { FlagsUnavailable } from '@llama-webui/shared';
 import { Cache, Context, Duration, Effect, Exit, Layer, Path } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
-import type { FlagCatalog } from 'llamacpp-js/flags';
-import { parseHelp } from 'llamacpp-js/flags';
+import { catalogOfHelp, type FlagCatalog } from 'llamacpp-js/flags';
 import { expandHome } from '../config/Home.ts';
 import { boundedText } from '../process/bounded.ts';
 import { CacheMetrics, cacheLoad, cacheLookup } from '../runtime/Metrics.ts';
@@ -39,8 +38,8 @@ export class Flags extends Context.Service<
               concurrency: 2,
             });
             if (code !== 0) return yield* Effect.fail(`exit code ${code}`);
-            const catalog = parseHelp(text);
-            return catalog.flags.length > 0 ? catalog : yield* Effect.fail('no flag listed');
+            const catalog = catalogOfHelp(text);
+            return catalog ?? (yield* Effect.fail('no flag listed'));
           },
           Effect.scoped,
           Effect.timeout(HELP_TIMEOUT),

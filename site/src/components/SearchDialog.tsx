@@ -41,6 +41,7 @@ let loading: Promise<Pagefind> | null = null;
 
 /** Loads the index script on first use only (never while prerendering). */
 function loadPagefind(): Promise<Pagefind> {
+  // oxlint-disable-next-line imports/no-restricted-calls -- a URL of the published site (Pagefind's index), never a module of the repo
   loading ??= import(/* @vite-ignore */ `${BASE}pagefind/pagefind.js`).then(async (pf: Pagefind) => {
     await pf.options({ baseUrl: BASE });
     return pf;

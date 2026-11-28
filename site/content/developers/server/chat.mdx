@@ -91,7 +91,8 @@ return { messages, stream: true, ...sampling, chat_template_kwargs: { enable_thi
 The run consumes `streamChat(baseUrl, body)` (`app/server/llama/chatStream.ts`), raced against its `stopped`
 signal. `streamChat` posts the body through `LlamaHttp`, a `node:http` client with no time limit on the headers or the
 body: a long prompt can take minutes before its first token. The request belongs to the stream, so ending or
-interrupting the stream aborts it. The body is decoded with Effect's SSE decoder, each `data:` as a `ChatChunk`, and
+interrupting the stream aborts it. The body is decoded with Effect's SSE decoder, each `data:` read by `readChatEvent()`
+of `llamacpp-js/client` (the reader the package's `streamChatCompletion()` uses), and
 its failures are tagged errors that `failureMessage()` words for the conversation:
 
 | Failure             | When                                                                                   | Message                                                                                            |
@@ -101,8 +102,9 @@ its failures are tagged errors that `failureMessage()` words for the conversatio
 | `LlamaStreamFailed` | An event with an `error` field.                                                        | The worded `llama-server` error.                                                                   |
 | `LlamaStreamCut`    | The body ends or breaks before `data: [DONE]`.                                         | `llama-server cut the reply short (stopped or crashed)`                                            |
 
-- An event whose data does not decode as a chunk is skipped; `timings` that do not decode are dropped alone, and the
-  chunk keeps its delta.
+- An event whose data is not JSON is skipped. A chunk is read field by field: a field of another type is left out and
+  the others are kept (`timings` without their four counts are dropped alone, and the chunk keeps its delta); an
+  `error`, in an event or in an HTTP error body, keeps its fields of their type.
 - `choices[0].delta.content` and `choices[0].delta.reasoning_content` are appended to the reply and its reasoning,
   and published as a `delta` event.
 - The time to the first token (`ttftMs`) is taken at the first non-empty content or reasoning delta, so it includes

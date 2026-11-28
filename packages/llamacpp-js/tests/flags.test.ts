@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
   catalogFrom,
+  catalogOfHelp,
   complete,
   type Flag,
   describeFlag,
@@ -151,4 +152,10 @@ describe('flagSuggestions', () => {
     assert.deepEqual(flagSuggestions(catalog, '--ctx=1', 8), []);
     assert.deepEqual(flagSuggestions(catalog, '', 8), []);
   });
+});
+
+test('catalogOfHelp gives the catalogue of a --help, null when it lists no flag (#116)', () => {
+  assert.ok((catalogOfHelp(HELP)?.flags.length ?? 0) > 0);
+  assert.equal(catalogOfHelp('usage: something else\n'), null);
+  assert.equal(catalogOfHelp(''), null);
 });

@@ -1,6 +1,6 @@
 // The web client (React): the base, the React rules, the Vitest rules and the Tailwind rules.
 import { defineConfig } from 'oxlint';
-import { base, llamacppNode, nodeBuiltins } from '../../oxlint.config.ts';
+import { bans, base, llamacppNode, nodeBuiltins } from '../../oxlint.config.ts';
 import { react } from '../../scripts/oxlint/oxlint.react.ts';
 import { tailwind } from '../../scripts/oxlint/oxlint.tailwind.ts';
 import { tests } from '../../scripts/oxlint/oxlint.tests.ts';
@@ -17,13 +17,13 @@ export default defineConfig({
   rules: {
     // The page logs nothing to the console but what it cannot show (a suppression says which)
     'no-console': 'error',
-    'no-restricted-imports': ['error', { patterns: [server, llamacppNode, { ...nodeBuiltins, message: web }] }],
+    ...bans([server, llamacppNode, { ...nodeBuiltins, message: web }]),
   },
   overrides: [
     {
       // A test may use Node (its modules, `llamacpp-js/node`)
       files: ['**/*.test.ts', '**/*.test.tsx'],
-      rules: { 'no-restricted-imports': ['error', { patterns: [server] }] },
+      rules: bans([server]),
     },
   ],
   // shadcn components keep their default code
