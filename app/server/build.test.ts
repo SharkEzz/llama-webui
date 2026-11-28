@@ -164,7 +164,10 @@ test('the licenses of the bundled code ship with the server', () => {
     const heading = `## ${name} - ${installedVersion(name)} `;
     expect(text).toMatch(new RegExp(`^${RegExp.escape(heading)}.*\n\n\\S`, 'm'));
   }
-  expect(text).toMatch(/^## @scalar\/api-reference - \S+ \(MIT\)\n\n\S/m);
+  expect(text).toMatch(
+    /^## @scalar\/api-reference - \S+ \(MIT\)\n\nMIT License\n\nCopyright \(c\) [^\n]+ Scalar\n\nPermission is hereby granted/m,
+  );
+  expect(text).toMatch(/The bundle embeds these packages and keeps their license comments: [^\n]*\bvue \S+ \(MIT\)/);
 });
 
 test('the server finds the NVML sampler: the module that names it sits next to it', () => {

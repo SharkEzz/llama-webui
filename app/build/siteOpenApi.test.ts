@@ -29,6 +29,11 @@ test('generateSiteOpenApi writes openapi.json and offline scalar.html', async ()
     expect(html).toContain('"withDefaultFonts":false');
     expect(html).toContain('"agent":{"disabled":true}');
     expect(html).toContain('"hideDarkModeToggle":true');
+    expect(html).toContain('"hideTestRequestButton":true');
+    expect(html).toMatch(
+      /^<!doctype html>\n<!--\nThis page bundles @scalar\/api-reference \d\S*, vendored in effect:\n\nMIT License\n/i,
+    );
+    expect(html).toContain('Permission is hereby granted');
     expect(html).toContain('http://127.0.0.1:7860');
     expect(html).not.toContain('<script src=');
     expect(html).not.toContain('cdn.jsdelivr.net');

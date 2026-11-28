@@ -194,8 +194,8 @@ catalogs:
       specifier: 4.1.7
       version: 4.1.7
     '@effect/tsgo':
-      specifier: 0.74.0
-      version: 0.74.0
+      specifier: 0.74.1
+      version: 0.74.1
     '@effect/vitest':
       specifier: 4.1.7
       version: 4.1.7
@@ -233,8 +233,8 @@ catalogs:
       specifier: 4.1.7
       version: 4.1.7
     lucide-react:
-      specifier: ^1.82.0
-      version: 1.82.0
+      specifier: ^1.83.0
+      version: 1.83.0
     oxlint-plugin-react-doctor:
       specifier: ^0.9.23
       version: 0.9.23
@@ -284,7 +284,7 @@ importers:
     devDependencies:
       '@effect/tsgo':
         specifier: 'catalog:'
-        version: 0.74.0
+        version: 0.74.1
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.11
@@ -365,7 +365,7 @@ importers:
         version: link:../packages/llamacpp-js
       lucide-react:
         specifier: 'catalog:'
-        version: 1.82.0(@types/react@19.3.3)(react@19.3.1)
+        version: 1.83.0(@types/react@19.3.3)(react@19.3.1)
       react:
         specifier: 'catalog:'
         version: 19.3.1
@@ -396,7 +396,7 @@ importers:
     devDependencies:
       '@effect/tsgo':
         specifier: 'catalog:'
-        version: 0.74.0
+        version: 0.74.1
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.7(effect@4.1.7)(vitest@5.1.2)
@@ -501,7 +501,7 @@ importers:
         version: 5.2.4
       lucide-react:
         specifier: 'catalog:'
-        version: 1.82.0(@types/react@19.3.3)(react@19.3.1)
+        version: 1.83.0(@types/react@19.3.3)(react@19.3.1)
       react:
         specifier: 'catalog:'
         version: 19.3.1
@@ -789,43 +789,43 @@ packages:
     peerDependencies:
       effect: ^4.1.7
 
-  '@effect/tsgo-darwin-arm64@0.74.0':
-    resolution: {integrity: sha512-mj/oHjushK3lEZCaZR+UJbeMAsawneMP3UwTa6v2aae5hf9L0TdZMthBRu6BZGBnM9GrK1ytMVW0Cm/NqwRh8A==}
+  '@effect/tsgo-darwin-arm64@0.74.1':
+    resolution: {integrity: sha512-t4+bXeD8Fzesm2achI/SX3N5K3bId6SFXpOc3fxdmXBASLu0pPAuZlOK6hsI3bsUvezrf3UmixU7Q718Tllveg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@effect/tsgo-darwin-x64@0.74.0':
-    resolution: {integrity: sha512-shfWpYxAmLUqmvZ+ed5fcO2C/oB5e4bj3qLHrKpdJgqdwHEEHFB/nB1i9ukcHNDntHhlQP5b/0KcmkFIU0Vmvg==}
+  '@effect/tsgo-darwin-x64@0.74.1':
+    resolution: {integrity: sha512-+3D6yNaIfJHG/6c61uWZFO7251NUoJ0bDWr/sC3r0bxJMF1UvejRKszpyaFtHx7cMUCzMiD9sYOR9ZZYxm6NOg==}
     cpu: [x64]
     os: [darwin]
 
-  '@effect/tsgo-linux-arm64@0.74.0':
-    resolution: {integrity: sha512-sPi3/rwiVrFV4mLza57UHxYAiSdKDUY/t7fbrmKEnfRSTHVI00Pbl2kf7S/ZwgXKqCyrHxGKNGTzB6mDrmcSNA==}
+  '@effect/tsgo-linux-arm64@0.74.1':
+    resolution: {integrity: sha512-OVoAOPJM9owq6Jiq73iS5FqDN+iZDoslSvwJVeRq5r3YY+l6KyCstcQUCB+UD0lSJNp70KG1Homp//Q0k0slig==}
     cpu: [arm64]
     os: [linux]
 
-  '@effect/tsgo-linux-arm@0.74.0':
-    resolution: {integrity: sha512-OshVflnHys+9G0iXo6ch3R2fJVbbAslrdEfQE0LFO9F2wFEDE610+0ppJFxDr5MtAWJK9rMiWuFltb7+Eff1dw==}
+  '@effect/tsgo-linux-arm@0.74.1':
+    resolution: {integrity: sha512-zBsN6/14tqRngM1VTouEmbf7GzoOCZfyWKxl43MoZ7wvXHPWhgg9aShWUSAHRBtATrCGun7CYoRCjCHs1tBPgA==}
     cpu: [arm]
     os: [linux]
 
-  '@effect/tsgo-linux-x64@0.74.0':
-    resolution: {integrity: sha512-vSMPlMRkCwH9MhkofuNniAAi11KIQB7DbNRPiOKHbY1cLn1k5JS6NqWq+g1nBwPaX3kSVnU2xwXCzvmZGgVfRA==}
+  '@effect/tsgo-linux-x64@0.74.1':
+    resolution: {integrity: sha512-XeFR22rFGNkHX7IEJOqML99J/MvwLzcxrpPtkU049LjAdeuCzf9ELBm6hxXPoT711YQ3p4rGP1blv0gOUfBCog==}
     cpu: [x64]
     os: [linux]
 
-  '@effect/tsgo-win32-arm64@0.74.0':
-    resolution: {integrity: sha512-m1VYKI3/66qNAhZySqvTfJKp+w710gbG2SSorHn1JzezYYfu0pqYYPJ6O7faHXSlEB6Yj5qx+KwyrOIHZbiApg==}
+  '@effect/tsgo-win32-arm64@0.74.1':
+    resolution: {integrity: sha512-et6/D25yBf+emYWRRxZeIqYtSAhMr1Z924UqbbQmLXhIGl5fW0kAviMrjs6y8vnp2D4mxAQv/jNSzBK2ISNFdw==}
     cpu: [arm64]
     os: [win32]
 
-  '@effect/tsgo-win32-x64@0.74.0':
-    resolution: {integrity: sha512-NmKmpDYheDfAGhnQU9sQoQgEw8DKe1+DPvD0ZkuulfkjewFL/9ciYrjPmrXCeinuv/HotshtqcbtO5U3bklevg==}
+  '@effect/tsgo-win32-x64@0.74.1':
+    resolution: {integrity: sha512-QK/FVrXElIXQlVyQFxFPFly2bobOZEfUILhoesyQf5xc4eHlxszD6JdskSjA1pLZYsFmcE+EH5uND//+J0Yn8g==}
     cpu: [x64]
     os: [win32]
 
-  '@effect/tsgo@0.74.0':
-    resolution: {integrity: sha512-fW1UWyvJ8LheNuovvEbmdNovSYXH1h8LikN7dDABBG3Otd8XUmnd+9UXAfMyIhykKuZO/o+rl3q4UnnAXycT3g==}
+  '@effect/tsgo@0.74.1':
+    resolution: {integrity: sha512-SGfx5zK3mMRDxe5Meli8saW07eQPJTwPhUgFsZ+8uNqWLuHoCHK7Xc2Mv0VWc2X0Z/0YDgwdvwx6bgAsxqxPtw==}
     hasBin: true
 
   '@effect/vitest@4.1.7':
@@ -2901,8 +2901,8 @@ packages:
   inline-style-parser@0.2.9:
     resolution: {integrity: sha512-IttN8BqKLxzUrnTqHI+/hwAJQItBAUjdoHERCDv+oOuX48VP6bzW8+QjOXSfoevzq3YrYAwX1uLHp8TqO9yIeg==}
 
-  ip-address@10.7.6:
-    resolution: {integrity: sha512-00LYkM6byILa9eQIx6qoaXCM40xTLd56AZ4vyaPW3YTyb49VZYPo5xsiAq4tuQ54GH4R7gVdYScJ1B7B77PuTg==}
+  ip-address@10.7.7:
+    resolution: {integrity: sha512-He15rAs4jip5AEAz7XM9L+S6Y8LBMIDj6YewbYuJfmDnOCKWb+3TLOGnHFBTAIW7wpm5ohtZ+Xyo5PEaG+O2vQ==}
     engines: {node: '>= 12'}
 
   is-alphabetical@2.0.1:
@@ -3128,8 +3128,8 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@1.82.0:
-    resolution: {integrity: sha512-6jSApJxVZnyOGO5q7ygxiaVmzt87OtkfzpU5aD14ph32W78hBtmwEkVj2ehGyhfEynSM6TEEnFhPq24QhSOz6g==}
+  lucide-react@1.83.0:
+    resolution: {integrity: sha512-bYosQeQphbbNtdWT4DvY1/wlen2CcsZEQI/pMykcQ8twiu+T7m7cY7s8hOTJiMEAs3nUxCkeCxTe4ohczS5jhA==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -3835,8 +3835,8 @@ packages:
   style-to-object@2.0.2:
     resolution: {integrity: sha512-QmbXPUylqU80HAgTOJeEOdbA40W9KtxmjMhQy+tq+b8F2aoh3aQLuy82hh2jm2qsC9hR9eI0+eQidTMydKcqRA==}
 
-  systeminformation@5.33.26:
-    resolution: {integrity: sha512-/AfmkcUh5/Zgul9vJgTzRqdyeeAkkZM857cXkN1CLzdj3gVvdij9EICcNcl3/nMGsr3A2uRvPmpCy2YX1A9uiQ==}
+  systeminformation@5.33.28:
+    resolution: {integrity: sha512-WTUQXga/NSQvBYOT5DJPOq4O5twFc1ZPlb+PmBWv+tyC9AoUpLghZafnQjywBU2rinf+wWG7MIJ7OBCOayJZOg==}
     engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
@@ -4399,7 +4399,7 @@ snapshots:
       object-treeify: 1.1.33
       open: 8.4.2
       picomatch: 4.0.7
-      systeminformation: 5.33.26
+      systeminformation: 5.33.28
       undici: 7.30.2
       which: 4.0.0
       yocto-spinner: 1.2.2
@@ -4429,36 +4429,36 @@ snapshots:
     dependencies:
       effect: 4.1.7
 
-  '@effect/tsgo-darwin-arm64@0.74.0':
+  '@effect/tsgo-darwin-arm64@0.74.1':
     optional: true
 
-  '@effect/tsgo-darwin-x64@0.74.0':
+  '@effect/tsgo-darwin-x64@0.74.1':
     optional: true
 
-  '@effect/tsgo-linux-arm64@0.74.0':
+  '@effect/tsgo-linux-arm64@0.74.1':
     optional: true
 
-  '@effect/tsgo-linux-arm@0.74.0':
+  '@effect/tsgo-linux-arm@0.74.1':
     optional: true
 
-  '@effect/tsgo-linux-x64@0.74.0':
+  '@effect/tsgo-linux-x64@0.74.1':
     optional: true
 
-  '@effect/tsgo-win32-arm64@0.74.0':
+  '@effect/tsgo-win32-arm64@0.74.1':
     optional: true
 
-  '@effect/tsgo-win32-x64@0.74.0':
+  '@effect/tsgo-win32-x64@0.74.1':
     optional: true
 
-  '@effect/tsgo@0.74.0':
+  '@effect/tsgo@0.74.1':
     optionalDependencies:
-      '@effect/tsgo-darwin-arm64': 0.74.0
-      '@effect/tsgo-darwin-x64': 0.74.0
-      '@effect/tsgo-linux-arm': 0.74.0
-      '@effect/tsgo-linux-arm64': 0.74.0
-      '@effect/tsgo-linux-x64': 0.74.0
-      '@effect/tsgo-win32-arm64': 0.74.0
-      '@effect/tsgo-win32-x64': 0.74.0
+      '@effect/tsgo-darwin-arm64': 0.74.1
+      '@effect/tsgo-darwin-x64': 0.74.1
+      '@effect/tsgo-linux-arm': 0.74.1
+      '@effect/tsgo-linux-arm64': 0.74.1
+      '@effect/tsgo-linux-x64': 0.74.1
+      '@effect/tsgo-win32-arm64': 0.74.1
+      '@effect/tsgo-win32-x64': 0.74.1
 
   '@effect/vitest@4.1.7(effect@4.1.7)(vitest@5.1.2)':
     dependencies:
@@ -6049,7 +6049,7 @@ snapshots:
 
   inline-style-parser@0.2.9: {}
 
-  ip-address@10.7.6: {}
+  ip-address@10.7.7: {}
 
   is-alphabetical@2.0.1: {}
 
@@ -6201,7 +6201,7 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lucide-react@1.82.0(@types/react@19.3.3)(react@19.3.1):
+  lucide-react@1.83.0(@types/react@19.3.3)(react@19.3.1):
     dependencies:
       react: 19.3.1
     optionalDependencies:
@@ -7328,7 +7328,7 @@ snapshots:
 
   socks@2.8.11:
     dependencies:
-      ip-address: 10.7.6
+      ip-address: 10.7.7
       smart-buffer: 4.2.0
 
   sonner@2.0.8(@types/react@19.3.3)(react-dom@19.3.1)(react@19.3.1):
@@ -7398,7 +7398,7 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.9
 
-  systeminformation@5.33.26: {}
+  systeminformation@5.33.28: {}
 
   tailwindcss@4.3.5: {}
 

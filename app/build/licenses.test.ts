@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { packageRoot, render, vendoredFromFile } from './licenses.ts';
+import { embeddedPackages, packageRoot, render, vendoredFromFile, vendoredLicense } from './licenses.ts';
 
 test('packageRoot finds the package of a bundled module, scoped or not, through pnpm', () => {
   const pnpm = '/r/node_modules/.pnpm/h3@2.0.8/node_modules';
@@ -37,7 +37,7 @@ test('vendoredFromFile extracts a vendored package header from a generated modul
       name: '@scalar/api-reference',
       version: '1.81.0',
       license: 'MIT',
-      text: 'Vendored in effect 4.1.7 (MIT).\nSource: https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.81.0/dist/browser/standalone.js',
+      text: `${vendoredLicense('@scalar/api-reference')}\n\nVendored in effect 4.1.7 (MIT).\nSource: https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.81.0/dist/browser/standalone.js`,
     });
 
     const plain = join(dir, 'plain.js');
@@ -46,4 +46,25 @@ test('vendoredFromFile extracts a vendored package header from a generated modul
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the vendored Scalar bundle ships with its full MIT notice', () => {
+  const text = vendoredLicense('@scalar/api-reference');
+  expect(text).toMatch(/^MIT License\n\nCopyright \(c\) \S+ Scalar\n/);
+  expect(text).toContain('The above copyright notice and this permission notice shall be included');
+  expect(() => vendoredLicense('left-pad')).toThrow(/no license text for the vendored left-pad/);
+});
+
+test('embeddedPackages lists the packages a bundle names in its kept license comments', () => {
+  const source = [
+    'export const javascript = "/*!\\n* tabbable 6.5.2\\n* @license MIT, https://x/LICENSE\\n*/\\nvar a;',
+    '/**\\n* @vue/shared v3.5.45\\n* (c) 2018-present Yuxi (Evan) You and Vue contributors\\n* @license MIT\\n**/\\n',
+    '/*! tailwindcss v4.3.5 | MIT License | https://tailwindcss.com */',
+    '/*!\\n* @scalar/api-reference 1.81.0\\n*\\n* Website: https://scalar.com\\n**/";',
+  ].join('');
+  expect(embeddedPackages(source)).toEqual([
+    '@vue/shared 3.5.45 (MIT)',
+    'tabbable 6.5.2 (MIT)',
+    'tailwindcss 4.3.5 (MIT)',
+  ]);
 });

@@ -67,7 +67,8 @@ messages leave in the order of the changes:
 
 - the API: `HttpApiBuilder.layer(Api)`, with each group's handlers (`app/server/<domain>/http.ts`), plus
   `OpenApiDocsLive` (`app/server/http/OpenApiDocs.ts`, serving the generated OpenAPI 3.1 spec at `GET /api/openapi.json`
-  and the offline Scalar UI at `GET /api/docs`), all merged in `ApiRoutes`: 67 endpoints plus the two docs routes. Any
+  and the offline Scalar UI at `GET /api/docs`, about 5 MB of HTML sent in gzip to a client that accepts it, with a
+  weak ETag and `no-cache`: a browser revalidates it and gets a `304` while it has not changed), all merged in `ApiRoutes`: 67 endpoints plus the two docs routes. Any
   other path under `/api`, whatever its method, is a `404` `{ "_tag": "RouteNotFound", "message": "Unknown route" }`, a
   method a path lacks too (there is no `405`);
 - `/ws`: the WebSocket (see [WebSocket](#websocket)); a request without an upgrade gets `426`
@@ -312,7 +313,8 @@ ways:
   `app/server/http/proxyEnv.ts`): disabled by default, enabled by setting `OTEL_EXPORTER_OTLP_ENDPOINT` (or a
   signal-specific endpoint). Exports spans and metrics only (no logs), enables Effect's runtime metrics
   (`child_fibers_*`) when metrics export is active, and supports standard `OTEL_*` environment variables (see
-  [OpenTelemetry (OTLP)](/docs/configuration/#opentelemetry-otlp)).
+  [OpenTelemetry (OTLP)](/docs/configuration/#opentelemetry-otlp)). Each export request is bounded (10 s by default)
+  and the final flush at 1 s; a value it cannot use is warned about and ignored, never a startup failure.
 - **Effect DevTools** in development (`LLAMA_WEBUI_DEV=1`), showing spans and metrics live in VS Code. `Otlp.layer` is
   provided below `DevToolsInDev` in `app/server/App.ts`, so both tracers chain cleanly when both are active in
   development, and `Otlp.layer` flushes last on shutdown.

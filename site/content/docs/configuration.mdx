@@ -251,24 +251,28 @@ Setting `OTEL_EXPORTER_OTLP_ENDPOINT` exports traces to `<endpoint>/v1/traces` a
 Signal-specific endpoints (`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`) are used as
 written, without appending a path. All standard options can be set in the environment or in `.env`:
 
-| Variable                                                                               | Default                    | Effect                                                                                     |
-| -------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------ |
-| `OTEL_SDK_DISABLED`                                                                    | `false`                    | Set to `true` to disable all OTLP export regardless of other `OTEL_*` variables            |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                                                          | unset                      | Base OTLP/HTTP collector URL; unset disables export unless a signal endpoint is set        |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`            | unset                      | Full URL for traces or metrics only (used verbatim, overrides the base endpoint)           |
-| `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`                                        | `otlp`                     | Set either to `none` to disable that signal while keeping the other active                 |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` (and `_TRACES_`, `_METRICS_`)                            | `http/protobuf`            | Wire format: `http/protobuf` or `http/json` (gRPC is not supported)                        |
-| `OTEL_EXPORTER_OTLP_HEADERS` (and `_TRACES_`, `_METRICS_`)                             | unset                      | Comma-separated `key=value` HTTP headers (URI-encoded values, e.g. `Authorization=...`)    |
-| `OTEL_EXPORTER_OTLP_COMPRESSION` (and `_TRACES_`, `_METRICS_`)                         | unset                      | Set to `gzip` to compress OTLP HTTP request bodies                                         |
-| `OTEL_EXPORTER_OTLP_TIMEOUT` (and `_TRACES_`, `_METRICS_`)                             | `10000`                    | Export request timeout in milliseconds                                                     |
-| `OTEL_BSP_SCHEDULE_DELAY`, `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`, `OTEL_BSP_MAX_QUEUE_SIZE` | `1000`, `512`, `2048`      | Trace batch export interval (ms), max batch size and max buffered spans                    |
-| `OTEL_METRIC_EXPORT_INTERVAL`                                                          | `10000`                    | Metric export interval in milliseconds                                                     |
-| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`                                    | `cumulative`               | Metric aggregation temporality: `cumulative` or `delta`                                    |
-| `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION`                                            | `llama-webui`, app version | OpenTelemetry `service.name` and `service.version` resource attributes                     |
-| `OTEL_RESOURCE_ATTRIBUTES`                                                             | unset                      | Extra comma-separated `key=value` resource attributes (e.g. `deployment.environment=home`) |
+| Variable                                                                               | Default                    | Effect                                                                                                                                  |
+| -------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_SDK_DISABLED`                                                                    | `false`                    | Set to `true` (any case) to disable all OTLP export regardless of other `OTEL_*` variables                                              |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                                                          | unset                      | Base OTLP/HTTP collector URL; unset disables export unless a signal endpoint is set                                                     |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`            | unset                      | Full URL for traces or metrics only (used verbatim, overrides the base endpoint)                                                        |
+| `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`                                        | `otlp`                     | Comma-separated exporters: a signal is exported when its list contains `otlp` (`none` turns it off); others are ignored                 |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` (and `_TRACES_`, `_METRICS_`)                            | `http/protobuf`            | Wire format: `http/protobuf` or `http/json` (with `grpc`, unsupported, that signal is not exported)                                     |
+| `OTEL_EXPORTER_OTLP_HEADERS` (and `_TRACES_`, `_METRICS_`)                             | unset                      | Comma-separated `key=value` HTTP headers (URI-encoded values, e.g. `Authorization=...`)                                                 |
+| `OTEL_EXPORTER_OTLP_COMPRESSION` (and `_TRACES_`, `_METRICS_`)                         | unset                      | Set to `gzip` to compress OTLP HTTP request bodies                                                                                      |
+| `OTEL_EXPORTER_OTLP_TIMEOUT` (and `_TRACES_`, `_METRICS_`)                             | `10000`                    | Time limit of each export request in milliseconds (else `OTEL_BSP_EXPORT_TIMEOUT` for traces, `OTEL_METRIC_EXPORT_TIMEOUT` for metrics) |
+| `OTEL_BSP_SCHEDULE_DELAY`, `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`, `OTEL_BSP_MAX_QUEUE_SIZE` | `5000`, `512`, `2048`      | Trace batch export interval (ms), max batch size and max buffered spans                                                                 |
+| `OTEL_METRIC_EXPORT_INTERVAL`                                                          | `60000`                    | Metric export interval in milliseconds                                                                                                  |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`                                    | `cumulative`               | Metric aggregation temporality: `cumulative` or `delta`                                                                                 |
+| `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION`                                            | `llama-webui`, app version | OpenTelemetry `service.name` and `service.version` resource attributes                                                                  |
+| `OTEL_RESOURCE_ATTRIBUTES`                                                             | unset                      | Extra comma-separated `key=value` resource attributes (e.g. `deployment.environment=home`)                                              |
 
 On shutdown (`SIGINT` or `SIGTERM`), buffered spans and metrics are flushed after the shutdown steps complete, bounded
-at 1 second so an unreachable collector never stalls exit.
+at 1 second (or the export timeout, if shorter) so an unreachable collector never stalls exit.
+
+Without an endpoint, no other `OTEL_*` variable is read, so a value set for another program does not affect llama-webui.
+A value llama-webui cannot use never stops it from starting: it is logged as a warning and its default applies (an
+invalid endpoint or an unsupported protocol leaves that signal unexported).
 
 ## Everything else is in Settings
 

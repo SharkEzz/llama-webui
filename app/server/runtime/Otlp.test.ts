@@ -10,6 +10,7 @@ import {
   Layer,
   Metric,
   Option,
+  Schedule,
   Schema,
   Scope,
   Tracer,
@@ -90,8 +91,14 @@ describe('Otlp.readOtlpConfig', () => {
       assert.strictEqual(metrics.protocol, 'http/protobuf');
       assert.strictEqual(traces.resource.serviceName, 'llama-webui');
       assert.strictEqual(traces.resource.serviceVersion, VERSION);
+      assert.strictEqual(Duration.toMillis(traces.exportTimeout), 10_000);
+      assert.strictEqual(Duration.toMillis(metrics.exportTimeout), 10_000);
       assert.strictEqual(Duration.toMillis(traces.shutdownTimeout), 1000);
       assert.strictEqual(Duration.toMillis(metrics.shutdownTimeout), 1000);
+      assert.strictEqual(Duration.toMillis(traces.exportInterval), 5000);
+      assert.strictEqual(traces.maxBatchSize, 512);
+      assert.strictEqual(traces.maxQueueSize, 2048);
+      assert.strictEqual(Duration.toMillis(metrics.exportInterval), 60_000);
       assert.strictEqual(traces.compression, 'none');
       assert.strictEqual(metrics.temporality, 'cumulative');
     }),
@@ -154,6 +161,8 @@ describe('Otlp.readOtlpConfig', () => {
         assert.deepStrictEqual(metrics.headers, { authorization: 'Bearer base' });
         assert.strictEqual(traces.compression, 'gzip');
         assert.strictEqual(metrics.compression, 'gzip');
+        assert.strictEqual(Duration.toMillis(traces.exportTimeout), 750);
+        assert.strictEqual(Duration.toMillis(metrics.exportTimeout), 600);
         assert.strictEqual(Duration.toMillis(traces.shutdownTimeout), 750);
         assert.strictEqual(Duration.toMillis(metrics.shutdownTimeout), 600);
         assert.strictEqual(Duration.toMillis(traces.exportInterval), 2500);
@@ -178,19 +187,88 @@ describe('Otlp.readOtlpConfig', () => {
     }),
   );
 
-  it.effect('fails with ConfigError on unsupported protocol or exporter or malformed URL', () =>
+  it.effect('keeps the shutdown flush at 1 s when the export timeout is longer', () =>
     Effect.gen(function* () {
-      for (const [label, env] of [
-        [
-          'grpc protocol',
-          { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318', OTEL_EXPORTER_OTLP_PROTOCOL: 'grpc' },
-        ],
-        ['unknown exporter', { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318', OTEL_TRACES_EXPORTER: 'jaeger' }],
-        ['malformed url', { OTEL_EXPORTER_OTLP_ENDPOINT: 'not-a-url' }],
-      ] as const) {
-        const exit = yield* Effect.exit(readPlan(env));
-        assert.isTrue(Exit.isFailure(exit), label);
+      const plan = yield* readPlan({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+        OTEL_EXPORTER_OTLP_TIMEOUT: '10000',
+        OTEL_METRIC_EXPORT_TIMEOUT: '30000',
+      });
+      const traces = Option.getOrThrow(plan.traces);
+      const metrics = Option.getOrThrow(plan.metrics);
+      assert.strictEqual(Duration.toMillis(traces.exportTimeout), 10_000);
+      assert.strictEqual(Duration.toMillis(traces.shutdownTimeout), 1000);
+      assert.strictEqual(Duration.toMillis(metrics.exportTimeout), 10_000);
+      assert.strictEqual(Duration.toMillis(metrics.shutdownTimeout), 1000);
+    }),
+  );
+
+  it.effect('reads nothing else without an endpoint, so no other OTEL_* value can fail startup', () =>
+    Effect.gen(function* () {
+      const cases: ReadonlyArray<readonly [string, Record<string, string>]> = [
+        ['other exporters', { OTEL_TRACES_EXPORTER: 'console', OTEL_METRICS_EXPORTER: 'prometheus' }],
+        ['grpc and a bad delay', { OTEL_EXPORTER_OTLP_PROTOCOL: 'grpc', OTEL_BSP_SCHEDULE_DELAY: 'soon' }],
+        ['a non-boolean SDK switch', { OTEL_SDK_DISABLED: 'yes' }],
+        ['an empty endpoint', { OTEL_EXPORTER_OTLP_ENDPOINT: '' }],
+        ['a blank endpoint', { OTEL_EXPORTER_OTLP_ENDPOINT: '   ' }],
+      ];
+      for (const [label, env] of cases) {
+        const plan = yield* readPlan(env);
+        assert.isTrue(Option.isNone(plan.traces), label);
+        assert.isTrue(Option.isNone(plan.metrics), label);
       }
+    }),
+  );
+
+  it.effect('turns a signal off for an unsupported protocol, exporter or URL instead of failing', () =>
+    Effect.gen(function* () {
+      const endpoint = 'http://127.0.0.1:4318';
+      const grpc = yield* readPlan({ OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, OTEL_EXPORTER_OTLP_PROTOCOL: 'grpc' });
+      assert.isTrue(Option.isNone(grpc.traces));
+      assert.isTrue(Option.isNone(grpc.metrics));
+
+      const tracesGrpc = yield* readPlan({
+        OTEL_EXPORTER_OTLP_ENDPOINT: endpoint,
+        OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: 'grpc',
+      });
+      assert.isTrue(Option.isNone(tracesGrpc.traces));
+      assert.strictEqual(Option.getOrThrow(tracesGrpc.metrics).protocol, 'http/protobuf');
+
+      const console = yield* readPlan({ OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, OTEL_TRACES_EXPORTER: 'console' });
+      assert.isTrue(Option.isNone(console.traces));
+      assert.isTrue(Option.isSome(console.metrics));
+
+      const listed = yield* readPlan({ OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, OTEL_TRACES_EXPORTER: 'otlp, console' });
+      assert.isTrue(Option.isSome(listed.traces));
+
+      const malformed = yield* readPlan({ OTEL_EXPORTER_OTLP_ENDPOINT: 'not-a-url' });
+      assert.isTrue(Option.isNone(malformed.traces));
+      assert.isTrue(Option.isNone(malformed.metrics));
+
+      const sdk = yield* readPlan({ OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, OTEL_SDK_DISABLED: 'TRUE' });
+      assert.isTrue(Option.isNone(sdk.traces));
+      const notDisabled = yield* readPlan({ OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, OTEL_SDK_DISABLED: 'yes' });
+      assert.isTrue(Option.isSome(notDisabled.traces));
+    }),
+  );
+
+  it.effect('falls back to the default of a setting that cannot be read', () =>
+    Effect.gen(function* () {
+      const plan = yield* readPlan({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+        OTEL_EXPORTER_OTLP_TIMEOUT: 'ten seconds',
+        OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '-1',
+        OTEL_EXPORTER_OTLP_COMPRESSION: 'zstd',
+        OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer%ZZ',
+        OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'lowmemory',
+      });
+      const traces = Option.getOrThrow(plan.traces);
+      const metrics = Option.getOrThrow(plan.metrics);
+      assert.strictEqual(Duration.toMillis(traces.exportTimeout), 10_000);
+      assert.strictEqual(traces.maxBatchSize, 512);
+      assert.strictEqual(traces.compression, 'none');
+      assert.isUndefined(traces.headers);
+      assert.strictEqual(metrics.temporality, 'cumulative');
     }),
   );
 });
@@ -286,6 +364,32 @@ describe('Otlp export', () => {
       yield* Scope.close(scope, Exit.void);
       const elapsed = (yield* Clock.currentTimeMillis) - t0;
       assert.isBelow(elapsed, 1000);
+    }),
+  );
+
+  it.live('bounds each export request, so a collector that never answers does not hold the exporter', () =>
+    Effect.gen(function* () {
+      let arrivals = 0;
+      const stub = yield* httpStub((_req, _res) => {
+        // Never answers: `httpStub`'s finalizer closes open sockets at the end of the test.
+        arrivals += 1;
+      });
+      const env = {
+        OTEL_EXPORTER_OTLP_ENDPOINT: stub.url,
+        OTEL_EXPORTER_OTLP_TIMEOUT: '200',
+        OTEL_METRICS_EXPORTER: 'none',
+      };
+      const testLayer = Otlp.layerWithClient(NodeHttpClient.layerNodeHttpOptions({ keepAlive: false }));
+      yield* Effect.gen(function* () {
+        yield* Effect.void.pipe(Effect.withSpan('stalled.span'));
+        yield* Effect.forkChild((yield* OtlpExporter.Flusher).flush);
+        // The first request times out after 200 ms and the exporter retries it 1 s later: a second arrival.
+        const retried = yield* Effect.sync(() => arrivals >= 2).pipe(
+          Effect.repeat({ until: (done) => done, schedule: Schedule.spaced(Duration.millis(50)) }),
+          Effect.timeoutOption(Duration.seconds(3)),
+        );
+        assert.isTrue(Option.isSome(retried), `arrivals: ${arrivals}`);
+      }).pipe(runWithLayer(env, testLayer));
     }),
   );
 

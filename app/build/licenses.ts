@@ -28,8 +28,37 @@ function readHead(file: string, bytes = 512): string {
 }
 
 /**
- * Extracts license attribution from a generated module that vendors an upstream bundle (for example Effect's
- * bundled `@scalar/api-reference` script).
+ * The license of each upstream bundle that a dependency vendors without its LICENSE file, copied from the upstream
+ * repository into `vendored-licenses/` (Scalar's from https://github.com/scalar/scalar/blob/main/LICENSE).
+ */
+const VENDORED_LICENSES: Readonly<Record<string, string>> = { '@scalar/api-reference': 'scalar-api-reference.txt' };
+
+/** The license text of a vendored bundle; a build that vendors one with no text here fails. */
+export function vendoredLicense(name: string): string {
+  const file = VENDORED_LICENSES[name];
+  if (!file)
+    throw new Error(`licenses: no license text for the vendored ${name} (add it to app/build/vendored-licenses/)`);
+  return readFileSync(join(import.meta.dirname, 'vendored-licenses', file), 'utf8').trim();
+}
+
+/**
+ * The packages a bundle names in the license comments it keeps (`/*! name version` then `@license`, or
+ * `/*! name vX | MIT License`), as `name version (license)`. The source is the module as written, where the bundle is
+ * a JS string: its line breaks are the two characters `\n`.
+ */
+export function embeddedPackages(source: string): string[] {
+  const found = new Set<string>();
+  const banner = /\/\*\*?!?\\n\* ((?:@[\w.-]+\/)?[\w.-]+) v?(\d[\w.-]*)\\n(?:\*[^\\]*\\n)*?\* @license ([\w.-]+)/g;
+  const inline = /\/\*! ((?:@[\w.-]+\/)?[\w.-]+) v(\d[\w.-]*) \| ([\w.-]+) License/g;
+  for (const pattern of [banner, inline]) {
+    for (const [, name, version, license] of source.matchAll(pattern)) found.add(`${name} ${version} (${license})`);
+  }
+  return [...found].toSorted((a, b) => a.localeCompare(b));
+}
+
+/**
+ * The entry of a generated module that vendors an upstream bundle (Effect's bundled `@scalar/api-reference`
+ * script): the bundle's license text, where it comes from, and the packages it embeds with their license comments.
  */
 export function vendoredFromFile(file: string, parent: { name: string; version: string }): Package | null {
   let head: string;
@@ -43,8 +72,12 @@ export function vendoredFromFile(file: string, parent: { name: string; version: 
   const [, name, version, license] = match;
   if (!name || !version || !license) return null;
   const source = VENDORED_SOURCE.exec(head)?.[1];
-  const lines = [`Vendored in ${parent.name} ${parent.version} (${license}).`];
+  const lines = [vendoredLicense(name), '', `Vendored in ${parent.name} ${parent.version} (${license}).`];
   if (source) lines.push(`Source: ${source}`);
+  const embedded = embeddedPackages(readFileSync(file, 'utf8'));
+  if (embedded.length > 0) {
+    lines.push('', `The bundle embeds these packages and keeps their license comments: ${embedded.join(', ')}.`);
+  }
   return { name, version, license, text: lines.join('\n') };
 }
 

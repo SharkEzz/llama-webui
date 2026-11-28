@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { HttpRouter } from 'effect/http';
 import { HttpApiScalar } from 'effect/http-api';
 import { annotatedApi, openApiSpec, SCALAR_CONFIG } from '../server/http/OpenApiDocs.ts';
+import { vendoredLicense } from './licenses.ts';
 
 const ROOT_PKG = resolve(import.meta.dirname, '../../package.json');
 const DEFAULT_OUT = resolve(import.meta.dirname, '../../site/public');
@@ -24,6 +25,18 @@ function packageVersion(): string {
     throw new Error(`siteOpenApi: missing version in ${ROOT_PKG}`);
   }
   return version;
+}
+
+/**
+ * `html` with the license of the Scalar bundle it inlines, in a comment after the doctype: the static site ships the
+ * bundle without the server's THIRD-PARTY-LICENSES.md.
+ */
+export function withScalarNotice(html: string): string {
+  const version = /@scalar\/api-reference (\d[\w.-]*)/.exec(html)?.[1];
+  if (!version) throw new Error('siteOpenApi: the Scalar page does not name its @scalar/api-reference version');
+  const notice = `<!--\nThis page bundles @scalar/api-reference ${version}, vendored in effect:\n\n${vendoredLicense('@scalar/api-reference')}\n-->\n`;
+  const doctype = /^<!doctype html>\n?/i.exec(html)?.[0] ?? '';
+  return `${doctype}${notice}${html.slice(doctype.length)}`;
 }
 
 export interface SiteOpenApiSummary {
@@ -49,6 +62,9 @@ export async function generateSiteOpenApi(outDir: string): Promise<SiteOpenApiSu
         ...SCALAR_CONFIG,
         darkMode: true,
         hideDarkModeToggle: true,
+        // A static page on another origin cannot reach an instance (mixed content, then the guard's Origin check):
+        // requests are sent from the instance's own /api/docs.
+        hideTestRequestButton: true,
       },
     }),
     { disableLogger: true },
@@ -56,7 +72,7 @@ export async function generateSiteOpenApi(outDir: string): Promise<SiteOpenApiSu
   try {
     const res = await handler(new Request('http://local/docs'));
     if (res.status !== 200) throw new Error(`siteOpenApi: Scalar render returned HTTP ${res.status}`);
-    writeFileSync(join(outDir, 'scalar.html'), await res.text());
+    writeFileSync(join(outDir, 'scalar.html'), withScalarNotice(await res.text()));
   } finally {
     await dispose();
   }

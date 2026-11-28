@@ -16,7 +16,9 @@ Every REST endpoint, request body, response schema and tagged error is documente
 specification, available in two places:
 
 - **On this site**: browse all 67 endpoints and schemas in the [HTTP reference](/developers/api/reference/) (powered by
-  Scalar), or download the raw OpenAPI 3.1 document from the download link in its header (`/openapi.json`).
+  Scalar), or download the raw OpenAPI 3.1 document from the download link in its header (`/openapi.json`). This page
+  does not send requests: a page of this site cannot reach your instance (the browser blocks an `http://` request from
+  an `https://` page, and the guard refuses another Origin), so try an endpoint from your instance's `/api/docs`.
 - **On any running llama-webui server**: open `http://127.0.0.1:7860/api/docs` for the same interactive Scalar UI
   (bundled offline with no external CDN requests), or fetch `GET /api/openapi.json` directly (gzip-compressed when the
   client sends `Accept-Encoding: gzip`). Both routes sit behind the [request guard](#the-request-guard).

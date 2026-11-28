@@ -1,5 +1,5 @@
 import { assert, layer } from '@effect/vitest';
-import { Effect, Layer, Predicate, Record as Rec, Stream } from 'effect';
+import { Effect, Layer, Predicate, Record as Rec, Stream, String as Str } from 'effect';
 import { HttpClient, HttpClientRequest } from 'effect/http';
 import { VERSION } from '../config/AppInfo.ts';
 import { ServerTest } from '../testing/http.ts';
@@ -70,6 +70,48 @@ layer(TestApp, { excludeTestServices: true })('OpenApiDocs', (it) => {
       assert.include(html, `"version":"${VERSION}"`);
       assert.notInclude(html, '<script src=');
       assert.notInclude(html, 'cdn.jsdelivr.net');
+    }),
+  );
+
+  it.effect('GET /api/docs goes out in gzip with an ETag, and a matching If-None-Match gets a 304', () =>
+    Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const get = (headers: Record<string, string>) =>
+        client.execute(HttpClientRequest.get('/api/docs').pipe(HttpClientRequest.setHeaders(headers)));
+
+      const plain = yield* get({ 'accept-encoding': 'identity' });
+      assert.strictEqual(plain.status, 200);
+      assert.isUndefined(plain.headers['content-encoding']);
+      const html = yield* plain.text;
+      const etag = plain.headers.etag ?? '';
+      assert.match(etag, /^W\/"[0-9a-f]+-[0-9a-f]+"$/);
+      assert.strictEqual(plain.headers['cache-control'], 'no-cache');
+
+      const gz = yield* get({ 'accept-encoding': 'gzip' });
+      assert.strictEqual(gz.status, 200);
+      assert.strictEqual(gz.headers['content-encoding'], 'gzip');
+      assert.strictEqual(gz.headers.etag, etag);
+      assert.include(gz.headers.vary ?? '', 'Accept-Encoding');
+      const compressed = yield* gz.arrayBuffer;
+      assert.isBelow(compressed.byteLength, html.length / 2);
+      const decompressed = yield* Stream.fromIterable([new Uint8Array(compressed)]).pipe(
+        Stream.toReadableStream(),
+        (stream) => stream.pipeThrough(new DecompressionStream('gzip')),
+        (stream) => Stream.fromReadableStream({ evaluate: () => stream, onError: () => 'not gzip' as const }),
+        Stream.decodeText,
+        Stream.mkString,
+      );
+      assert.strictEqual(decompressed, html);
+
+      for (const header of [etag, Str.replace(/^W\//, '')(etag), `"other", ${etag}`, '*']) {
+        const revalidated = yield* get({ 'if-none-match': header, 'accept-encoding': 'gzip' });
+        assert.strictEqual(revalidated.status, 304, header);
+        assert.strictEqual(revalidated.headers.etag, etag);
+        assert.strictEqual((yield* revalidated.arrayBuffer).byteLength, 0);
+      }
+      const stale = yield* get({ 'if-none-match': 'W/"0-0"', 'accept-encoding': 'identity' });
+      assert.strictEqual(stale.status, 200);
+      assert.strictEqual((yield* stale.text).length, html.length);
     }),
   );
 

@@ -407,7 +407,8 @@
   "GET /api/docs": {
     "status": 200,
     "headers": {
-      "content-type": "text/html"
+      "content-type": "text/html",
+      "cache-control": "no-cache"
     }
   },
   "GET /api/docs/ (trailing slash)": {
