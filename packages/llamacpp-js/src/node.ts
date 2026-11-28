@@ -5,7 +5,7 @@
 import { execFile } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import { type FlagCatalog, parseHelp } from './flags.ts';
+import { catalogOfHelp, type FlagCatalog } from './flags.ts';
 
 /** The arguments of a `/proc/<pid>/cmdline` (NUL-separated). */
 export function parseCmdline(raw: string): string[] {
@@ -13,13 +13,18 @@ export function parseCmdline(raw: string): string[] {
 }
 
 /** The `--port` of a llama-server command line; 8080, its default, when it has none. */
-export function portFromArgv(argv: string[]): number {
+export function portFromArgv(argv: readonly string[]): number {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === '--port' && argv[i + 1] !== undefined) return Number(argv[i + 1]);
     if (a.startsWith('--port=')) return Number(a.slice(7));
   }
   return 8080;
+}
+
+/** Whether a command line runs a program named `llama-server` with that `--port` (8080 when it names none). */
+export function isLlamaServerOn(argv: readonly string[], port: number): boolean {
+  return argv[0] !== undefined && basename(argv[0]) === 'llama-server' && portFromArgv(argv) === port;
 }
 
 /** The pid of the `llama-server` process listening on `port`, from `/proc` (Linux); null when there is none. */
@@ -38,8 +43,7 @@ export async function findLlamaServerPid(port: number, procRoot = '/proc'): Prom
     } catch {
       continue;
     }
-    const argv = parseCmdline(raw);
-    if (argv[0] && basename(argv[0]) === 'llama-server' && portFromArgv(argv) === port) return Number(e);
+    if (isLlamaServerOn(parseCmdline(raw), port)) return Number(e);
   }
   return null;
 }
@@ -56,8 +60,7 @@ export function loadFlags(binary: string, timeoutMs = 5000): Promise<FlagCatalog
           resolve(null);
           return;
         }
-        const catalog = parseHelp(stdout);
-        resolve(catalog.flags.length > 0 ? catalog : null);
+        resolve(catalogOfHelp(stdout));
       },
     );
   });

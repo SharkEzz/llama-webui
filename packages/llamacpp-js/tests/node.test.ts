@@ -3,7 +3,14 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { benchBinary, findLlamaServerPid, loadFlags, parseCmdline, portFromArgv } from '../src/node.ts';
+import {
+  benchBinary,
+  findLlamaServerPid,
+  isLlamaServerOn,
+  loadFlags,
+  parseCmdline,
+  portFromArgv,
+} from '../src/node.ts';
 import { TESTDATA } from './helpers.ts';
 
 test('benchBinary sits next to the server binary', () => {
@@ -54,4 +61,12 @@ test('loadFlags reads the --help of a binary, null when it cannot run', async ()
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('isLlamaServerOn names a llama-server program on that port (#116)', () => {
+  assert.equal(isLlamaServerOn(['/opt/bin/llama-server', '--port', '9090'], 9090), true);
+  assert.equal(isLlamaServerOn(['llama-server'], 8080), true);
+  assert.equal(isLlamaServerOn(['llama-server', '--port=9090'], 8080), false);
+  assert.equal(isLlamaServerOn(['/opt/bin/llama-bench', '--port', '9090'], 9090), false);
+  assert.equal(isLlamaServerOn([], 8080), false);
 });

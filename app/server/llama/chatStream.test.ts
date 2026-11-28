@@ -55,6 +55,8 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('streamChat', (it) => {
         { choices: [{ delta: { content: null } }] },
         { choices: [{ delta: { reasoning_content: 'They say hi.' } }] },
         { choices: [{ delta: { content: 'Hel' } }] },
+        // A content of another type is left out, the chunk is kept (#116)
+        { choices: [{ delta: {} }] },
         { choices: [{ delta: { content: 'lo' } }] },
         {
           choices: [{ delta: {} }],
@@ -129,6 +131,39 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('streamChat', (it) => {
       if (error._tag !== 'LlamaStreamFailed') return;
       assert.deepStrictEqual(error.error, { code: 500, message: 'boom', type: 'server_error' });
       yield* until(() => stub.closes() === 1);
+    }),
+  );
+
+  it.effect('a chunk keeps its fields of their type, a field of another type is left out (#116)', () =>
+    Effect.gen(function* () {
+      const stub = yield* httpStub((_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        res.write('data: {"choices":[{"delta":{"content":5,"reasoning_content":"think"}}]}\n\n');
+        res.write('data: not json\n\n');
+        res.write('data: [DONE]\n\n');
+      });
+      const chunks = yield* streamChat(stub.url, {}).pipe(Stream.runCollect);
+      assert.deepStrictEqual(chunks, [{ choices: [{ delta: { reasoning_content: 'think' } }] }]);
+    }),
+  );
+
+  it.effect('an error, in the stream or in an HTTP body, keeps its fields of their type (#116)', () =>
+    Effect.gen(function* () {
+      const stream = yield* httpStub((_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        res.write('data: {"error":{"code":"500","message":"boom"}}\n\n');
+      });
+      const failed = yield* streamChat(stream.url, {}).pipe(Stream.runCollect, Effect.flip);
+      assert.deepStrictEqual(failed._tag === 'LlamaStreamFailed' ? failed.error : failed, { message: 'boom' });
+
+      const http = yield* httpStub((_req, res) => {
+        res.writeHead(400, { 'content-type': 'application/json' }).end('{"error":{"code":"400","message":"bad"}}');
+      });
+      const refused = yield* streamChat(http.url, {}).pipe(Stream.runCollect, Effect.flip);
+      assert.deepStrictEqual(
+        refused._tag === 'LlamaHttpFailed' ? refused.error : refused,
+        Option.some({ message: 'bad' }),
+      );
     }),
   );
 
