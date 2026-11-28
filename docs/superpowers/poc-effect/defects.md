@@ -169,7 +169,8 @@ reviewing this list, done in E11: `docs/superpowers/plans/2026-11-15-effect-e11-
   `design choice` (Call 4 of the E8 plan): the creation loads the GGUF to plan, like `POST /api/tuning/plan`, and keeps
   its errors; run, resume and validate parse no GGUF and keep `BenchFileMissing`, a 404 since E11 (`changed after the E10 review (user, 2026-11-15)`: was a 400).
 - The `git log` of the build date has no timeout. `confirmed`, `fixed in E8`: bounded to 5 s like every program of the
-  server, a timeout gives no build date (read, not tested: no test drives a slow git).
+  server, a timeout gives no build date. Proof (#124): `tuning/sysinfo.test.ts` (a git log that never answers gives
+  no build date after 5 s, and its process is gone).
 
 ## Changed by the Effect server (not defects)
 
@@ -469,8 +470,9 @@ Found while porting E6, accepted with its result:
   `Variant key expected` and `1024 characters at most` (one key); a missing `id` reads `Invalid repository id: `, a
   missing `q` or info `path` the same message as an invalid value; a query key given twice is a 400.
 - A blank `HF_TOKEN` falls back to `HUGGING_FACE_HUB_TOKEN`, a blank `no_proxy` to `NO_PROXY` (an empty variable is
-  unset). An https request through a proxy (CONNECT) is not tested, and the unreachable tests rely on `*.invalid` not
-  resolving, as the Nitro ones did.
+  unset). The unreachable tests rely on `*.invalid` not resolving, as the Nitro ones did. An https request through a
+  proxy: `hf/HfHttp.test.ts` (an https request goes to HTTPS_PROXY as a CONNECT of its host, a refused tunnel fails it,
+  #124; on `connectStub` of `testing/proxy.ts`).
 - The fallback message of a `stat` that fails with no errno is the error's message, not an errno; the branch of a
   file behind a folder the user cannot enter is not tested as root (`skipIf`).
 - `HfVariant` has no `queued` flag: the plan named one, the Nitro type never had it.
@@ -596,8 +598,9 @@ Found while porting E7, accepted with its result:
 - `execute` takes the run, its start time, a cancel `Deferred` and the monitor's GPUs and disk; its `onLive` says when
   only the log lines changed, so the runner throttles those only (phase and step changes go out at once, as the
   legacy executor). The throttle is leading-edge: a dropped line change is not resent (as before).
-- The gate says whether its stop still runs (`stopping`), so a run shows `stopping-server` meanwhile (not tested: the
-  fake stops in a few ms).
+- The gate says whether its stop still runs (`stopping`), so a run shows `stopping-server` meanwhile. Proof (#124):
+  `bench/BenchRunner.test.ts` (a run shows stopping-server while the gate stops llama-server, then moves on: the fake
+  ignores SIGTERM).
 - An interruption of the trial (llama-webui stopping) kills its llama-server at once through its scope, not SIGTERM
   then the timeout. The trial's own SIGKILL line carries the `[llama-webui]` prefix (the legacy trial had none).
 - The shutdown step keeps an error the run already had (a cancel then a stop) instead of always writing `interrupted
@@ -614,7 +617,8 @@ Found by the final review of E7, fixed with it:
 - `start` and `startSweep` set `abandon` (the gate's release on a start that does not go through) only after
   `gate.acquire` returned: an interruption landing between the two left the gate held, so the runner busy until the
   app restarts. `abandon` now covers the acquire (its own refusals leave the gate free, and a release of a free gate
-  does nothing). Read, not tested: the window is between two steps of one fiber.
+  does nothing). Proof (#124): `bench/BenchRunner.test.ts` (a start interrupted right after the gate is taken releases the
+  gate), on a stub gate given by the `gate` option of `BenchRunner.layerWith`.
 - `abandon` restarted llama-server even while the app stopped: a request interrupted by the shutdown (its HTTP fiber
   ends after the shutdown steps) restarted the server it had stopped. It now does nothing once the runner is
   `closing`. Test `a request interrupted by the shutdown restarts nothing` (fails without the guard).

@@ -353,6 +353,46 @@ layer(NodeServices.layer, { excludeTestServices: true })('the NVML reader', (it)
     ),
   );
 
+  it.effect('a sampler that reports an error after ready clears its readings for good, and is killed (#124)', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const found = yield* startNvml({
+          // Fresh for a minute: only the error clears the readings.
+          intervalMs: 60_000,
+          needs: MEASURE_ALL,
+          lib: Option.none(),
+          command: ws.command('ready-then-error'),
+        });
+        const nvml = Option.getOrThrow(found);
+        yield* eventually(nvml.gpus, (g) => g.length === 1);
+        yield* nvml.died.pipe(Effect.timeout('3 seconds'));
+        const cleared = yield* nvml.gpus;
+        assert.deepStrictEqual(cleared, []);
+        // Killed while the reader's scope is still open: the fake stays up on its own.
+        const pids = yield* ws.pids;
+        assert.lengthOf(pids, 1);
+        const alive = yield* eventually(isAlive(pids[0] ?? 0), (a) => !a);
+        assert.isFalse(alive);
+        // A configure after the death reaches nothing and changes nothing.
+        yield* nvml.configure({ intervalMs: 1000, needs: MEASURE_ALL });
+        yield* Effect.sleep('100 millis');
+        const gpus = yield* nvml.gpus;
+        assert.deepStrictEqual(gpus, []);
+        const vram = yield* nvml.procVram(4242);
+        assert.strictEqual(vram.size, 0);
+        // The fake received the start only, and was not started again.
+        const received = yield* ws.received;
+        const commands = yield* Effect.forEach(received, (line) => decodeCommand(line));
+        assert.deepStrictEqual(
+          Arr.map(commands, (c) => c.type),
+          ['start'],
+        );
+        const after = yield* ws.pids;
+        assert.lengthOf(after, 1);
+      }),
+    ),
+  );
+
   it.effect('a sampler exits when its stdin ends', () =>
     withFakes((ws) =>
       Effect.gen(function* () {

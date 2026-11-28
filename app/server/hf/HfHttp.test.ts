@@ -2,6 +2,7 @@ import { assert, describe, it } from '@effect/vitest';
 import { ConfigProvider, Effect, Layer, String as Str, Stream } from 'effect';
 import { HttpClientRequest } from 'effect/http';
 import { httpStub, later, proxiedEnvironment, until } from '../testing/llama.ts';
+import { connectStub } from '../testing/proxy.ts';
 import { HfHttp } from './HfHttp.ts';
 
 const decoder = new TextDecoder();
@@ -121,6 +122,21 @@ describe('HfHttp', () => {
       ]).pipe(withHfHttp({ HTTP_PROXY: proxy.url, HTTPS_PROXY: proxy.url, NO_PROXY: 'skipped.invalid' }));
       assert.deepStrictEqual(texts, ['proxy http://hub.invalid/api/models', 'direct', 'TransportError']);
       assert.deepStrictEqual(proxied, ['http://hub.invalid/api/models']);
+    }),
+  );
+
+  it.live('an https request goes to HTTPS_PROXY as a CONNECT of its host, a refused tunnel fails it (#124)', () =>
+    Effect.gen(function* () {
+      const proxy = yield* connectStub;
+      const errors = yield* Effect.all([
+        textOf('https://hub.invalid/api/models'),
+        textOf('https://cdn.invalid:8443/file'),
+        textOf('https://skipped.invalid/'),
+      ]).pipe(withHfHttp({ HTTPS_PROXY: proxy.url, NO_PROXY: 'skipped.invalid' }));
+      assert.deepStrictEqual(errors, ['TransportError', 'TransportError', 'TransportError']);
+      // The NO_PROXY host went direct (and found no such host): no tunnel asked for it.
+      assert.deepStrictEqual(proxy.connects(), ['hub.invalid:443', 'cdn.invalid:8443']);
+      assert.strictEqual(proxy.requests(), 0);
     }),
   );
 

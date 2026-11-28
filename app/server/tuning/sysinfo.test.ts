@@ -4,7 +4,9 @@ import {
   Array as Arr,
   ConfigProvider,
   Context,
+  Deferred,
   Effect,
+  Fiber,
   FileSystem,
   Layer,
   Option,
@@ -14,6 +16,8 @@ import {
   String as Str,
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
+import { TestClock } from 'effect/testing';
+import { pidAlive } from '../testing/llama.ts';
 import { fsTypeOf, gfxName, kfdBusId, largestBar, readHipTargets, readSys, resolveBinary } from './sysinfo.ts';
 import { TuningMemo } from './TuningMemo.ts';
 
@@ -268,6 +272,42 @@ describe('sysinfo', () => {
         yield* fs.utimes(lib, 0, 2_000);
         const rebuilt = yield* readSys({ ...options, hipTargets: memo.hipTargets });
         assert.deepStrictEqual(rebuilt.hipTargets, []);
+      }),
+    ),
+  );
+
+  it.effect('a git log that never answers gives no build date after 5 s, and its process is gone (#124)', () =>
+    fresh(
+      Effect.gen(function* () {
+        const { fs, at, write } = yield* workspace;
+        const binary = yield* write('llama.cpp/build/bin/llama-server', '#!/bin/sh\n', 0o755);
+        // A checkout is found by its `.git` alone: `git` itself is the program below.
+        yield* fs.makeDirectory(at('llama.cpp/.git'));
+        const platform = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const spawned = yield* Deferred.make<number>();
+        // `git` runs as a `sleep 60` that says nothing; any other program as it is.
+        const silentGit = ChildProcessSpawner.make((command) =>
+          ChildProcess.isStandardCommand(command) && command.command === 'git'
+            ? platform
+                .spawn(ChildProcess.make('sleep', ['60'], command.options))
+                .pipe(Effect.tap((handle) => Deferred.succeed(spawned, handle.pid)))
+            : platform.spawn(command),
+        );
+        const reading = yield* readSys({
+          procRoot: at('proc'),
+          sysRoot: at('sys'),
+          binary,
+          modelPath: null,
+          logLines: NO_LOGS,
+        }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, silentGit), Effect.forkChild);
+        const pid = yield* Deferred.await(spawned);
+        yield* TestClock.adjust('4900 millis');
+        assert.isUndefined(reading.pollUnsafe());
+        yield* TestClock.adjust('100 millis');
+        const readings = yield* Fiber.join(reading);
+        assert.strictEqual(readings.buildDate, null);
+        // The timeout closed the program's scope, which waited for its exit.
+        assert.isFalse(pidAlive(pid));
       }),
     ),
   );

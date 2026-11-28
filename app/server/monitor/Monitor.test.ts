@@ -7,6 +7,7 @@ import {
   Clock,
   ConfigProvider,
   Context,
+  Deferred,
   Duration,
   Effect,
   Exit,
@@ -105,6 +106,8 @@ interface Options {
   readonly buildDelay?: Duration.Input;
   /** How long the monitor waits for its collectors. */
   readonly collectorsWait?: Duration.Input;
+  /** The wait before a model disk lookup that missed runs again (30 s). */
+  readonly modelDiskRetry?: Duration.Input;
 }
 
 /** The settings of the test: every 250 ms, 30 s of history (120 points), NVML off. */
@@ -141,7 +144,7 @@ const monitorLayer = Effect.fnUntraced(function* (options: Options) {
   const delay = options.buildDelay;
   const collectors = delay === undefined ? changed : Layer.unwrap(Effect.as(Effect.sleep(delay), changed));
   const monitorLive = Monitor.layerWith({
-    modelDiskRetry: '30 seconds',
+    modelDiskRetry: options.modelDiskRetry ?? '30 seconds',
     appsEvery: 5,
     collectors,
     ...(options.collectorsWait === undefined ? {} : { collectorsWait: options.collectorsWait }),
@@ -416,6 +419,119 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         }),
       );
       yield* stopFake(pid);
+    }),
+  );
+
+  it.effect('a model disk lookup that missed runs again only after the retry delay (#124)', () =>
+    Effect.gen(function* () {
+      const lookups = yield* Ref.make<ReadonlyArray<number>>([]);
+      const missing = (collectors: Collectors['Service']): Collectors['Service'] => ({
+        ...collectors,
+        disk: Effect.map(
+          collectors.disk,
+          Option.map(
+            Struct.assign({
+              resolveModelDisk: () =>
+                Clock.currentTimeMillis.pipe(
+                  Effect.flatMap((at) => Ref.update(lookups, Arr.append(at))),
+                  Effect.andThen(Effect.succeedNone),
+                ),
+            }),
+          ),
+        ),
+      });
+      const pid = yield* startFake;
+      // At 250 ms a tick: a miss on the first tick is tried again on the fourth (750 ms), not before.
+      yield* withMonitor({ collectors: missing, modelDiskRetry: '600 millis' }, () =>
+        Effect.gen(function* () {
+          const snapshots = yield* Effect.forEach(Arr.range(1, 8), () => next());
+          for (const s of snapshots) assert.isNull(s.disk?.model);
+          const at = yield* Ref.get(lookups);
+          assert.isAtLeast(at.length, 2);
+          assert.isAtMost(at.length, 3);
+          for (const [before, after] of Arr.zip(at, Arr.drop(at, 1))) {
+            assert.isAtLeast(after - before, 600);
+            // The first tick past the delay: one interval later at most, with some slack for a loaded machine.
+            assert.isBelow(after - before, 600 + 250 + 250);
+          }
+        }),
+      );
+      yield* stopFake(pid);
+    }),
+  );
+
+  it.effect(
+    "with nvidia-smi, the VRAM per card is refreshed and awaited on a pid's first tick, then in the background every 5th tick (#124)",
+    () =>
+      Effect.gen(function* () {
+        /** The ticks begun so far: each tick reads the system collector once, before the cards. */
+        const ticks = yield* Ref.make(0);
+        /** The tick of each refresh. */
+        const refreshes = yield* Ref.make<ReadonlyArray<number>>([]);
+        const firstHeld = yield* Deferred.make<void>();
+        const counted = (collectors: Collectors['Service']): Collectors['Service'] => ({
+          ...collectors,
+          system: Effect.tap(collectors.system, () => Ref.update(ticks, (n) => n + 1)),
+          nvidia: {
+            ...collectors.nvidia,
+            refreshApps: Effect.gen(function* () {
+              const tick = yield* Ref.get(ticks);
+              const all = yield* Ref.updateAndGet(refreshes, Arr.append(tick));
+              // The first one waits for the test; the second never ends.
+              if (all.length === 1) yield* Deferred.await(firstHeld);
+              else if (all.length === 2) return yield* Effect.never;
+            }),
+          },
+        });
+        const pid = yield* startFake;
+        yield* withMonitor({ collectors: counted }, () =>
+          Effect.gen(function* () {
+            yield* Ref.get(refreshes).pipe(
+              Effect.repeat({ until: (r) => r.length === 1, schedule: Schedule.spaced('20 millis') }),
+              Effect.timeout('3 seconds'),
+            );
+            // The first tick waits for its refresh: two intervals later, no snapshot and no other tick.
+            yield* Effect.sleep('600 millis');
+            const held = yield* Published.use((published) => Queue.size(published));
+            assert.strictEqual(held, 0);
+            const begun = yield* Ref.get(ticks);
+            assert.strictEqual(begun, 1);
+            yield* Deferred.succeed(firstHeld, undefined);
+            // The 5th tick's refresh never ends: the ticks come all the same.
+            const snapshots = yield* Effect.forEach(Arr.range(1, 11), () => next());
+            assert.deepStrictEqual(
+              Arr.map(snapshots, (s) => s.tick),
+              Arr.range(1, 11),
+            );
+            const at = yield* Ref.get(refreshes);
+            assert.deepStrictEqual(at, [1, 5, 10]);
+          }),
+        );
+        yield* stopFake(pid);
+      }),
+  );
+
+  it.effect('a change refused before the collectors are up, then refused by them, is logged as a warning (#124)', () =>
+    Effect.gen(function* () {
+      const refuse = (collectors: Collectors['Service']): Collectors['Service'] => ({
+        ...collectors,
+        configure: () => Effect.fail(CollectorsNotApplied.make({ message: 'refused' })),
+      });
+      const warnings: Array<unknown> = [];
+      const logger = Logger.make(({ logLevel, message }) => {
+        if (logLevel === 'Warn') warnings.push(message);
+      });
+      yield* withMonitor({ collectors: refuse, buildDelay: '800 millis', collectorsWait: '200 millis' }, (monitor) =>
+        Effect.gen(function* () {
+          yield* SettingsRepo.use((repo) => repo.patch({ historySeconds: 60 }));
+          const early = yield* Effect.flip(monitor.configure);
+          assert.strictEqual(early.message, 'the collectors are not up yet');
+          // Once up, they refuse the change: the ticks start on the settings they started with.
+          const first = yield* next('3 seconds');
+          assert.deepStrictEqual(first.history, { intervalMs: 250, capacity: 120 });
+        }),
+      ).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
+      assert.deepStrictEqual(warnings, [['the collectors could not apply the stored settings: refused']]);
     }),
   );
 

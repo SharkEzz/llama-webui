@@ -17,6 +17,7 @@ import {
   Deferred,
   type Duration,
   Effect,
+  Exit,
   Fiber,
   FileSystem,
   Layer,
@@ -37,12 +38,13 @@ import { Shutdown } from '../runtime/Shutdown.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
-import { FAKE, freePort, httpStub } from '../testing/llama.ts';
+import { FAKE, freePort, httpStub, pidAlive } from '../testing/llama.ts';
 import { ServicesWithoutBench } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { BenchHardware } from './BenchHardware.ts';
 import { BenchRunner, makeThrottle } from './BenchRunner.ts';
 import { BenchRunsRepo } from './BenchRunsRepo.ts';
+import type { Gate } from './gate.ts';
 import { SweepsRepo } from './SweepsRepo.ts';
 
 /** What the runner published, in order. */
@@ -132,6 +134,8 @@ const withRunner =
       readonly hardware?: Effect.Effect<typeof HARDWARE>;
       /** How many times the runner's `finish` dies before it works. */
       readonly dyingFinish?: number;
+      /** A gate in place of the one on the supervisor. */
+      readonly gate?: Gate;
     } = {},
   ) =>
   <A, E, R>(test: Effect.Effect<A, E, R>) =>
@@ -141,6 +145,7 @@ const withRunner =
         pause: options.pause ?? '10 millis',
         stoppingTimeout: '60 seconds',
         liveThrottle: '250 millis',
+        ...(options.gate === undefined ? {} : { gate: options.gate }),
       }).pipe(
         Layer.provide(
           Layer.mergeAll(RecordingHub, hardwareLayer(options.hardware), dyingFinish(options.dyingFinish ?? 0)),
@@ -182,6 +187,14 @@ const startA = Effect.gen(function* () {
   yield* supervisor.start(cmd).pipe(Effect.orDie);
   yield* stateWhen((s) => s.kind === 'ready');
   return profile;
+});
+
+/** The pid of the server the supervisor runs; it dies on the test's failure when there is none. */
+const serverPid = Effect.gen(function* () {
+  const state = yield* (yield* Supervisor).state;
+  return state.kind === 'ready' || state.kind === 'starting'
+    ? state.pid
+    : yield* Effect.die(`no server: ${state.kind}`);
 });
 
 /** What the gate did: its stop, its restarts and their failures, from the ring. */
@@ -942,6 +955,154 @@ describe('BenchRunner', () => {
       const final = yield* sweepOfId(sweep.id);
       assert.strictEqual(final.status, 'done');
       assert.isNotNull(final.finishedAt);
+    }).pipe(withRunner(), fresh),
+  );
+
+  it.live('a run shows stopping-server while the gate stops llama-server, then moves on (#124)', () =>
+    Effect.gen(function* () {
+      const ring = yield* LogRing;
+      const supervisor = yield* Supervisor;
+      // llama-server ignores SIGTERM: the gate's stop lasts until the supervisor's SIGKILL, 1 s later.
+      yield* useFake({ FAKE_IGNORE_TERM: '1' });
+      yield* startA;
+      const stopped = yield* serverPid;
+      yield* startBench;
+      yield* runEnded;
+      const all = yield* progress;
+      const lives = Arr.filter(all, (l): l is BenchLive => l !== null);
+      assert.strictEqual(lives[0]?.phase, 'stopping-server');
+      const after = Arr.dropWhile(lives, (l) => l.phase === 'stopping-server');
+      assert.isTrue(Arr.some(after, (l) => l.phase === 'prompt'));
+      assert.isFalse(Arr.some(after, (l) => l.phase === 'stopping-server'));
+      const last = yield* lastRun;
+      assert.strictEqual(last.status, 'ok');
+      const ringed = yield* ring.since(0);
+      const lines = Arr.map(ringed, (line) => line.text);
+      assert.include(lines, '[llama-webui] not stopped after 1000 ms, SIGKILL');
+      assert.isFalse(pidAlive(stopped));
+      yield* gateWas(STOP_AND_RESTART);
+      // The restarted server ignores SIGTERM too: stopped here, and dead.
+      yield* stateWhen((s) => s.kind === 'ready');
+      const restarted = yield* serverPid;
+      yield* supervisor.stop;
+      assert.isFalse(pidAlive(restarted));
+    }).pipe(withRunner(), fresh),
+  );
+
+  it.live('a start interrupted right after the gate is taken releases the gate (#124)', () =>
+    Effect.gen(function* () {
+      const taken = yield* Deferred.make<void>();
+      const latch = yield* Deferred.make<void>();
+      const held = yield* Ref.make(false);
+      const releases = yield* Ref.make(0);
+      // A gate whose acquire takes it, then waits on the latch uninterruptibly: an interruption of the request lands
+      // just after the acquire, between two steps of its fiber.
+      const gate: Gate = {
+        held: Ref.get(held),
+        stopping: Effect.succeed(false),
+        stoppedCommand: Effect.succeedNone,
+        acquire: () =>
+          Effect.uninterruptible(
+            Ref.set(held, true).pipe(
+              Effect.andThen(Deferred.succeed(taken, undefined)),
+              Effect.andThen(Deferred.await(latch)),
+            ),
+          ),
+        ready: Effect.void,
+        release: () => Ref.update(releases, (n) => n + 1).pipe(Effect.andThen(Ref.set(held, false))),
+      };
+      const run = Effect.gen(function* () {
+        const runner = yield* BenchRunner;
+        const runs = yield* BenchRunsRepo;
+        yield* useFake();
+        const request = yield* Effect.forkChild(startBench);
+        yield* Deferred.await(taken);
+        const busy = yield* runner.busy;
+        assert.isTrue(busy);
+        // Started at once: the interruption is sent before the latch opens.
+        const interrupting = yield* Effect.forkChild(Fiber.interrupt(request), { startImmediately: true });
+        yield* Deferred.succeed(latch, undefined);
+        yield* Fiber.join(interrupting);
+        const ended = yield* Fiber.await(request);
+        assert.isTrue(Exit.hasInterrupts(ended));
+        const released = yield* Ref.get(releases);
+        assert.strictEqual(released, 1);
+        const free = yield* runner.busy;
+        assert.isFalse(free);
+        const saved = yield* runs.list({
+          kind: Option.none(),
+          status: Option.none(),
+          modelPath: Option.none(),
+          sweep: 'all',
+          limit: 10,
+        });
+        assert.deepStrictEqual(saved, []);
+      });
+      yield* withRunner({ gate })(run);
+    }).pipe(fresh),
+  );
+
+  it.live('a sweep moves on to its next item after one item is cancelled (#124)', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      yield* useFake({ FAKE_BENCH_STEP_MS: '200' });
+      yield* startA;
+      const sweep = yield* startSweepOf([1, 2]);
+      yield* until(Effect.map(benchRuns, (runs) => Arr.some(runs, (r) => r.status === 'running')));
+      const started = yield* benchRuns;
+      const running = Arr.findFirst(started, (r) => r.status === 'running');
+      if (Option.isNone(running)) return assert.fail('a running item expected');
+      yield* runner.cancel(running.value.id);
+      yield* sweepEnded;
+      const items = yield* itemsOf(sweep.id);
+      assert.deepStrictEqual(
+        Arr.map(items, (r) => [r.id, r.status]),
+        [
+          [running.value.id, 'cancelled'],
+          [items[1]?.id, 'ok'],
+        ],
+      );
+      const final = yield* sweepOfId(sweep.id);
+      assert.strictEqual(final.status, 'done');
+      yield* gateWas(STOP_AND_RESTART);
+      const busy = yield* runner.busy;
+      assert.isFalse(busy);
+      yield* stateWhen((s) => s.kind === 'ready');
+    }).pipe(withRunner(), fresh),
+  );
+
+  it.live('a failed restart at the end of a sweep is recorded on its last item only (#124)', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      const profiles = yield* ProfilesRepo;
+      yield* useFake({ FAKE_BENCH_STEP_MS: '20' });
+      const a = yield* startA;
+      const sweep = yield* startSweepOf([1, 2]);
+      // The profile now names a port another service holds: the restart fails.
+      const other = yield* httpStub((_, res) => res.end('not llama'));
+      yield* profiles
+        .update({
+          id: a.id,
+          input: { name: 'A', model: 'm.gguf', host: '127.0.0.1', port: other.port, args: [], env: {} },
+        })
+        .pipe(Effect.orDie);
+      yield* sweepEnded;
+      const items = yield* itemsOf(sweep.id);
+      assert.deepStrictEqual(
+        Arr.map(items, (r) => r.status),
+        ['ok', 'ok'],
+      );
+      assert.isNull(items[0]?.error);
+      assert.strictEqual(
+        items[1]?.error,
+        `could not restart llama-server: port ${other.port} is in use by another service`,
+      );
+      const last = yield* lastRun;
+      assert.deepStrictEqual([last.id, last.error], [items[1]?.id, items[1]?.error]);
+      const final = yield* sweepOfId(sweep.id);
+      assert.strictEqual(final.status, 'done');
+      const busy = yield* runner.busy;
+      assert.isFalse(busy);
     }).pipe(withRunner(), fresh),
   );
 });

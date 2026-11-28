@@ -142,7 +142,8 @@ describe('SettingsRepo', () => {
   `FAKE_BENCH`), `freePort`, `pidAlive(pid)`, `httpStub` (a `node:http` server that answers what the test says),
   `chatStub` (a fake `llama-server` stream the test feeds chunk by chunk) and `fakeOutside` (a `llama-server` started
   by someone else). `app/server/testing/hub.ts` is a fake Hugging Face Hub and CDN, with `Range` support and scripted
-  faults. A test that starts a process checks that it is dead at the end.
+  faults, and `app/server/testing/proxy.ts`'s `connectStub` a proxy that records each `CONNECT` and refuses the
+  tunnel. A test that starts a process checks that it is dead at the end.
 - **Ports**: a test takes a free port, never 7860, 7861 or 8080 (where the user's own app and `llama-server` run):
   `freePort` draws it from a block of ports of its Vitest worker, below Linux's ephemeral range, so that neither
   another worker nor an outgoing connection takes it before the program listens on it.
@@ -299,6 +300,7 @@ Environment variables shape its behavior:
 | `FAKE_TAIL`                             | Writes this last line without its newline                                                       |
 | `FAKE_ECHO_ENV`                         | `A,B`: logs one line per variable, with its value as the fake sees it                           |
 | `FAKE_CRASH_ON_PREDICT`                 | Dies mid-request on a `/completion` with that `n_predict`                                       |
+| `FAKE_COMPLETION_DELAY_MS`              | Answers `/completion` that many ms late                                                         |
 | `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`      | Reported prompt and generation speeds, draft statistics when `1`                                |
 | `FAKE_N_CTX`                            | Simulated context size (default 40192 tokens)                                                   |
 | `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES` | Delay between streamed chunks (default 60 ms), extra reply lines                                |

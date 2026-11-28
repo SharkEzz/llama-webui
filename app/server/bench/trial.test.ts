@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, type LoadProgress, type Profile } from '@llama-webui/
 import { Array as Arr, type Duration, Effect, Layer, Option, Ref, type Scope } from 'effect';
 import { health } from '../llama/probes.ts';
 import { buildCommand } from '../supervisor/command.ts';
-import { FAKE, fakeOutside, freePort } from '../testing/llama.ts';
+import { FAKE, fakeOutside, freePort, pidAlive } from '../testing/llama.ts';
 import { ServicesWithoutBench } from '../testing/services.ts';
 import { runTrial } from './trial.ts';
 
@@ -30,7 +30,15 @@ const fakeOn = (port: number, env: Record<string, string>) => {
   return buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
 };
 
-const trialOf = (cmd: Effect.Success<ReturnType<typeof fakeOn>>, loadTimeout?: Duration.Input) =>
+/** The trial of `cmd`, its bounds shortened when given; `pid` gets the pid of the llama-server it spawns. */
+const trialOf = (
+  cmd: Effect.Success<ReturnType<typeof fakeOn>>,
+  options: {
+    readonly loadTimeout?: Duration.Input;
+    readonly requestTimeout?: Duration.Input;
+    readonly pid?: Ref.Ref<number | null>;
+  } = {},
+) =>
   runTrial({
     cmd,
     p: 16,
@@ -38,12 +46,20 @@ const trialOf = (cmd: Effect.Success<ReturnType<typeof fakeOn>>, loadTimeout?: D
     r: 1,
     onPhase: () => Effect.void,
     onLine: () => Effect.void,
-    onSpawn: () => Effect.void,
+    onSpawn: (program) => (options.pid === undefined ? Effect.void : Ref.set(options.pid, program.handle.pid)),
     say: () => Effect.void,
     killTimeout: '1 second',
     healthPoll: '50 millis',
-    ...(loadTimeout === undefined ? {} : { loadTimeout }),
+    ...(options.loadTimeout === undefined ? {} : { loadTimeout: options.loadTimeout }),
+    ...(options.requestTimeout === undefined ? {} : { requestTimeout: options.requestTimeout }),
   });
+
+/** The llama-server of a trial that ended is dead. */
+const deadAfter = Effect.fnUntraced(function* (pid: Ref.Ref<number | null>) {
+  const spawned = yield* Ref.get(pid);
+  assert.isNotNull(spawned);
+  assert.isFalse(pidAlive(spawned));
+});
 
 describe('trial', () => {
   it.live('a trial on a port already in use fails with port <port> is used by another server', () =>
@@ -114,10 +130,37 @@ describe('trial', () => {
       Effect.gen(function* () {
         const port = yield* freePort;
         const cmd = yield* fakeOn(port, { FAKE_SSE: '1', FAKE_SSE_STALL: 'events', FAKE_LOAD_MS: '50' });
-        const measured = yield* trialOf(cmd, '1 second');
+        const measured = yield* trialOf(cmd, { loadTimeout: '1 second' });
         assert.isAbove(measured.tg.tps, 0);
         const after = yield* health({ port });
         assert.deepStrictEqual(after, Option.none());
+      }),
+    ),
+  );
+
+  it.live('a server still loading after loadTimeout fails with loading > <bound> and is stopped (#124)', () =>
+    fresh(
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        const cmd = yield* fakeOn(port, { FAKE_LOAD_MS: '5000' });
+        const pid = yield* Ref.make<number | null>(null);
+        const failed = yield* Effect.flip(trialOf(cmd, { loadTimeout: '300 millis', pid }));
+        assert.strictEqual(failed.message, 'loading > 300 ms');
+        yield* deadAfter(pid);
+      }),
+    ),
+  );
+
+  it.live('a request unanswered after requestTimeout fails with no response after <bound> and is stopped (#124)', () =>
+    fresh(
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        // The warm-up (/completion) answers after 5 s.
+        const cmd = yield* fakeOn(port, { FAKE_LOAD_MS: '50', FAKE_COMPLETION_DELAY_MS: '5000' });
+        const pid = yield* Ref.make<number | null>(null);
+        const failed = yield* Effect.flip(trialOf(cmd, { requestTimeout: '300 millis', pid }));
+        assert.strictEqual(failed.message, 'no response after 300 ms');
+        yield* deadAfter(pid);
       }),
     ),
   );
